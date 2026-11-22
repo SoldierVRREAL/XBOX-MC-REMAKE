@@ -133,6 +133,9 @@ table.res{border-collapse:collapse;margin:8px auto;font-size:22px}table.res td{p
 #tInv{right:12vh;top:2vh;width:8vh;height:8vh}#tDrop{right:22vh;top:2vh;width:8vh;height:8vh}#tPause{right:2vh;top:2vh;width:8vh;height:8vh}
 #tReady{right:21vh;bottom:18vh}#tList{right:4vh;bottom:26vh}
 body.touch #clickResume{display:none!important}
+#xhair{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;mix-blend-mode:difference;z-index:3}
+#xhair i,#xhair b{position:absolute;background:#fff;display:block}#xhair i{left:-9px;top:-1px;width:18px;height:2px}#xhair b{left:-1px;top:-9px;width:2px;height:18px}
+#chatBar{position:fixed;left:4px;right:4px;bottom:4px;z-index:6}#chatIn{width:100%;box-sizing:border-box;background:rgba(0,0,0,.5);border:0;color:#fff;font:20px 'VT323',monospace;padding:3px 6px;outline:none}
 .lbt{border-collapse:collapse}.lbt td{padding:calc(var(--S)*2px) calc(var(--S)*6px)}.lbt tr:first-child td{border-bottom:calc(var(--S)*1px) solid #8b8b8b}
 </style>
 </head>
@@ -204,14 +207,12 @@ body.touch #clickResume{display:none!important}
 <div id="onlinePanel" class="screen hidden"><div class="panel">
   <h3>Play Online</h3>
   <div class="form">
-    <label for="n_kind">Connection</label><select id="n_kind"><option value="relay">Internet (built-in relay, no setup)</option><option value="photon">Photon Realtime (your AppId)</option><option value="local">Same browser, other tabs (test)</option></select>
-    <label for="n_app" class="ph">Photon AppId</label><input class="ph" id="n_app" type="password" placeholder="Realtime AppId from dashboard.photonengine.com">
-    <label for="n_region" class="ph">Region</label><select class="ph" id="n_region"><option>us</option><option>usw</option><option>eu</option><option>asia</option><option>jp</option><option>au</option><option>sa</option><option>kr</option><option>in</option></select>
+    <label for="n_kind">Connection</label><select id="n_kind"><option value="relay">Internet</option><option value="local">Same browser, other tabs (test)</option></select>
     <label for="n_room">Room code</label><input id="n_room" type="text" maxlength="24" value="battle">
-    <label for="n_sdk" class="ph">Photon SDK URL (optional)</label><input class="ph" id="n_sdk" type="text" placeholder="photon.min.js next to this page">
+    <label for="n_server">Game server (optional)</label><input id="n_server" type="text" maxlength="120" placeholder="e.g. my-battle.onrender.com or 192.168.1.20:8080">
   </div>
-  <div class="note" id="relayNote">Everyone types the same room code and presses Connect. The built-in relay needs no account: it uses free public servers, so pick an unusual room code to keep strangers out. The first player in a room hosts: it runs the bots, chests and round timer.</div>
-  <div class="note ph">Photon needs your own free Realtime AppId and the Photon JavaScript SDK (put <code>photon.min.js</code> beside this page, or give its URL). Hosted pages work; this preview blocks outside connections, so use "Same browser, other tabs" here. The first player in a room hosts: it runs the bots, chests and round timer.</div>
+  <div class="note">Everyone types the same room code and presses Connect. The first player in a room hosts: it runs the bots, chests and round timer.
+  If you run the game's own server (<code>node server/server.js</code>), players on it connect to it automatically, or type its address above. Without one, the game uses free public relays, so pick an unusual room code.</div>
   <div id="status"></div>
   <div class="row"><button class="btn small" id="connectBtn">Connect</button><button class="btn small" id="onlineClose">Back</button></div>
 </div></div>
@@ -238,6 +239,8 @@ body.touch #clickResume{display:none!important}
 <div id="pause" class="screen hidden"><div class="lhead" id="pauseTitle" data-t="Game menu" style="margin-bottom:calc(var(--S)*14px)">Game menu</div><div class="menuList" style="margin-top:0">
   <button class="lbtn" id="resumeBtn">Back to Game</button><button class="lbtn" id="pauseOpts">Options...</button><button class="lbtn" id="leaveBtn">Leave Game</button></div></div>
 <div id="jOpt" class="screen hidden jscreen"><div id="jTitle"></div><div id="jGrid"></div><div id="jFoot"></div></div>
+<div id="xhair" class="hidden"><i></i><b></b></div>
+<div id="chatBar" class="hidden"><input id="chatIn" type="text" maxlength="100" autocomplete="off" aria-label="Chat message"></div>
 <div id="touchUI" class="hidden"><div id="tLook"></div><div id="tStickZone"><div id="tStickBase"><div id="tStickKnob"></div></div></div>
   <button class="tb" id="tPause" aria-label="Pause"><b>II</b></button><button class="tb" id="tInv" aria-label="Inventory"><b>E</b></button><button class="tb" id="tDrop" aria-label="Drop item"><b>Q</b></button>
   <button class="tb" id="tSneak" aria-label="Sneak"><b>&#8615;</b></button><button class="tb" id="tSprint" aria-label="Sprint"><b>&#187;</b></button><button class="tb" id="tUse" aria-label="Use"><b>&#9995;</b></button>

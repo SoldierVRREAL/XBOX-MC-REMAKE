@@ -145,6 +145,19 @@ function rebuildItemAtlas(){
   for(const k in ITEMS){const cx=(i%ITEM_COLS)*ITEM_CELL,cy=Math.floor(i/ITEM_COLS)*ITEM_CELL;g.drawImage(ICONS[k],cx,cy,ITEM_CELL,ITEM_CELL);itemSlot[k]=[cx,cy];i++;}
   if(itemTex)gl.deleteTexture(itemTex);itemTex=mkTex(itemAtlas);for(const k in itemMesh)gl.deleteBuffer(itemMesh[k].buf);itemMesh={};
 }
+// block items render as little 3D blocks (their real shape), everything else as extruded sprites
+const blockItemMesh={};
+function heldMesh(id){const it=ITEMS[id];const b=it&&it.type==='block'?it.block:0;const D=b&&BD[b];
+  if(!D||D.cross||D.liquid||!D.render&&!D.tileEnt||b===B.CHEST)return {mesh:getItemMesh(id),tex:itemTex,block:false};
+  if(!blockItemMesh[b]){const o=[];const boxes=D.fence?[[6/16,0,6/16,10/16,1,10/16]]:D.shape||[[0,0,0,1,1,1]];
+    const uvT=(t,u,v)=>[((t%ACOLS)+.002+u*.996)/ACOLS,(Math.floor(t/ACOLS)+.002+v*.996)/ACOLS];
+    for(const bx of boxes){const [x0,y0,z0,x1,y1,z1]=bx;const tile=f=>bx[6]!=null?bx[6]:f===2?D.top:f===3?D.bottom:f===4?(D.front!=null?D.front:D.side):D.side;
+      const faces=[[[x1,y1,z1],[x1,y1,z0],[x1,y0,z0],[x1,y0,z1],[1,0,0],0],[[x0,y1,z0],[x0,y1,z1],[x0,y0,z1],[x0,y0,z0],[-1,0,0],1],[[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1],[0,1,0],2],
+        [[x0,y0,z1],[x1,y0,z1],[x1,y0,z0],[x0,y0,z0],[0,-1,0],3],[[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x1,y0,z0],[0,0,-1],4],[[x0,y1,z1],[x1,y1,z1],[x1,y0,z1],[x0,y0,z1],[0,0,1],5]];
+      for(const [P0,P1,P2,P3,n,fi] of faces){const t=tile(fi);const uv=q=>{if(fi<2)return uvT(t,fi===0?1-q[2]:q[2],1-q[1]);if(fi<4)return uvT(t,q[0],fi===2?q[2]:1-q[2]);return uvT(t,fi===4?1-q[0]:q[0],1-q[1]);};
+        for(const q of [P0,P1,P2,P0,P2,P3]){o.push(q[0]-.5,q[1]-.5,q[2]-.5,...n,...uv(q));}}}
+    blockItemMesh[b]=meshFrom(o);}
+  return {mesh:blockItemMesh[b],tex:atlasTex,block:true};}
 function getItemMesh(id){
   if(itemMesh[id])return itemMesh[id];const [cx,cy]=itemSlot[id];const data=itemAtlas.getContext('2d').getImageData(cx,cy,ITEM_CELL,ITEM_CELL).data;
   const N=ITEM_CELL,A=(x,y)=>x>=0&&y>=0&&x<N&&y<N&&data[(y*N+x)*4+3]>40;const o=[];const W=itemAtlas.width,H=itemAtlas.height;const th=1/N;const S=1/N;

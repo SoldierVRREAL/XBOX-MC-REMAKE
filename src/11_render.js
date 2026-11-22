@@ -92,6 +92,9 @@ function camera(){
       const back=[Math.sin(t.yaw)*4,0,Math.cos(t.yaw)*4];let cp=[t.pos[0]+back[0],t.pos[1]+2.6,t.pos[2]+back[2]];const e=[t.pos[0],t.pos[1]+1.6,t.pos[2]];const d=[cp[0]-e[0],cp[1]-e[1],cp[2]-e[2]],L=Math.hypot(...d);
       const h=raycastBlock(e,[d[0]/L,d[1]/L,d[2]/L],L);if(h){const k=Math.max(.3,h.t-.3)/L;cp=[e[0]+d[0]*k,e[1]+d[1]*k,e[2]+d[2]*k];}camPos=cp;camYaw=t.yaw;camPitch=-.3;return;}spectate.mode='bat';}
   spectate.target=null;const rp=(player.alive&&player.rpos)||player.pos;camPos=[rp[0],rp[1]+eyeH(player),rp[2]];camYaw=player.yaw;camPitch=player.pitch;
+  // F5: third person behind (4 blocks, pulled in by walls) or in front looking back, like EntityRenderer.orientCamera
+  if(camMode&&player.alive){const e=camPos.slice(),cp=Math.cos(player.pitch);let d=[Math.sin(player.yaw)*cp,-Math.sin(player.pitch),Math.cos(player.yaw)*cp];if(camMode===2)d=d.map(v=>-v);
+    let dd=4;const h=raycastBlock(e,d,4);if(h)dd=Math.max(.2,h.t-.2);camPos=[e[0]+d[0]*dd,e[1]+d[1]*dd,e[2]+d[2]*dd];if(camMode===2){camYaw=player.yaw+Math.PI;camPitch=-player.pitch;}}
 }
 let skyCol=[.53,.74,.96];
 function render(){
@@ -116,6 +119,7 @@ function render(){
     gl.uniform1f(PB.u.fogN,0);gl.uniform1f(PB.u.fogF,fogF*1.6);box(chain(M4.tr(camPos[0],camPos[1]+16,camPos[2]),M4.sc(1400,.01,1400)),info.sky);
     gl.uniform3fv(PB.u.fogC,info.fog);box(chain(M4.tr(camPos[0],camPos[1]-24,camPos[2]),M4.sc(1400,.01,1400)),[info.fog[0]*.55,info.fog[1]*.6,info.fog[2]*.75]);
     gl.uniform1f(PB.u.lit,1);gl.enable(gl.DEPTH_TEST);}
+  drawSunMoon();
   // world (opaque + cutout)
   gl.useProgram(PW.p);gl.uniformMatrix4fv(PW.u.vp,false,VP);gl.uniform3fv(PW.u.cam,camPos);gl.uniform3fv(PW.u.fogC,curFog.c);gl.uniform1f(PW.u.fogN,curFog.n);gl.uniform1f(PW.u.fogF,curFog.f);gl.uniform1f(PW.u.alpha,1);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,atlasTex);gl.uniform1i(PW.u.tex,0);
@@ -125,26 +129,27 @@ function render(){
   gl.disableVertexAttribArray(PW.a.t);gl.disableVertexAttribArray(PW.a.s);
   // entities
   useTex(VP,camPos);
-  for(const e of ents){if(e===player&&player.alive&&spectate.mode!=='follow')continue;if(e===player&&!player.alive&&spectate.mode==='bat')continue;
+  for(const e of ents){if(e===player&&player.alive&&spectate.mode!=='follow'&&!camMode)continue;if(e===player&&!player.alive&&spectate.mode==='bat')continue;
     if(e.bat&&!e.alive){drawBat(e);continue;}if(!e.alive)continue;drawHumanoid(e);}
   // chests are tile-entity models (TileEntityChestRenderer), lid animated
   for(const c of chests.values()){if(getB(c.x,c.y,c.z)!==B.CHEST)continue;if(Math.hypot(c.x+.5-camPos[0],c.z+.5-camPos[2])>fogF+8)continue;
     if(c.rot==null)c.rot=chestFacing(c);const lid=c.lidPrev+(c.lid-c.lidPrev)*tickAlpha();const f=1-Math.pow(1-lid,3);
     setEntLight([c.x+.5,c.y+.5,c.z+.5]);const base=chain(M4.tr(c.x+.5,c.y,c.z+.5),M4.ry(c.rot));const M=MODELS.chest;
     drawMesh(M.base,base,CHEST_TEX);const lm=chain(base,M4.tr(0,9/16,7/16),M4.rx(f*Math.PI/2));drawMesh(M.lid,lm,CHEST_TEX);drawMesh(M.knob,lm,CHEST_TEX);}
+  drawShadows();useTex(VP,camPos);
   // dropped items and projectiles
-  for(const d of drops){const m=chain(M4.tr(d.pos[0],d.pos[1]+Math.sin(d.spin*1.5)*.08+.12,d.pos[2]),M4.ry(d.spin),M4.sc(.45,.45,.45));setEntLight(d.pos);drawMesh(getItemMesh(d.id),m,itemTex);}
+  for(const d of drops){const hm=heldMesh(d.id);const sc=hm.block?.25:.5;const m=chain(M4.tr(d.pos[0],d.pos[1]+Math.sin(d.spin*1.5)*.1+.1+sc/2,d.pos[2]),M4.ry(d.spin),M4.sc(sc,sc,sc));setEntLight(d.pos);drawMesh(hm.mesh,m,hm.tex);}
   for(const a of projs){if(a.kind==='splash'){setEntLight(a.pos);drawMesh(getItemMesh(a.pot),chain(M4.tr(...a.pos),M4.ry(perfT*8),M4.sc(.4,.4,.4)),itemTex);continue;}
     const l=Math.hypot(...a.vel)||1;const yw=Math.atan2(-a.vel[0],-a.vel[2]),pt=Math.asin(clamp(a.vel[1]/l,-1,1));setEntLight(a.pos);
     drawMesh(getItemMesh('arrow'),chain(M4.tr(...a.pos),M4.ry(yw),M4.rx(pt),M4.ry(Math.PI/2),M4.rz(-Math.PI/4),M4.sc(.7,.7,.7)),itemTex);}
   // particles, highlights, beacon beam, borders (solid colour)
   useBox(VP,camPos);
-  for(const p of particles)box(chain(M4.tr(...p.p),M4.sc(.08,.08,.08)),p.col);
+  drawParticles();useBox(VP,camPos);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.uniform1f(PB.u.lit,0);
   if(MATCH.mode==='br'&&MATCH.state==='play'&&player&&player.alive&&locked&&!chestOpen){const h=raycastBlock(eye(player),fwd(player),4.5);
     if(h){const pr=mining&&mining.x===h.x&&mining.y===h.y&&mining.z===h.z?mining.t/MINE_T[mining.b]:0;
       if(crackTex.length&&pr>0){useTex(VP,camPos);gl.uniform1f(PT.u.bright,1);drawMesh(crackCube,chain(M4.tr(h.x+.5,h.y+.5,h.z+.5),M4.sc(1.004,1.004,1.004)),crackTex[Math.min(9,Math.floor(pr*10))]);useBox(VP,camPos);gl.uniform1f(PB.u.lit,0);}
-      else box(chain(M4.tr(h.x+.5,h.y+.5,h.z+.5),M4.sc(1.006,1.006,1.006)),[0,0,0],.08+pr*.55);}}
+      drawSelection(h.x,h.y,h.z);}}
   // water (translucent) after opaque things
   gl.depthMask(false);gl.useProgram(PW.p);gl.uniform1f(PW.u.alpha,.99);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,atlasTex);if(!window.__noWater)for(const c of chunks){if(!vis(c)||!c.wcount)continue;bindW(c.wbuf);gl.drawArrays(gl.TRIANGLES,0,c.wcount);}
   gl.disableVertexAttribArray(PW.a.t);gl.disableVertexAttribArray(PW.a.s);
@@ -156,19 +161,34 @@ function render(){
     box(chain(M4.tr(cx,28,cz-h),M4.sc(h*2,80,.05)),col,a);box(chain(M4.tr(cx,28,cz+h),M4.sc(h*2,80,.05)),col,a);box(chain(M4.tr(cx-h,28,cz),M4.sc(.05,80,h*2)),col,a);box(chain(M4.tr(cx+h,28,cz),M4.sc(.05,80,h*2)),col,a);}
   gl.depthMask(true);gl.disable(gl.BLEND);gl.uniform1f(PB.u.lit,1);
   // first-person hand
-  if(player&&player.alive&&MATCH.state!=='menu'){gl.clear(gl.DEPTH_BUFFER_BIT);drawHand(M4.persp(70*Math.PI/180,W/H,.01,10));}
+  if(player&&player.alive&&MATCH.state!=='menu'&&!camMode&&!hideGui){gl.clear(gl.DEPTH_BUFFER_BIT);drawHand(M4.persp(70*Math.PI/180,W/H,.05,10),pre);}
   // underwater / lava tint
   drawHUD();
 }
 function setEntLight(p){const x=Math.floor(p[0]),z=Math.floor(p[2]),y=Math.floor(p[1]+.5);const a=lightAt(x,y,z),b=lightAt(x,y+1,z);const L=Math.max(a>>4,b>>4)<<4|Math.max(a&15,b&15);const v=Math.max(LB[(L>>4)&15]*(mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1),LB[L&15],mapInfo&&mapInfo.dark?.12:.2);gl.uniform1f(PT.u.bright,v);}
+// ModelBiped / ModelPlayer.setRotationAngles (1.8). Our parts are the vanilla model flipped by scale(-1,-1,1), so X and Y rotations change sign.
+function limbTick(e){const dts=dtFrame*20;const v=Math.hypot(e.vel[0],e.vel[2])/20;const tgt=Math.min(1,v*4);
+  e.limbAmt=(e.limbAmt||0)+(tgt-(e.limbAmt||0))*(1-Math.pow(.6,dts));e.limbSwing=(e.limbSwing||0)+e.limbAmt*dts;}
 function drawHumanoid(e){
-  const invis=e.effects.invis;const S=skinTex(e.skin);const M=S.slim?MODELS.slim:MODELS.wide;
-  const rp=e.rpos||e.pos;const by=e.bodyYaw==null?e.yaw:e.bodyYaw;const base=chain(M4.tr(rp[0],rp[1]-(e.sneak?.12:0),rp[2]),M4.ry(by),M4.sc(.9/1,.9,.9));const headTurn=e.yaw-by;
-  const sp=Math.min(1,Math.hypot(e.vel[0],e.vel[2])/4.3);const sw=Math.sin(e.walkT*2.2)*.75*sp;
-  const atk=e.swing>0?-Math.sin(e.swing*Math.PI)*1.6:0;const aim=e.using==='bow'?-Math.PI/2-e.pitch:0;const eat=(e.using==='eat'||e.using==='drink')?-1.2+Math.sin(e.useT*20)*.15:e.using==='block'?-.95:0;
-  const rA=aim||eat||(-sw+atk),lA=aim?aim:sw;
-  const idle=Math.sin(perfT*1.3+e.pos[0])*.05;const parts={head:chain(base,M4.tr(0,1.5,0),M4.ry(headTurn),M4.rx(-e.pitch)),body:chain(base,M4.tr(0,1.5,0)),rarm:chain(base,M4.tr(5/16,22/16,0),M4.rx(rA+idle*.5),M4.rz(aim?0:.05+idle)),larm:chain(base,M4.tr(-5/16,22/16,0),M4.rx(lA-idle*.5),M4.rz(-.05-idle)),
-    rleg:chain(base,M4.tr(1.9/16,.75,0),M4.rx(sw)),lleg:chain(base,M4.tr(-1.9/16,.75,0),M4.rx(-sw))};
+  const invis=e.effects.invis;const S=skinTex(e.skin);const M=S.slim?MODELS.slim:MODELS.wide;limbTick(e);
+  const rp=e.rpos||e.pos;const by=e.bodyYaw==null?e.yaw:e.bodyYaw;const base=chain(M4.tr(rp[0],rp[1]-(e.sneak?.125:0),rp[2]),M4.ry(by),M4.sc(.9375,.9375,.9375));
+  const headYaw=e.yaw-by,headPitch=-e.pitch;  // vanilla: positive pitch looks down
+  const ls=(e.limbSwing||0)*.6662,la=e.limbAmt||0;const age=perfT*20+(e.color||0)*7;
+  let rX=Math.cos(ls+Math.PI)*2*la*.5,lX=Math.cos(ls)*2*la*.5,rY=0,lY=0,rZ=0,lZ=0;const rlX=Math.cos(ls)*1.4*la,llX=Math.cos(ls+Math.PI)*1.4*la;
+  const held=e.inv[e.sel];if(held)rX=rX*.5-Math.PI/10;
+  if(e.using==='block'){rX=rX*.5-Math.PI*.3;rY=-Math.PI/6;}
+  if(e.using==='eat'||e.using==='drink'){rX=-1.2+Math.sin(e.useT*22)*.12;rY=-.3;}
+  let bodyY=0;const sw=e.swing>0?1-e.swing:-1;
+  if(sw>=0){bodyY=Math.sin(Math.sqrt(sw)*Math.PI*2)*.2;rY+=bodyY;lY+=bodyY;lX+=bodyY;let f=1-sw;f=f*f;f=f*f;f=1-f;const f1=Math.sin(f*Math.PI),f2=Math.sin(sw*Math.PI)*-(headPitch-.7)*.75;
+    rX-=f1*1.2+f2;rY+=bodyY*2;rZ+=Math.sin(sw*Math.PI)*-.4;}
+  if(e.sneak){rX+=.4;lX+=.4;}
+  rZ+=Math.cos(age*.09)*.05+.05;lZ-=Math.cos(age*.09)*.05+.05;rX+=Math.sin(age*.067)*.05;lX-=Math.sin(age*.067)*.05;
+  if(e.using==='bow'){rY=-.1+headYaw*-1;lY=.1+headYaw*-1+.4;rX=-Math.PI/2+headPitch;lX=-Math.PI/2+headPitch;rZ=0;lZ=0;}
+  const sk=e.sneak;const P=(x,y,z,X,Y,Z)=>[M4.tr(x/16,y/16,z/16),M4.rz(Z),M4.ry(-Y),M4.rx(-X)];  // vanilla pivot (y up from feet) + Z,Y,X rotation order
+  const body=chain(base,M4.tr(0,24/16,0),M4.ry(-bodyY),M4.rx(sk?-.5:0));
+  const parts={head:chain(base,...P(0,24-(sk?1:0),0,headPitch,-headYaw,0)),body,
+    rarm:chain(base,...P(5*Math.cos(bodyY),22-(S.slim?.5:0),5*Math.sin(bodyY),rX,rY,rZ)),larm:chain(base,...P(-5*Math.cos(bodyY),22-(S.slim?.5:0),-5*Math.sin(bodyY),lX,lY,lZ)),
+    rleg:chain(base,...P(1.9,12+(sk?3:0),sk?4:.1,rlX,0,0)),lleg:chain(base,...P(-1.9,12+(sk?3:0),sk?4:.1,llX,0,0))};
   setEntLight(e.pos);gl.uniform1f(PT.u.hurt,e.hurtT>0?1:0);
   if(!invis){for(const [m,ov] of [['head','hat'],['body','jacket'],['rarm','rsleeve'],['larm','lsleeve'],['rleg','rpants'],['lleg','lpants']]){drawMesh(M[m],parts[m],S.tex);drawMesh(M[ov],parts[m],S.tex);}}
   // armor layers
@@ -178,9 +198,16 @@ function drawHumanoid(e){
     if(i===2){drawMesh(A.body2,parts.body,T.l2);drawMesh(A.rleg2,parts.rleg,T.l2);drawMesh(A.lleg2,parts.lleg,T.l2);}
     if(i===3){drawMesh(A.rleg,parts.rleg,T.l1);drawMesh(A.lleg,parts.lleg,T.l1);}
     gl.uniform4f(PT.u.tint,1,1,1,1);});
-  // held item
-  const s=e.inv[e.sel];if(s){const it=ITEMS[s.id];const tool=it.type==='weapon'||it.type==='bow';
-    const m=chain(parts.rarm,M4.tr(-.03,-.62,-.12),M4.rx(tool?-Math.PI/2+.4:-Math.PI/2),M4.ry(Math.PI/2),M4.rz(tool?-Math.PI/4:0),M4.sc(tool?.7:.45,tool?.7:.45,tool?.7:.45));drawMesh(getItemMesh(s.id),m,itemTex);}
+  // held item (LayerHeldItem 1.8: translate to the hand, then the model's third-person display transform)
+  if(held&&ITEMS[held.id]){const hm=heldMesh(held.id),it=ITEMS[held.id],R=Math.PI/180;
+    // back into vanilla model space (y down), then LayerHeldItem + the item model's "thirdperson" display, verbatim
+    const hand=chain(parts.rarm,M4.sc(-1,-1,1),M4.tr(-1/16,7/16,1/16),M4.tr(0,e.sneak?.203125:0,0),M4.sc(2,2,2));
+    const disp=(t,r,sc)=>[M4.tr(t[0]/16,t[1]/16,t[2]/16),M4.ry(r[1]*R),M4.rx(r[0]*R),M4.rz(r[2]*R),M4.sc(sc,sc,sc)];
+    const m=hm.block?chain(hand,...disp([0,1.5,-2.75],[10,-45,170],.375))
+      :it.type==='bow'?chain(hand,...disp([.75,0,.25],[5,80,-45],1))
+      :it.type==='weapon'?chain(hand,...disp([0,1.25,-3.5],[0,90,-35],.85))
+      :chain(hand,...disp([0,1,-3],[-90,0,0],.55));
+    drawMesh(hm.mesh,chain(m,M4.sc(.5,.5,.5)),hm.tex);}
   gl.uniform1f(PT.u.hurt,0);
   if(e.fire>0){useBox(VP,camPos);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.uniform1f(PB.u.lit,0);for(let i=0;i<3;i++)box(chain(M4.tr(e.pos[0],e.pos[1]+.9+Math.sin(perfT*9+i)*.2,e.pos[2]),M4.ry(perfT*2+i*2),M4.sc(.7,1.6,.7)),[1,.5+.2*i,.1],.18);gl.disable(gl.BLEND);useTex(VP,camPos);}
 }
@@ -200,33 +227,59 @@ function drawStars(){if(!STARS){STARS=[];let r=12345;const rnd=()=>{r=(r*16807)%
   gl.uniform1f(PB.u.lit,0);gl.uniform1f(PB.u.fogN,1e6);gl.uniform1f(PB.u.fogF,2e6);
   for(const [x,y,z,sz,b] of STARS){const tw=b*(.85+.15*Math.sin(perfT*2+x*40));box(chain(M4.tr(camPos[0]+x*300,camPos[1]+y*300,camPos[2]+z*300),M4.sc(sz,sz,sz)),[tw,tw,tw*1.05]);}
   gl.uniform1f(PB.u.fogN,curFog.n);gl.uniform1f(PB.u.fogF,curFog.f);}
+// ---- billboard particles (EffectRenderer): particles.png sprites, or chips of the block texture ----
+let PART_TEX=null;const partMesh={};
+function procParticles(){const c=mkCanvas(128,128),g=c.getContext('2d');
+  for(let i=0;i<8;i++){const r=3.5-i*.4;g.fillStyle='#fff';for(let y=0;y<8;y++)for(let x=0;x<8;x++){const d=Math.hypot(x-3.5,y-3.5);if(d<r&&hash2(x,y,i)>.15)g.fillRect(i*8+x,y,1,1);}}
+  for(const [col,fill] of [[1,'#fff'],[2,'#fff']]){const ox=col*8,oy=32;g.fillStyle=fill;for(let k=0;k<8;k++){g.fillRect(ox+3,oy+k,2,1);g.fillRect(ox+k,oy+3,1,2);}g.fillRect(ox+1,oy+1,1,1);g.fillRect(ox+6,oy+1,1,1);g.fillRect(ox+1,oy+6,1,1);g.fillRect(ox+6,oy+6,1,1);}
+  return c;}
+function initParticleTex(){if(PART_TEX)gl.deleteTexture(PART_TEX);PART_TEX=mkTex(PACK.particles||procParticles());for(const k in partMesh)delete partMesh[k];}
+function pMesh(key,u0,v0,u1,v1){if(partMesh[key])return partMesh[key];const o=[];const v=[[-.5,.5,u0,v0],[.5,.5,u1,v0],[.5,-.5,u1,v1],[-.5,-.5,u0,v1]];for(const i of [0,1,2,0,2,3])o.push(v[i][0],v[i][1],0,0,0,1,v[i][2],v[i][3]);return partMesh[key]=meshFrom(o);}
+function drawParticles(){if(!particles.length)return;if(!PART_TEX)initParticleTex();useTex(VP,camPos);gl.uniform1f(PT.u.fogF,curFog.f);
+  const R=chain(M4.ry(camYaw),M4.rx(camPitch));
+  for(const p of particles){let mesh,tex,tint=[1,1,1];const a=p.t/p.t0;
+    if(typeof p.kind==='number'){const D=BD[p.kind];const t=D.side;const tx=t%ACOLS,ty=Math.floor(t/ACOLS);const qx=(p.q&1)*.25+.25*Math.random()*0,qy=(p.q>>1)*.25;
+      mesh=pMesh('b'+t+':'+p.q,(tx+qx+.25)/ACOLS,(ty+qy+.25)/ACOLS,(tx+qx+.5)/ACOLS,(ty+qy+.5)/ACOLS);tex=atlasTex;tint=[.6,.6,.6];}
+    else{const idx=p.kind==='crit'?65:p.kind==='magic'?66:Math.min(7,Math.floor((1-a)*8));const cx=idx%16,cy=Math.floor(idx/16);mesh=pMesh('p'+idx,cx/16+.002,cy/16+.002,(cx+1)/16-.002,(cy+1)/16-.002);tex=PART_TEX;
+      tint=p.col||[1,1,1];if(p.kind==='poof'){const g=.7+.3*a;tint=[g,g,g];}}
+    gl.uniform4f(PT.u.tint,tint[0],tint[1],tint[2],1);setEntLight(p.p);const s=p.sz*(p.kind==='poof'?1+(1-a):1);
+    drawMesh(mesh,chain(M4.tr(p.p[0],p.p[1],p.p[2]),R,M4.sc(s,s,s)),tex);}
+  gl.uniform4f(PT.u.tint,1,1,1,1);}
 function drawBat(e){
   const flap=Math.sin(perfT*18+e.pos[0])*1.1;const base=chain(M4.tr(e.pos[0],e.pos[1]+Math.sin(perfT*3)*.1,e.pos[2]),M4.ry(e.yaw),M4.rz(Math.PI),M4.sc(.35,.35,.35));const M=MODELS.bat;setEntLight(e.pos);
   for(const k of ['head','rear','lear','body'])drawMesh(M[k],base,BAT_TEX);
   drawMesh(M.rwing,chain(base,M4.ry(flap)),BAT_TEX);drawMesh(M.lwing,chain(base,M4.ry(-flap)),BAT_TEX);
 }
-function drawHand(proj){
-  const p=player;const s=p.inv[p.sel],it=s&&ITEMS[s.id];
-  const bob=0;const sw=0;
-  // ItemRenderer (1.8): equip progress and swing curves
-  const held=s?s.id:null;if(held!==p.lastHeld){p.lastHeld=held;p.equip=0;}p.equip=Math.min(1,(p.equip==null?1:p.equip)+dtFrame*8);const eq=1-p.equip;
-  const sp=p.swing>0?1-p.swing:0;const r1=Math.sin(Math.sqrt(sp)*Math.PI),r2=Math.sin(sp*sp*Math.PI),r3=Math.sin(Math.sqrt(sp)*Math.PI*2),r4=Math.sin(sp*Math.PI);
-  let base=chain(M4.tr(.56-.4*r1*.5,-.6+.2*r3*.5-eq*.6,-.9-.2*r4*.5),M4.ry(-r2*20*Math.PI/180),M4.rz(-r1*20*Math.PI/180),M4.rx(-r1*70*Math.PI/180));
-  if(p.using==='eat'||p.using==='drink')base=chain(M4.tr(.2,-.38+Math.sin(p.useT*20)*.03,-.55),M4.ry(.7));
-  if(p.using==='block')base=chain(M4.tr(.34,-.42,-.66),M4.ry(.75),M4.rz(.45),M4.rx(-.2));
-  if(p.using==='bow'){const pw=bowCharge(p.useT);base=chain(M4.tr(.18,-.32,-.6+pw*.1),M4.rz(-.2+Math.random()*.01*pw));}
+// ItemRenderer.renderItemInFirstPerson (1.8), step for step. View space: camera at the origin looking down -z.
+function drawHand(proj,pre){
+  const p=player,R=Math.PI/180;const cur=p.inv[p.sel];const key=cur?cur.id+':'+cur.count:null;
+  // updateEquippedItem: lower the old stack, swap below 0.1, raise the new one (0.4 per tick). Any change, even the count, dips the hand like 1.8.
+  if(p.handKey===undefined){p.handKey=key;p.handId=cur?cur.id:null;p.equip=1;}
+  const tgt=key===p.handKey?1:0;p.equip+=clamp(tgt-p.equip,-dtFrame*8,dtFrame*8);if(p.equip<.1&&key!==p.handKey){p.handKey=key;p.handId=cur?cur.id:null;}
+  const f=1-p.equip,sp=p.swing>0?1-p.swing:0,sq=Math.sqrt(sp);
+  // rotateWithPlayerRotations: the arm lags behind fast turns (renderArmYaw/Pitch ease 0.5 per tick)
+  const k=1-Math.pow(.5,dtFrame*20);if(p.armYaw==null){p.armYaw=p.yaw;p.armPitch=p.pitch;}let dy=p.yaw-p.armYaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;
+  p.armYaw+=dy*k;p.armPitch+=(p.pitch-p.armPitch)*k;
+  const base=chain(pre||M4.id(),M4.rx(-(p.pitch-p.armPitch)*.1),M4.ry(-dy*.1));
+  const tfpi=(eq,s)=>{const a=Math.sin(s*s*Math.PI),b=Math.sin(Math.sqrt(s)*Math.PI);return chain(M4.tr(.56,-.52,-.72),M4.tr(0,eq*-.6,0),M4.ry(45*R),M4.ry(a*-20*R),M4.rz(b*-20*R),M4.rx(b*-80*R),M4.sc(.4,.4,.4));};
   useTex(proj,[0,0,0]);gl.uniform1f(PT.u.fogF,1e9);gl.uniform1f(PT.u.fogN,1e8);setEntLight(p.pos);
-  const S=skinTex(p.skin);const M=S.slim?MODELS.slim:MODELS.wide;
-  if(!it){ // vanilla-style empty hand: the right arm rises from the bottom-right corner, leaning in toward the crosshair
-    const walk=Math.min(1,Math.hypot(p.vel[0],p.vel[2])/4);const bx=Math.sin(p.walkT*2.2)*.03*walk,by=-Math.abs(Math.cos(p.walkT*2.2))*.03*walk;
-    const d=[-.2,.92,-.36];const L=Math.hypot(...d);for(let i=0;i<3;i++)d[i]/=L;
-    const Y=[-d[0],-d[1],-d[2]];let X=[Y[1]*1-Y[2]*0,Y[2]*0-Y[0]*1,0];const lx=Math.hypot(...X);X=X.map(v=>v/lx);const Z=[X[1]*Y[2]-X[2]*Y[1],X[2]*Y[0]-X[0]*Y[2],X[0]*Y[1]-X[1]*Y[0]];
-    const R=new Float32Array([X[0],X[1],X[2],0,Y[0],Y[1],Y[2],0,Z[0],Z[1],Z[2],0,0,0,0,1]);
-    const m=chain(M4.tr(.44-.3*r1*.6,-.34+.4*r3*.4-eq*.6,-.95-.4*r4*.4),M4.ry(r1*55*Math.PI/180),M4.rz(-r2*20*Math.PI/180),R,M4.ry(-.35),M4.sc(.92,.92,.92),M4.tr(0,10/16,0));
-    drawMesh(M.rarm,m,S.tex);drawMesh(M.rsleeve,m,S.tex);
-    if(p.armor[1]){const T=ARMOR_TEX[ITEMS[p.armor[1]].tier];drawMesh(MODELS.armor.rarm,m,T.l1);}return;}
-  const tool=it.type==='weapon';
-  if(it.type==='bow')drawMesh(getItemMesh(s.id),chain(base,M4.ry(-Math.PI/2+.3),M4.rz(-.2),M4.sc(.65,.65,.65)),itemTex);
-  else if(tool)drawMesh(getItemMesh(s.id),chain(base,M4.tr(.02,.16,-.08),M4.ry(-Math.PI/2+.75),M4.rz(.2),M4.sc(-.5,.5,.5)),itemTex);
-  else drawMesh(getItemMesh(s.id),chain(base,M4.tr(-.04,.05,0),M4.ry(-.4),M4.sc(.42,.42,.42)),itemTex);
+  const id=p.handId,it=id&&ITEMS[id];
+  if(!it){ // renderPlayerArm
+    const S=skinTex(p.skin);const M=S.slim?MODELS.slim:MODELS.wide;
+    const m=chain(base,M4.tr(-.3*Math.sin(sq*Math.PI),.4*Math.sin(sq*Math.PI*2),-.4*Math.sin(sp*Math.PI)),M4.tr(.64000005,-.6,-.72),M4.tr(0,f*-.6,0),M4.ry(45*R),
+      M4.ry(Math.sin(sq*Math.PI)*70*R),M4.rz(Math.sin(sp*sp*Math.PI)*-20*R),M4.tr(-1,3.6,3.5),M4.rz(120*R),M4.rx(200*R),M4.ry(-135*R),M4.tr(5.6,0,0),
+      M4.tr(-5/16,(S.slim?2.5:2)/16,0),M4.rz(.1),M4.sc(-1,-1,1));   // bipedRightArm at its rotation point, idle Z sway at age 0, back into vanilla model space
+    drawMesh(M.rarm,m,S.tex);drawMesh(M.rsleeve,m,S.tex);return;}
+  let m;
+  if(p.using==='eat'||p.using==='drink'){const maxD=32;const ff=Math.max(0,maxD-p.useT*20)+1;const f1=Math.min(1,ff/maxD);let f2=Math.abs(Math.cos(ff/4*Math.PI)*.1);if(f1>=.8)f2=0;const f3=1-Math.pow(f1,27);
+    m=chain(base,M4.tr(0,f2,0),M4.tr(f3*.6,f3*-.5,0),M4.ry(f3*90*R),M4.rx(f3*10*R),M4.rz(f3*30*R),tfpi(f,0));}
+  else if(p.using==='block')m=chain(base,tfpi(f,0),M4.tr(-.5,.2,0),M4.ry(30*R),M4.rx(-80*R),M4.ry(60*R));
+  else if(p.using==='bow'){const ft=p.useT*20;let f1=ft/20;f1=Math.min(1,(f1*f1+f1*2)/3);const shake=f1>.1?M4.tr(0,Math.sin((ft-.1)*1.3)*(f1-.1)*.01,0):M4.id();
+    m=chain(base,tfpi(f,0),M4.rz(-18*R),M4.ry(-12*R),M4.rx(-8*R),M4.tr(-.9,.2,0),shake,M4.tr(0,0,f1*.1),M4.sc(1,1,1+f1*.2));}
+  else m=chain(base,M4.tr(-.4*Math.sin(sq*Math.PI),.2*Math.sin(sq*Math.PI*2),-.2*Math.sin(sp*Math.PI)),tfpi(f,sp));
+  const hm=heldMesh(id);
+  // RenderItem: scale 2, then the model's firstperson display (items: [0,-135,25] / [0,4,2] / 1.7; blocks: none), then the 0.5 model scale
+  if(hm.block)m=chain(m,M4.sc(2,2,2),M4.sc(.5,.5,.5));
+  else m=chain(m,M4.sc(2,2,2),M4.tr(0,.25,.125),M4.ry(-135*R),M4.rz(25*R),M4.sc(1.7,1.7,1.7),M4.sc(.5,.5,.5));
+  drawMesh(hm.mesh,m,hm.tex);
 }

@@ -9,7 +9,7 @@ function lookDelta(dx,dy){const f=SENS*.6+.2,k=f*f*f*8*.15*Math.PI/180;player.ya
 function setNetStatus(s){const el=$('status');if(el)el.textContent=s;}
 document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===cv;
   if(locked){hide('clickResume');hide('pause');paused=false;}
-  else if((MATCH.state==='play'||MATCH.state==='lobby')&&!chestOpen&&$('lobbyPanel').classList.contains('hidden')&&$('results').classList.contains('hidden')){if(!online)paused=true;show('pause');}});
+  else if((MATCH.state==='play'||MATCH.state==='lobby')&&!chestOpen&&!chatUI&&$('lobbyPanel').classList.contains('hidden')&&$('results').classList.contains('hidden')){if(!online)paused=true;show('pause');}});
 cv.addEventListener('click',()=>{if((MATCH.state==='play'||MATCH.state==='lobby')&&!locked&&!chestOpen)lockPointer();});
 $('clickResume').addEventListener('click',()=>lockPointer());
 document.addEventListener('mousemove',e=>{if(!locked||!player)return;if(!player.alive&&spectate.mode==='follow')return;const dx=e.movementX,dy=e.movementY;if(Math.abs(dx)>350||Math.abs(dy)>350)return;lookDelta(dx,dy);});
@@ -154,7 +154,7 @@ function loadLogoURL(url,save){return new Promise(res=>{const im=new Image();im.
 (async()=>{const saved=store('bb_logo');if(saved&&await loadLogoURL(saved,false))return;if(location.protocol!=='file:')for(const n of ['logo.png','logo.webp','logo.jpg'])if(await loadLogoURL(n,false))return;})();
 $('logoFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>loadLogoURL(r.result,true).then(ok=>{$('packList').textContent=ok?'Title logo set.':'Could not read that image.';});r.readAsDataURL(f);});
 $('logoClear').addEventListener('click',()=>{store('bb_logo','');const c=$('logo');c.width=760;c.height=150;c.style.imageRendering='';drawLogo();$('edition').classList.remove('hidden');$('splash').classList.remove('onlogo');$('packList').textContent='Title logo reset.';});
-const SPLASHES=['Now with Photon!','Spam click!','Last one standing!','Bats can squeak!','100% procedural!','Grace period!','Showdown!','Not Herobrine!','Also try BR mode!','Sprint jump!'];
+const SPLASHES=['Now with our own servers!','Spam click!','Last one standing!','Bats can squeak!','100% procedural!','Grace period!','Showdown!','Not Herobrine!','Also try BR mode!','Sprint jump!'];
 
 $('optClose').addEventListener('click',()=>{readOptions();hide('optPanel');show(optReturn);sfx('click');});
 $('soloBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();online=false;if(net){net.leave();net=null;}MATCH.mapIdx=MATCH.mapIdx||0;hide('menu');showLoading('Loading level',()=>{player=null;ents=[];hostStartMatch();});});
@@ -173,24 +173,18 @@ function refreshSkinPicker(){const row=$('skinRow');const opts=availableSkins().
   for(const k of opts){const c=mkCanvas(16,16);const g=c.getContext('2d');g.imageSmoothingEnabled=false;const S=skinTex(k).img;g.drawImage(S,8,8,8,8,0,0,16,16);g.drawImage(S,40,8,8,8,0,0,16,16);c.title=k.replace(/^(pack|gen):/,'');if(k===mySkin)c.classList.add('on');
     c.addEventListener('click',()=>{mySkin=k;store('bb_skin',k);refreshSkinPicker();sfx('click');});row.appendChild(c);}}
 $('nameIn').addEventListener('change',()=>{if(mySkin.startsWith('gen:'))mySkin='gen:'+($('nameIn').value||'Player');refreshSkinPicker();});
-const DEFAULT_APPID='d4f1dd7f-3b87-4c28-ae83-c1ea4b649097',OLD_APPIDS=['d20d4904-60a7-49e7-8d96-7976eadfcaf6'];$('n_kind').value=store('bb_nkind2')||'relay';{const sv=store('bb_app');$('n_app').value=(!sv||OLD_APPIDS.includes(sv))?DEFAULT_APPID:sv;}$('n_region').value=store('bb_region')||'us';$('n_room').value=store('bb_room')||'battle';$('n_sdk').value=store('bb_sdk')||'';
-function showNetFields(){const ph=$('n_kind').value==='photon';document.querySelectorAll('#onlinePanel .ph').forEach(el=>el.classList.toggle('hidden',!ph));$('relayNote').classList.toggle('hidden',ph);}
-$('n_kind').addEventListener('change',showNetFields);showNetFields();
+$('n_server').value=store('bb_server')||'';$('n_kind').value=store('bb_nkind3')||'relay';$('n_room').value=store('bb_room')||'battle';
 $('connectBtn').addEventListener('click',async()=>{
-  const kind=$('n_kind').value,room=($('n_room').value||'battle').trim();store('bb_nkind2',kind);store('bb_app',$('n_app').value);store('bb_region',$('n_region').value);store('bb_room',room);store('bb_sdk',$('n_sdk').value);
+  const kind=$('n_kind').value,room=($('n_room').value||'battle').trim();store('bb_nkind3',kind);store('bb_server',$('n_server').value.trim());store('bb_room',room);
   if(net){net.leave();net=null;}readOptions();
   const ready=()=>{online=true;setNetStatus('Connected. '+(net.isHost()?'You are the host.':'Joining host...'));hide('onlinePanel');player=null;ents=[];
     if(net.isHost())enterLobby();else{enterLobby();netSend(N.HELLO,{},'host');}};
   const wire=()=>{net.onEvent=onNetEvent;net.onJoin=()=>{if(isHost()&&MATCH.state==='lobby')MATCH.phaseT=0;};net.onLeave=onMemberLeave;net.onHostChange=onHostChanged;};
   if(kind==='local'){setNetStatus('Joining room "'+room+'" in this browser...');net=new LocalNet(room,myName);wire();net.onReady=ready;return;}
-  if(kind==='relay'){setNetStatus('Connecting to the relay...');const n=new RelayNet(room,myName);net=n;wire();
-    n.onReady=()=>{if(net!==n)return;setNetStatus('Connected via '+(n.tr.url||'relay').replace(/^wss:\/\//,'').replace(/[:/].*$/,''));ready();};
+  if(kind==='relay'){setNetStatus('Connecting to the relay...');const n=new RelayNet(room,myName,$('n_server').value);net=n;wire();n.tr.trying=url=>{if(net===n&&!n.ready)setNetStatus('Connecting to '+url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,'')+'...');};
+    n.onReady=()=>{if(net!==n)return;setNetStatus('Connected to '+(n.tr.url||'relay').replace(/^wss?:\/\//,'').replace(/\/mqtt$/,''));ready();};
     n.onFail=msg=>{if(net!==n)return;const wasOnline=online;net=null;n.leave();if(wasOnline){toMenu();hide('menu');show('onlinePanel');}setNetStatus(msg);};return;}
-  if(!$('n_app').value.trim()){setNetStatus('Enter your Photon Realtime AppId first.');return;}
-  setNetStatus('Loading Photon SDK...');const ok=await loadPhotonSDK($('n_sdk').value.trim());
-  if(!ok){setNetStatus('Could not load the Photon JavaScript SDK. Download the Photon Realtime JavaScript SDK from photonengine.com and put lib/photon.min.js next to index.html (or paste its URL).');return;}
-  setNetStatus('Photon SDK: '+PHOTON_SDK_URL);
-  try{net=new PhotonNet($('n_app').value.trim(),$('n_region').value,room,myName,ready,msg=>setNetStatus(msg));wire();}catch(err){setNetStatus('Photon failed: '+err.message);net=null;}
+  setNetStatus('Pick a connection type.');
 });
 $('resumeBtn').addEventListener('click',()=>{paused=false;hide('pause');lockPointer();});
 $('leaveBtn').addEventListener('click',()=>toMenu());

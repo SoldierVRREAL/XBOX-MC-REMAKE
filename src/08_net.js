@@ -1,4 +1,4 @@
-// ================= networking: Photon Realtime (online) or BroadcastChannel (same-browser tabs) =================
+// ================= networking: our own room relay (online) or BroadcastChannel (same-browser tabs) =================
 const N={STATE:1,HIT:2,DEATH:3,CHESTREQ:4,CHEST:5,GIVE:6,DROPADD:7,DROPDEL:8,DROPREQ:9,PROJ:10,BOTS:11,PHASE:12,START:13,ANN:14,BLOCK:15,SQUEAK:16,LOBBY:17,READY:18,END:19,DEALT:20,PICK:21,CHAT:22,TOLOBBY:23,HELLO:24,BR:25,CHESTS:26,LEAVE:27,SKIN:28};
 let net=null;
 function isHost(){return !net||net.isHost();}
@@ -39,18 +39,24 @@ class MeshNet{
 function bcTransport(room){const t={ch:null,open(ok){this.ch=new BroadcastChannel('blockbattle:'+room);this.ch.onmessage=e=>this.onmessage&&this.onmessage(e.data);ok();},post(o){this.ch&&this.ch.postMessage(o);},close(){this.ch&&this.ch.close();}};return t;}
 class LocalNet extends MeshNet{constructor(room,name){super(room,name,bcTransport(room),{kind:'local',hb:400,timeout:2500,listen:1300});}}
 // internet: our own tiny MQTT 3.1.1-over-WebSocket client talking to free public brokers (no account, no SDK, no setup)
-// a page URL like ?relay=wss://my-broker:8084/mqtt tries your own MQTT broker first
-const RELAY_BROKERS=(new URLSearchParams(location.search).get('relay')||'').split(',').filter(u=>/^wss?:\/\//.test(u)).concat(['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt']);
-function mqttTransport(room,brokers){
+// where to find the room relay, in order: ?relay=... in the page URL, a server typed in Play Online, the server that is hosting
+// this page (server/server.js serves the game and the relay together), then free public relays as a backup
+const PUBLIC_RELAYS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
+function relayList(typed){const out=[];const add=(u,quick)=>{if(u&&/^wss?:\/\//.test(u)&&!out.some(o=>o.url===u))out.push({url:u,quick});};
+  for(const u of (new URLSearchParams(location.search).get('relay')||'').split(','))add(u.trim(),false);
+  if(typed){let t=typed.trim();if(t&&!/^wss?:\/\//.test(t))t=(location.protocol==='https:'||/^[^:]+\.[a-z]{2,}$/i.test(t)?'wss://':'ws://')+t;if(t&&!/\/mqtt$/.test(t))t=t.replace(/\/$/,'')+'/mqtt';add(t,false);}
+  if(location.protocol==='http:'||location.protocol==='https:'){if(!/\.github\.io$/i.test(location.hostname))add((location.protocol==='https:'?'wss://':'ws://')+location.host+'/mqtt',true);}
+  for(const u of PUBLIC_RELAYS)add(u,false);return out;}
+function mqttTransport(room,brokers){ // brokers: [{url,quick}]
   const enc=new TextEncoder(),dec=new TextDecoder();
   const str=s=>{const b=enc.encode(s);return [b.length>>8,b.length&255,...b];};
   const len=n=>{const o=[];do{let d=n%128;n=Math.floor(n/128);if(n>0)d|=128;o.push(d);}while(n>0);return o;};
   const pkt=(h,body)=>new Uint8Array([h,...len(body.length),...body]);
   const topic='xmbbe/v2/'+String(room).toLowerCase().replace(/[^a-z0-9_-]/g,'_').slice(0,40);
   const t={ws:null,buf:new Uint8Array(0),url:null,
-    open(ok,fail){let i=0;const tryNext=()=>{if(i>=brokers.length){fail('Could not reach any free relay server. This network may block it (school/work Wi-Fi often does).');return;}
-        const url=brokers[i++];let done=false;let ws;try{ws=new WebSocket(url,['mqtt']);}catch(e){tryNext();return;}ws.binaryType='arraybuffer';
-        const to=setTimeout(()=>{if(!done){done=true;try{ws.close();}catch(e){}tryNext();}},6000);
+    open(ok,fail){let i=0;const tryNext=()=>{if(i>=brokers.length){fail('Could not reach a game server. Check the server address, or this network may block it (school/work Wi-Fi often does): try home Wi-Fi or a phone hotspot.');return;}
+        const br=brokers[i++],url=br.url;let done=false;let ws;try{ws=new WebSocket(url,['mqtt']);}catch(e){tryNext();return;}ws.binaryType='arraybuffer';t.trying&&t.trying(url);
+        const to=setTimeout(()=>{if(!done){done=true;try{ws.close();}catch(e){}tryNext();}},br.quick?2500:6000);
         ws.onopen=()=>{const cid='xmbbe'+Math.random().toString(36).slice(2,12);
           ws.send(pkt(0x10,[...str('MQTT'),4,0x02,0,60,...str(cid)]));};
         ws.onmessage=e=>{const d=new Uint8Array(e.data);const nb=new Uint8Array(t.buf.length+d.length);nb.set(t.buf);nb.set(d,t.buf.length);t.buf=nb;
@@ -65,53 +71,4 @@ function mqttTransport(room,brokers){
       const out=new Uint8Array(1+len(total).length+total);out[0]=0x30;out.set(len(total),1);out.set(head,1+len(total).length);out.set(body,1+len(total).length+head.length);t.ws.send(out);},
     close(){t.closed=true;clearInterval(t.ping);try{t.ws&&t.ws.send(new Uint8Array([0xE0,0]));t.ws&&t.ws.close();}catch(e){}}};
   return t;}
-class RelayNet extends MeshNet{constructor(room,name,brokers){const tr=mqttTransport(room,brokers||RELAY_BROKERS);super(room,name,tr,{kind:'relay',hb:1000,timeout:7000,listen:2600});tr.onlost=()=>this.onFail&&this.onFail('Lost the connection to the relay server.');}}
-// Photon payloads go through a JSON round trip so the binary protocol never sees undefined/NaN/typed arrays
-const netClean=v=>v===undefined?null:JSON.parse(JSON.stringify(v));
-function photonHelp(code,msg){const m=`Photon error ${code}${msg?': '+msg:''}. `;
-  if(code>=2001&&code<=2004)return m+'The game server dropped the connection. Usual causes: the AppId is not a Realtime/PUN app (Fusion, Chat and Voice AppIds do not work here; create a "Realtime" app in the Photon dashboard), the free 20-player (CCU) limit is full, or this network blocks Photon (school/work Wi-Fi often does).';
-  if(code===1101||code===3101||code===4101||code===32767)return m+'Photon rejected the AppId. Check it is copied exactly and that custom authentication is off for that app.';
-  if(code>=4001&&code<=4004)return m+'Could not reach Photon\'s name server. The network may block it, or the region is wrong.';
-  if(code>=1001&&code<=1004)return m+'Could not reach the Photon master server. Try another region or network.';
-  return m;}
-class PhotonNet{
-  constructor(appId,region,room,name,onReady,onFail){this.kind='photon';this.room=room;this.myId=-1;this.retries=0;this.left=false;this.joined=false;this.cfg={appId,region,room,name,onReady,onFail};this.connect();}
-  connect(){const {appId,region,room,name,onReady,onFail}=this.cfg;const LBC=Photon.LoadBalancing.LoadBalancingClient;this.LBC=LBC;
-    const c=this.c=new LBC(Photon.ConnectionProtocol.Wss,appId,'blockbattle-1.0');this.joining=false;
-    c.onStateChange=s=>{if(c!==this.c)return;this.stateName=LBC.StateToName?LBC.StateToName(s):String(s);setNetStatus('Photon: '+this.stateName);
-      if((s===LBC.State.JoinedLobby||s===LBC.State.ConnectedToMaster)&&!this.joining&&!this.joined){this.joining=true;c.joinRoom(room,{createIfNotExists:true},{maxPlayers:16,isVisible:true,isOpen:true});}};
-    c.onJoinRoom=()=>{if(c!==this.c)return;this.joined=true;this.retries=0;this.myId=c.myActor().actorNr;this._h=this.hostId();setNetStatus('Photon: joined room '+room);onReady&&onReady();};
-    c.onActorJoin=a=>{if(a.actorNr!==this.myId)this.onJoin&&this.onJoin(a.actorNr,a.name);this.checkHost();};
-    c.onActorLeave=a=>{this.onLeave&&this.onLeave(a.actorNr);this.checkHost();};
-    c.onEvent=(code,content,actorNr)=>{this.onEvent&&this.onEvent(code,content,actorNr);};
-    c.onError=(code,msg)=>{if(c!==this.c||this.left)return;
-      // a dropped game-server connection before we got into the room: try again a couple of times
-      if(!this.joined&&code>=2001&&code<=2004&&this.retries<2){this.retries++;setNetStatus(`Photon: game server dropped the connection, retrying (${this.retries}/2)...`);try{c.disconnect();}catch(e){}setTimeout(()=>{if(!this.left)this.connect();},1500);return;}
-      onFail&&onFail(photonHelp(code,msg)+(PHOTON_SDK_URL?' [SDK loaded from: '+PHOTON_SDK_URL+']':''));};
-    try{c.myActor().setName(String(name||'Player').slice(0,16));}catch(e){}
-    try{c.connectToRegionMaster(region||'us');}catch(e){onFail&&onFail('Photon failed to start: '+e.message);}
-  }
-  hostId(){try{return this.c.myRoom().masterClientId;}catch(e){return -1;}}
-  isHost(){return this.inRoom()&&this.hostId()===this.myId;}
-  checkHost(){const h=this.hostId();if(this._h!==h){this._h=h;this.onHostChange&&this.onHostChange(h);}}
-  inRoom(){try{return this.c.isJoinedToRoom();}catch(e){return false;}}
-  send(code,data,to){const o={};if(to)o.targetActors=to;this.c.raiseEvent(code,netClean(data),o);}
-  list(){const a=this.c.myRoomActors();return Object.keys(a).map(k=>({id:a[k].actorNr,name:a[k].name||('Player '+a[k].actorNr)}));}
-  leave(){this.left=true;try{this.c.disconnect();}catch(e){}}
-}
-function loadScript(u){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
-// Photon JavaScript SDK: prefer the official SDK file next to the page (lib/photon.min.js from the Realtime JavaScript SDK download).
-// The old 2017 npm copy is no longer tried: an outdated SDK gets past the master server and is then dropped by the game server (error 2003).
-let PHOTON_SDK_URL=null;
-async function loadPhotonSDK(custom){
-  if(window.Photon&&window.Photon.LoadBalancing)return true;
-  const local=[custom,'photon.min.js','photon.js','lib/photon.min.js','Photon-Javascript_SDK.min.js','Photon-Javascript_SDK.js'].filter(Boolean);
-  for(const u of local){try{await loadScript(u);if(window.Photon&&window.Photon.LoadBalancing){PHOTON_SDK_URL=u;return true;}}catch(e){}}
-  // npm build of the current SDK, written for require(): give it a CommonJS shim and pick up its exports
-  for(const u of ['https://cdn.jsdelivr.net/npm/photon-realtime@4/photon.min.js','https://cdn.jsdelivr.net/npm/photon-realtime@4/photon.js','https://cdn.jsdelivr.net/npm/photon-realtime@4']){
-    const hadM='module' in window,hadE='exports' in window;window.module={exports:{}};window.exports=window.module.exports;
-    try{await loadScript(u);const ex=window.module.exports;if(!window.Photon&&ex&&(ex.LoadBalancing||(ex.Photon&&ex.Photon.LoadBalancing)))window.Photon=ex.LoadBalancing?ex:ex.Photon;}catch(e){}
-    if(!hadM)delete window.module;if(!hadE)delete window.exports;
-    if(window.Photon&&window.Photon.LoadBalancing){PHOTON_SDK_URL=u;return true;}}
-  return false;
-}
+class RelayNet extends MeshNet{constructor(room,name,typed){const tr=mqttTransport(room,relayList(typed));super(room,name,tr,{kind:'relay',hb:1000,timeout:7000,listen:2600});tr.onlost=()=>this.onFail&&this.onFail('Lost the connection to the relay server.');}}

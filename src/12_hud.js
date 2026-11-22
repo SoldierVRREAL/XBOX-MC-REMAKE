@@ -31,32 +31,33 @@ function project(p){const q=xform(VP,p);if(q[3]<=0)return null;return [(q[0]/q[3
 function nameTag(e,col){const p=project([e.pos[0],e.pos[1]+(e.bat?.6:2.05),e.pos[2]]);if(!p)return;hc.font="18px "+HFONT;const tw=hc.measureText(e.name).width;
   hc.fillStyle='rgba(0,0,0,.45)';hc.fillRect(p[0]-tw/2-4,p[1]-15,tw+8,18);hc.textAlign='center';hc.fillStyle=col||'#fff';hc.fillText(e.name,p[0],p[1]-2);}
 function drawHUD(){
-  if(OPT.showFps&&MATCH.state!=='menu')drawFps();
   hc.setTransform(DPR,0,0,DPR,0,0);hc.clearRect(0,0,W,H);hc.imageSmoothingEnabled=false;
   if(MATCH.state==='menu'||!player)return;
+  if(hideGui)return;
+  if(showDebug)drawDebug();else if(OPT.showFps)drawFps();
   // name tags: lobby shows everyone; in Battle they are hidden until Showdown reveals the survivors
   for(const e of ents){if(e===player||!e.alive)continue;
-    if(MATCH.state==='lobby'){if(dist(camPos,e.pos)<30)nameTag(e,e.ready?'#7f7':'#fff');}
-    else if(MATCH.mode==='battle'&&MATCH.showdown)nameTag(e,PLAYER_COLORS[e.color%16]);
+    if(MATCH.state==='lobby'){if(dist(camPos,e.pos)<64)nameTagMC(e,e.ready?'#77ff77':'#ffffff');}
+    else if(MATCH.mode==='battle'&&MATCH.showdown)nameTagMC(e,PLAYER_COLORS[e.color%16]);
     else if(MATCH.mode==='battle'&&dist(camPos,e.pos)<6&&!e.effects.invis&&los(camPos,eye(e)))nameTag(e);}
   if(MATCH.state==='lobby')drawLobbyHud();
+  else if(showDebug){}
   else if(MATCH.mode==='br')drawBRHud();
   else drawBattleTop();
   // kill feed
   const fy=MATCH.mode==='br'?190:56;feed.forEach((f,i)=>{hc.globalAlpha=Math.min(1,f.t);txt(f.txt,W-14,fy+i*22,14,'#fff','right');});hc.globalAlpha=1;
   // chat (bottom left)
-  hc.font="20px "+HFONT;chat.forEach((c,i)=>{const y=H-130-(chat.length-1-i)*20;hc.globalAlpha=Math.min(1,c.t);hc.fillStyle='rgba(0,0,0,.45)';hc.fillRect(8,y-15,Math.min(W*.6,hc.measureText(c.txt).width+12),20);hc.textAlign='left';hc.fillStyle=c.col;hc.fillText(c.txt,14,y);});hc.globalAlpha=1;
+  {const cw=Math.min(W*.6,640),lh=18,by=H-(chatUI?40:120);chat.forEach((c,i)=>{const y=by-(chat.length-1-i)*lh;const a=chatUI?1:Math.min(1,c.t);if(a<=0)return;hc.globalAlpha=a;hc.fillStyle='rgba(0,0,0,.5)';hc.fillRect(4,y-lh+3,cw,lh);txt(c.txt,8,y,13,c.col&&c.col.length>=4?c.col:'#ffffff','left');});hc.globalAlpha=1;}
   if(msgs.length){const m=msgs[msgs.length-1];hc.globalAlpha=Math.min(1,m.t);txt(m.txt,W/2,H/2-80,44,'#ffd54a','center');if(m.sub)txt(m.sub,W/2,H/2-48,18,'#fff','center');hc.globalAlpha=1;}
   drawPrompts();
   if(MATCH.state==='play'&&MATCH.preT>0){const n=Math.ceil(MATCH.preT);txt(`Time to start: ${n} second${n===1?'':'s'}`,W/2,30,18,'#fff','center');}
   if(!player.alive){drawBatHud();return;}
-  if(player.hurtT>0){hc.fillStyle=`rgba(255,0,0,${player.hurtT*.45})`;hc.fillRect(0,0,W,H);}
   if(player.fire>0){const g=hc.createLinearGradient(0,H,0,H*.5);g.addColorStop(0,'rgba(255,120,0,.45)');g.addColorStop(1,'rgba(255,120,0,0)');hc.fillStyle=g;hc.fillRect(0,0,W,H);}
   if(fluidAt(camPos[0],camPos[1],camPos[2])==='water'){hc.fillStyle='rgba(30,60,200,.35)';hc.fillRect(0,0,W,H);}
   if(fluidAt(camPos[0],camPos[1],camPos[2])==='lava'){hc.fillStyle='rgba(255,90,0,.75)';hc.fillRect(0,0,W,H);}
   if(MATCH.state==='play'&&!inZone(player.pos,false)){const g=hc.createRadialGradient(W/2,H/2,H*.2,W/2,H/2,H*.8);g.addColorStop(0,'rgba(255,0,0,0)');g.addColorStop(1,'rgba(255,0,0,.45)');hc.fillStyle=g;hc.fillRect(0,0,W,H);}
   // crosshair
-  if(!spr('crosshair',W/2-9,H/2-9,18,18)){hc.fillStyle='rgba(255,255,255,.9)';hc.fillRect(W/2-9,H/2-1,18,2);hc.fillRect(W/2-1,H/2-9,2,18);}
+  // crosshair: DOM element #xhair (difference blend, like vanilla's inverted crosshair)
   if(MATCH.state==='play'&&locked&&!chestOpen&&lookChest())txt('[RMB] Open chest',W/2,H/2+34,14,'#fff','center');
   if(player.using&&player.using!=='block'){const pr=player.using==='bow'?bowCharge(player.useT):Math.min(1,player.useT/1.6);hc.fillStyle='rgba(0,0,0,.6)';hc.fillRect(W/2-30,H/2+14,60,6);hc.fillStyle=player.using==='bow'&&pr>=1?'#ffd54a':'#fff';hc.fillRect(W/2-30,H/2+14,60*pr,6);}
   drawHotbar();drawArmorDoll();drawEffects();

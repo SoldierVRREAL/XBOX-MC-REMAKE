@@ -50,7 +50,7 @@ function skinTex(key){
 function initEntityTextures(){
   for(const k in SKIN_TEX)gl.deleteTexture(SKIN_TEX[k].tex);SKIN_TEX={};
   ARMOR_TEX=ARMOR_TIERS.map(([t,,col,mat],ti)=>{const p=PACK.armor[mat]||{};return {l1:mkTex(p.l1||procArmor(ti,1)),l2:mkTex(p.l2||procArmor(ti,2)),tint:mat==='leather'&&p.l1?hexRGB('#a06540'):null};});
-  BAT_TEX=mkTex(PACK.bat||procBat());CHEST_TEX=mkTex(PACK.chestTex||procChest());
+  initSkyTextures();if(typeof initParticleTex==='function'&&PART_TEX)initParticleTex();BAT_TEX=mkTex(PACK.bat||procBat());CHEST_TEX=mkTex(PACK.chestTex||procChest());
 }
 function availableSkins(){return CUSTOM_SKINS.concat(PACK.skins.length?PACK.skins.map(s=>'pack:'+s.name):[]);}
 
@@ -125,6 +125,7 @@ async function loadPackBuffer(buf,label){
   for(const [,,,mat] of ARMOR_TIERS){const l1=await get(`textures/entity/equipment/humanoid/${mat}.png`)||await get(`textures/models/armor/${mat}_layer_1.png`);
     const l2=await get(`textures/entity/equipment/humanoid_leggings/${mat}.png`)||await get(`textures/models/armor/${mat}_layer_2.png`);
     if(l1||l2){PACK.armor[mat]={l1:l1?imgToCanvas(l1,64,32,0,0,l1.width,l1.height):null,l2:l2?imgToCanvas(l2,64,32,0,0,l2.width,l2.height):null};found++;}}
+  for(const [k,pth] of [['sun','textures/environment/sun.png'],['moon','textures/environment/moon_phases.png'],['shadow','textures/misc/shadow.png'],['particles','textures/particle/particles.png']]){const im=await get(pth);if(im){PACK[k]=imgToCanvas(im,im.width,im.height,0,0,im.width,im.height);found++;}}
   const bat=await get('textures/entity/bat.png');if(bat){PACK.bat=imgToCanvas(bat,64,64,0,0,bat.width,bat.height);found++;}
   const clouds=await get('textures/environment/clouds.png');if(clouds){PACK.clouds=imgToCanvas(clouds,256,256,0,0,clouds.width,clouds.height);found++;}
   const cracks=[];for(let i=0;i<10;i++){const im=await get(`textures/block/destroy_stage_${i}.png`)||await get(`textures/blocks/destroy_stage_${i}.png`);if(im)cracks.push(imgToCanvas(im,16,16,0,0,im.width,im.width));}

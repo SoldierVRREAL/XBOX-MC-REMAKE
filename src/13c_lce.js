@@ -130,7 +130,7 @@ function drawPreview(){
     g.setTransform(a,b,cc,d,e,f);const u0=Math.min(A[3],B[3]),v0=Math.min(A[4],D[4]);g.drawImage(T.l[li],u0,v0,Math.abs(du),Math.abs(dv),u0,v0,Math.abs(du),Math.abs(dv));g.restore();g.setTransform(1,0,0,1,0,0);}}
 // ---- per-frame hook ----
 let lceLastPad=null;
-function tickLCE(dt){tickTouch();if(lceLastPad!==padActive){lceLastPad=padActive;if(chestOpen)renderChest();}drawPreview();}
+function tickLCE(dt){tickTouch();tickCrosshair();tickRunParticles();if(lceLastPad!==padActive){lceLastPad=padActive;if(chestOpen)renderChest();}drawPreview();}
 // keyboard: Escape/Backspace go back, X opens the Dressing Room, arrows cycle skins in the Dressing Room
 document.addEventListener('keydown',e=>{const inInput=e.target&&e.target.tagName==='INPUT';
   if(!$('dressPanel').classList.contains('hidden')){if(e.code==='Escape'||(e.code==='Enter'&&inInput)){closeDress();e.preventDefault();}else if(!inInput&&(e.code==='ArrowLeft'||e.code==='ArrowRight')){cycleSkin(e.code==='ArrowLeft'?-1:1);e.preventDefault();}else if(!inInput&&e.code==='KeyX')$('skinFile').click();return;}

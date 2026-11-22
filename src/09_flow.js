@@ -111,10 +111,10 @@ function hostChestOp(k,op,slot,who,item){
 function chestOp(op,slot,item){if(!chestOpen)return;const k=key(chestOpen.x,chestOpen.y,chestOpen.z);if(isHost())hostChestOp(k,op,slot,player,item);else netSend(N.CHESTREQ,{k,op,slot,item},'host');sfx('pick');}
 
 // ---------- blocks (Battle Royale building) ----------
-function applyBlock(x,y,z,b){setB(x,y,z,b);relightColumn(x,z);rebuildAt(x,z);if(isHost())MATCH.edits.push([x,y,z,b]);}
+function applyBlock(x,y,z,b){const was=getB(x,y,z);if(was&&!b)blockParticles(x,y,z,was,40);setB(x,y,z,b);relightColumn(x,z);rebuildAt(x,z);if(isHost())MATCH.edits.push([x,y,z,b]);}
 function setBlockNet(x,y,z,b){applyBlock(x,y,z,b);netSend(N.BLOCK,[x,y,z,b]);}
 let mining=null;
-function breakBlock(x,y,z,who){const b=getB(x,y,z);if(!b||b===B.CHEST||b===B.BARRIER||b===B.BEACON)return;setBlockNet(x,y,z,0);sfx('dig',{pos:[x,y,z],mat:blockMat(b)});spawnParticles(x+.5,y+.5,z+.5,10,hexRGB(BLOCK_COL[b]||'#888'),2);
+function breakBlock(x,y,z,who){const b=getB(x,y,z);if(!b||b===B.CHEST||b===B.BARRIER||b===B.BEACON)return;setBlockNet(x,y,z,0);sfx('dig',{pos:[x,y,z],mat:blockMat(b)});
   const d=MINE_DROP[b];if(d){const left=addItem(who,d,1);if(left)requestDrop([x+.5,y-.5,z+.5],d,left);}if(b===B.LEAVES&&Math.random()<.05)requestDrop([x+.5,y-.5,z+.5],'apple',1);}
 function placeBlock(x,y,z,id){if(x<1||z<1||y<1||x>=WX-1||z>=WZ-1||y>=WY)return false;const cur=getB(x,y,z);if(cur&&!BD[cur].liquid&&!BD[cur].cross)return false;
   for(const e of ents){if(!e.alive)continue;if(e.pos[0]+HW>x&&e.pos[0]-HW<x+1&&e.pos[2]+HW>z&&e.pos[2]-HW<z+1&&e.pos[1]+EH>y&&e.pos[1]<y+1)return false;}setBlockNet(x,y,z,id);sfx('step',{pos:[x,y,z],mat:blockMat(id),vol:6});return true;}
@@ -189,7 +189,7 @@ function onNetEvent(code,d,from){
   case N.BR:if(!br)return;br.T=d.T;br.ev=d.ev;br.border=d.border;br.lastCx=d.lastCx;br.lastCz=d.lastCz;break;
   case N.START:if(!fromHost)return;applyStart(d,d.join||null);showLoading(d.join?'Joining game':'Loading level',null);break;
   case N.ANN:msgs.push({t:d.d,txt:d.t,sub:d.s||''});break;
-  case N.CHAT:chat.push({t:10,txt:String(d.t||'').slice(0,120),col:/^#[0-9a-f]{3,6}$/i.test(d.c)?d.c:'#fff'});if(chat.length>8)chat.shift();break;
+  case N.CHAT:if(d&&d.p){chat.push({t:10,txt:`<${String(d.n||'Player').slice(0,16)}> ${String(d.m||'').slice(0,100)}`,col:'#ffffff'});if(chat.length>8)chat.shift();sfx('click');break;}chat.push({t:10,txt:String(d.t||'').slice(0,120),col:/^#[0-9a-f]{3,6}$/i.test(d.c)?d.c:'#fff'});if(chat.length>8)chat.shift();break;
   case N.BLOCK:applyBlock(d[0],d[1],d[2],d[3]);break;
   case N.SQUEAK:{const e=entById(d.id);if(e){spawnParticles(e.pos[0],e.pos[1],e.pos[2],4,[.3,.2,.15],1.5);if(player&&dist(e.pos,player.pos)<24)sfx('squeak');}break;}
   case N.LOBBY:if(!fromHost)return;if(MATCH.state!=='lobby')enterLobby();MATCH.lobbyCD=d.cd;MATCH.nextMap=d.next;Object.assign(SET,d.set);for(const e of ents)e.ready=d.ready.includes(e.id);break;

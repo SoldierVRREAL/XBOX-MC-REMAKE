@@ -84,7 +84,7 @@ function hurt(e,amt,src,cause,kb,raw,ignoreInvuln){
   if(fresh){
     if(kb)knockback(e,kb[0],kb[1],kb[2]||0,kb[3]||0,kb[4]||0);
     sfx(cause==='fall'?(amt>4?'fallbig':'fall'):cause==='fire'||cause==='lava'?'burn':cause==='drown'?'drown':'hurt',{pos:e.pos});
-    spawnParticles(e.pos[0],e.pos[1]+1,e.pos[2],6,[.7,.1,.1],2);
+    if(cause==='fall'&&amt>0){const b=getB(Math.floor(e.pos[0]),Math.floor(e.pos[1]-.2),Math.floor(e.pos[2]));if(b)blockParticles(Math.floor(e.pos[0]),Math.floor(e.pos[1]-.2),Math.floor(e.pos[2]),b,Math.min(40,8+amt*4));}
   }
   if(e.health<=0)kill(e,src,cause);
   return true;
@@ -120,7 +120,7 @@ function onDeath(m){
   feed.unshift({t:7,txt:deathText(e,killer,m.c)});if(feed.length>6)feed.pop();
   if(isHost()){for(const s of m.inv)hostSpawnDrop(m.pos,s.id,s.count);for(const a of m.armor)hostSpawnDrop(m.pos,a,1);}
   e.inv=new Array(9).fill(null);e.armor=[null,null,null,null];
-  spawnParticles(e.pos[0],e.pos[1]+1,e.pos[2],20,[.85,.85,.85],3);
+  spawnParticles(e.pos[0],e.pos[1]+.8,e.pos[2],20,[.85,.85,.85],1.2,'poof');
   if(e===player){sfx('death');chestClose(false);player.bat=true;player.pos[1]+=2.2;player.vel=[0,0,0];spectate.mode='bat';showDeathPanel(killer);}
   if(e.kind==='player'&&e!==player)e.bat=true;
 }
@@ -134,7 +134,7 @@ function meleeTarget(e,range){
 function doAttack(e,target){
   if(e.atkCD>0)return;e.atkCD=e.isLocal?0:.12;e.swing=1;
   const t=target!==undefined?target:meleeTarget(e,3);if(!t)return;exhaust(e,.3);
-  let dmg=weaponDmg(e);const crit=(e.fallDist||0)>0&&!e.onGround&&!onLadder(e)&&!e.inWater;if(crit){dmg*=1.5;spawnParticles(t.pos[0],t.pos[1]+1.2,t.pos[2],8,[1,.9,.4],3);}
+  let dmg=weaponDmg(e);const crit=(e.fallDist||0)>0&&!e.onGround&&!onLadder(e)&&!e.inWater;if(crit){dmg*=1.5;spawnParticles(t.pos[0],t.pos[1]+1.2,t.pos[2],14,[1,1,1],4,'crit');}
   const extra=e.sprint?1:0;if(e.sprint){e.sprint=false;if(e.mot){e.mot[0]*=.6;e.mot[2]*=.6;}}
   if(e.effects.invis)delete e.effects.invis;
   damage(t,dmg,e,'melee',[t.pos[0]-e.pos[0],t.pos[2]-e.pos[2],extra,-Math.sin(e.yaw),-Math.cos(e.yaw)]);
@@ -198,5 +198,13 @@ function updateDrops(dt){
 function invRoom(e,id){const it=ITEMS[id];if(it.type==='armor')return true;if(e.inv.some(s=>!s))return true;return it.stack>1&&e.inv.some(s=>s&&s.id===id&&s.count<it.stack);}
 
 // ---------- particles ----------
-function spawnParticles(x,y,z,n,col,sp){n=Math.ceil(n*[.2,.5,1][OPT.particles]);for(let i=0;i<n;i++)particles.push({p:[x,y,z],v:[(Math.random()-.5)*sp,Math.random()*sp,(Math.random()-.5)*sp],t:.4+Math.random()*.5,col});if(particles.length>600)particles.splice(0,particles.length-600);}
-function updateParticles(dt){for(const p of particles){p.t-=dt;p.v[1]-=9*dt;for(let k=0;k<3;k++)p.p[k]+=p.v[k]*dt;}particles=particles.filter(p=>p.t>0);}
+// particles are textured billboards like vanilla: kind 'poof' (generic smoke), 'crit', 'magic', or a block id (digging chips); others are tinted generic
+function spawnParticles(x,y,z,n,col,sp,kind){n=Math.ceil(n*[.2,.5,1][OPT.particles]);for(let i=0;i<n;i++){const life=kind==='crit'||kind==='magic'?.6+Math.random()*.4:typeof kind==='number'?.5+Math.random()*1:.4+Math.random()*.5;
+    particles.push({p:[x,y,z],v:[(Math.random()-.5)*sp,Math.random()*sp,(Math.random()-.5)*sp],t:life,t0:life,col,kind,sz:typeof kind==='number'?.1+Math.random()*.08:kind==='crit'||kind==='magic'?.12:.12+Math.random()*.1,q:Math.random()*4|0,
+      g:typeof kind==='number'?16:kind==='crit'||kind==='magic'?2:kind==='poof'?-1.5:9});}
+  if(particles.length>700)particles.splice(0,particles.length-700);}
+function blockParticles(x,y,z,b,n){if(!b||!BD[b])return;n=Math.ceil(n*[.2,.5,1][OPT.particles]);for(let i=0;i<n;i++){const life=.5+Math.random();
+  particles.push({p:[x+Math.random(),y+Math.random(),z+Math.random()],v:[(Math.random()-.5)*3,Math.random()*3,(Math.random()-.5)*3],t:life,t0:life,kind:b,sz:.1+Math.random()*.06,q:Math.random()*4|0,g:16});}}
+function updateParticles(dt){for(const p of particles){p.t-=dt;p.v[1]-=p.g*dt;const drag=Math.pow(.98,dt*20);for(let k=0;k<3;k++){p.v[k]*=drag;p.p[k]+=p.v[k]*dt;}
+    if(typeof p.kind==='number'){const b=getB(Math.floor(p.p[0]),Math.floor(p.p[1]),Math.floor(p.p[2]));if(b&&BD[b].solid){p.p[1]=Math.floor(p.p[1])+1.01;p.v[1]=0;p.v[0]*=.7;p.v[2]*=.7;}}}
+  particles=particles.filter(p=>p.t>0);}
