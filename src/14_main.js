@@ -23,11 +23,13 @@ chestAcc+=dt;while(chestAcc>=TICK){chestAcc-=TICK;tickChestLids();}
   sendMyState(dt);sendBots(dt);
 }
 let last=performance.now();
-function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;perfT+=dt;dtFrame=dt;try{update(dt);render();}catch(err){console.error(err);}requestAnimationFrame(frame);}
+let lastDraw=0;
+function frame(now){const cap=[0,60,30][OPT.fps|0];if(cap&&now-lastDraw<1000/cap-2){requestAnimationFrame(frame);return;}lastDraw=now;const dt=Math.min(.05,(now-last)/1000);last=now;perfT+=dt;dtFrame=dt;try{update(dt);render();}catch(err){console.error(err);}requestAnimationFrame(frame);}
 rebuildIcons();rebuildItemAtlas();initEntityTextures();
 generateMap('skyhold',1,false);buildMesh();refreshSkinPicker();
 requestAnimationFrame(frame);
 (async()=>{let n=await loadSavedPacks();
-  if(location.protocol!=='file:')for(const name of ['pack.zip','resourcepack.zip','sounds.zip']){try{const r=await fetch(name);if(r.ok){const buf=await r.arrayBuffer();n+=await loadPackBuffer(buf,name)?1:0;}}catch(e){}}
-  if(n){applyPack();refreshPackList();}})();
+  if(n){applyPack();refreshPackList();}
+  // default packs beside the page: textures first (applied straight away), then sounds
+  if(location.protocol!=='file:')for(const name of ['pack.zip','resourcepack.zip','sounds.zip']){try{const r=await fetch(name);if(r.ok){const buf=await r.arrayBuffer();if(await loadPackBuffer(buf,name)){applyPack();refreshPackList();}}}catch(e){}}})();
 window.__bb={get state(){return MATCH.state;},get MATCH(){return MATCH;},get ents(){return ents;},get player(){return player;},get chests(){return chests;},get br(){return br;},get net(){return net;},SET,update,hostStartMatch,generateMap,loadPackBuffer,applyPack,PACK,get drops(){return drops;},getB,fluidAt,BD,topSolid,physics,mcTick,setB,B,enterLobby,hurt,doAttack,fireBow,bowCharge,get projs(){return projs;},update,sfx,packEvent,packGroup,get actx(){return actx;},initAudio,sndCache,get atlas(){return atlasCanvas;},get cam(){return [camPos,camYaw,camPitch];}};

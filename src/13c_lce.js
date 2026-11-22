@@ -11,28 +11,26 @@ function pxCanvas(t,S,col,shadow=true){t=String(t);
   if(shadow){g.fillStyle=hexRGBs(col);g.fillText(t,S,S-fs*.12);}g.fillStyle=col;g.fillText(t,0,-fs*.12);return c;}
 function pxSet(el,t,col,shadow=true,sc){el.textContent='';el.appendChild(pxCanvas(t,sc||GS,col,shadow));}
 // buttons: pack widgets.png if loaded, otherwise a stone-textured console button
-function procButton(sel){const c=mkCanvas(200,20),g=c.getContext('2d');const base=sel?[150,155,214]:[111,111,111];
+function procButton(sel){const c=mkCanvas(200,20),g=c.getContext('2d');const base=sel==='off'?[44,44,44]:sel?[150,155,214]:[111,111,111];
   for(let y=0;y<20;y++)for(let x=0;x<200;x++){const n=(hash2(x>>1,y>>1,sel?31:30)-.5)*18;g.fillStyle=`rgb(${base[0]+n|0},${base[1]+n|0},${base[2]+n|0})`;g.fillRect(x,y,1,1);}
-  g.fillStyle=sel?'#c8ccf4':'#a8a8a8';g.fillRect(1,1,198,1);g.fillRect(1,1,1,17);g.fillStyle=sel?'#5b609e':'#4a4a4a';g.fillRect(1,17,198,2);g.fillRect(198,1,1,18);
+  g.fillStyle=sel===true?'#c8ccf4':sel==='off'?'#505050':'#a8a8a8';g.fillRect(1,1,198,1);g.fillRect(1,1,1,17);g.fillStyle=sel===true?'#5b609e':sel==='off'?'#1c1c1c':'#4a4a4a';g.fillRect(1,17,198,2);g.fillRect(198,1,1,18);
   g.strokeStyle='#000';g.lineWidth=1;g.strokeRect(.5,.5,199,19);return c;}
 function refreshLCE(){
-  const S=clamp(Math.min(Math.round(innerHeight/360),Math.floor(innerWidth*.92/210)),1,4);GS=S;document.documentElement.style.setProperty('--S',S);
-  const G=PACK.gui||{};document.documentElement.style.setProperty('--btn',`url(${(G.btn||procButton(false)).toDataURL()})`);document.documentElement.style.setProperty('--btnSel',`url(${(G.btn_hover||procButton(true)).toDataURL()})`);
+  const fitS=clamp(Math.min(Math.round(innerHeight/360),Math.floor(innerWidth*.92/210)),1,4);const S=OPT.gui?clamp(Math.min(OPT.gui,Math.floor(innerWidth*.92/210)),1,4):fitS;GS=S;document.documentElement.style.setProperty('--S',S);
+  const G=PACK.gui||{};document.documentElement.style.setProperty('--btn',`url(${(G.btn||procButton(false)).toDataURL()})`);document.documentElement.style.setProperty('--btnSel',`url(${(G.btn_hover||procButton(true)).toDataURL()})`);document.documentElement.style.setProperty('--btnOff',`url(${(G.btn_off||procButton('off')).toDataURL()})`);
   document.querySelectorAll('.lbtn').forEach(b=>{const t=b.dataset.t||(b.dataset.t=b.textContent.trim());b.textContent='';const n=pxCanvas(t,S,'#e0e0e0'),s=pxCanvas(t,S,'#ffffa0');n.className='n';s.className='s';b.append(n,s);b.setAttribute('aria-label',t);});
   document.querySelectorAll('.sbtn').forEach(b=>{const t=b.dataset.t||(b.dataset.t=b.textContent.trim());pxSet(b,t,'#404040',false);b.setAttribute('aria-label',t);});
   document.querySelectorAll('.lab[data-t],.lhead[data-t],.lnote[data-t]').forEach(el=>pxSet(el,el.dataset.t,'#404040',false));
-  const sp=$('splash');sp.dataset.t=sp.dataset.t||sp.textContent;pxSet(sp,sp.dataset.t,'#ffff00',true,S*2);const cvs=sp.firstChild;const maxW=190*S;if(cvs.width>maxW){cvs.style.width=maxW+'px';cvs.style.height=Math.round(cvs.height*maxW/cvs.width)+'px';}
+  const sp=$('splash');sp.dataset.t=sp.dataset.t||sp.textContent;pxSet(sp,sp.dataset.t,'#ffff00',true,S*2);const cvs=sp.firstChild;const maxW=200*S;if(cvs.width>maxW){cvs.style.width=maxW+'px';cvs.style.height=Math.round(cvs.height*maxW/cvs.width)+'px';}
   pxSet($('verL'),$('verL').dataset.t,'#ffffff');pxSet($('verR'),$('verR').dataset.t,'#ffffff');
-  menuPrompts();if(chestOpen)renderChest();if(!$('lbPanel').classList.contains('hidden'))renderLB();if(!$('dressPanel').classList.contains('hidden'))renderDress();pxSet($('pvName'),myName||'Player','#ffffff');
+  menuPrompts();if(chestOpen)renderChest();if(!$('jOpt').classList.contains('hidden'))jRender();if(!$('lbPanel').classList.contains('hidden'))renderLB();if(!$('dressPanel').classList.contains('hidden'))renderDress();pxSet($('pvName'),myName||'Player','#ffffff');
 }
 addEventListener('resize',()=>{clearTimeout(refreshLCE.t);refreshLCE.t=setTimeout(refreshLCE,120);});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(!FONT)refreshLCE();});
 // ---- bible verse splashes (King James Version) ----
-const VERSES=['Jesus wept. -John 11:35','God is love. -1 John 4:8','Rejoice evermore. -1 Thess 5:16','Pray without ceasing. -1 Thess 5:17','Fear thou not! -Isaiah 41:10',
-  'The LORD is my shepherd! -Psalm 23:1','Be strong and of a good courage! -Joshua 1:9','Be still, and know that I am God. -Psalm 46:10','I can do all things through Christ! -Phil 4:13',
-  'Let there be light! -Genesis 1:3','Love one another. -John 13:34','Seek, and ye shall find. -Matthew 7:7','Charity never faileth. -1 Cor 13:8',
-  'The joy of the LORD is your strength. -Neh 8:10','This is the day which the LORD hath made! -Psalm 118:24','Trust in the LORD with all thine heart. -Prov 3:5',
-  'Ask, and it shall be given you. -Matthew 7:7','In the beginning God created the heaven and the earth. -Genesis 1:1'];
+const VERSES=['Jesus wept. -John 11:35','God is love. -1 John 4:8','Rejoice evermore! -1 Thess 5:16','Pray without ceasing! -1 Thess 5:17','Fear thou not! -Isaiah 41:10',
+  'The LORD is my shepherd! -Ps 23:1','Let there be light! -Gen 1:3','Love one another! -John 13:34','Seek, and ye shall find! -Matt 7:7','Charity never faileth! -1 Cor 13:8',
+  'Be still! -Psalm 46:10','Be of good courage! -Psalm 27:14','Watch and pray! -Matt 26:41','Be strong! -Joshua 1:9'];
 $('splash').dataset.t=VERSES[Math.random()*VERSES.length|0];
 // ---- button prompts (Xbox-style A/B/X/Y circles, bumpers, or keyboard keys) ----
 function setPrompts(id,list){const el=$(id);if(!el)return;el.textContent='';const S=GS;
@@ -76,9 +74,12 @@ function saveCustomSkins(){try{store('bb_cskins',JSON.stringify(CUSTOM_SKINS.map
 (()=>{try{const l=JSON.parse(store('bb_cskins')||'[]');for(const [k,u] of l){CUSTOM_SKINS.push(k);addSkinData(k,u,false);}}catch(e){}})();
 const skinAsk={};
 function requestSkin(k){if(!net||skinAsk[k]>performance.now())return;skinAsk[k]=performance.now()+5000;netSend(N.SKIN,{req:k});}
-function onSkinNet(d){if(!d)return;if(d.req){if(d.req===mySkin&&SKIN_DATA[mySkin])netSend(N.SKIN,{k:mySkin,d:SKIN_DATA[mySkin]});return;}
-  if(typeof d.k==='string'&&typeof d.d==='string'&&d.d.startsWith('data:image/png')&&d.d.length<400000&&d.k==='img:'+hashStr(d.d).toString(36))addSkinData(d.k,d.d,false);}
-$('skinFile').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();r.onload=async()=>{const url=r.result;if(!String(url).startsWith('data:image/png')){dressMsg('Skins must be PNG files.');return;}
+function onSkinNet(d){if(!d)return;if(d.req){if(d.req===mySkin&&SKIN_DATA[mySkin]&&SKIN_DATA[mySkin].length<30000)netSend(N.SKIN,{k:mySkin,d:SKIN_DATA[mySkin]});return;}
+  if(typeof d.k==='string'&&typeof d.d==='string'&&d.d.startsWith('data:image/png')&&d.d.length<30000&&d.k==='img:'+hashStr(d.d).toString(36))addSkinData(d.k,d.d,false);}
+$('skinFile').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();r.onload=async()=>{const raw=r.result;if(!String(raw).startsWith('data:image/png')){dressMsg('Skins must be PNG files.');return;}
+    // normalise to a 64x64 PNG (legacy 64x32 converted, HD scaled) so it stays small enough to send to other players
+    const url=await new Promise(res=>{const im=new Image();im.onload=()=>{const sk=skinFromImage(im);if(!sk)return res(null);const c=mkCanvas(64,64),g=c.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(sk.img,0,0,64,64);res(c.toDataURL('image/png'));};im.onerror=()=>res(null);im.src=raw;});
+    if(!url){dressMsg('That image is not a 64x64 or 64x32 skin.');return;}
     const k='img:'+hashStr(url).toString(36);const ok=await addSkinData(k,url,true);if(!ok){dressMsg('That image is not a 64x64 or 64x32 skin.');return;}mySkin=k;store('bb_skin',k);sfx('pick');dressMsg('Skin imported!');renderDress();if(typeof refreshSkinPicker==='function')refreshSkinPicker();};r.readAsDataURL(f);});
 // ---- Dressing Room ----
 function dressSkins(){return CUSTOM_SKINS.concat(availableSkins().filter(k=>!k.startsWith('img:')),['gen:'+(myName||'Player'),'gen:Alpha','gen:Bravo','gen:Charlie','gen:Delta','gen:Echo','gen:Foxtrot']);}
@@ -129,7 +130,7 @@ function drawPreview(){
     g.setTransform(a,b,cc,d,e,f);const u0=Math.min(A[3],B[3]),v0=Math.min(A[4],D[4]);g.drawImage(T.l[li],u0,v0,Math.abs(du),Math.abs(dv),u0,v0,Math.abs(du),Math.abs(dv));g.restore();g.setTransform(1,0,0,1,0,0);}}
 // ---- per-frame hook ----
 let lceLastPad=null;
-function tickLCE(dt){if(lceLastPad!==padActive){lceLastPad=padActive;if(chestOpen)renderChest();}drawPreview();}
+function tickLCE(dt){tickTouch();if(lceLastPad!==padActive){lceLastPad=padActive;if(chestOpen)renderChest();}drawPreview();}
 // keyboard: Escape/Backspace go back, X opens the Dressing Room, arrows cycle skins in the Dressing Room
 document.addEventListener('keydown',e=>{const inInput=e.target&&e.target.tagName==='INPUT';
   if(!$('dressPanel').classList.contains('hidden')){if(e.code==='Escape'||(e.code==='Enter'&&inInput)){closeDress();e.preventDefault();}else if(!inInput&&(e.code==='ArrowLeft'||e.code==='ArrowRight')){cycleSkin(e.code==='ArrowLeft'?-1:1);e.preventDefault();}else if(!inInput&&e.code==='KeyX')$('skinFile').click();return;}

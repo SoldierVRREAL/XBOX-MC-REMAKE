@@ -1,9 +1,9 @@
 // ================= UI, input, local player =================
 let sprintTap=false,lastWUp=-1;const keys={};let lmb=false,rmb=false,rmbEdge=false,lmbEdge=false,locked=false,selShow=0,paused=false;
-const OVERLAYS=['lbPanel','dressPanel','menu','optPanel','onlinePanel','packPanel','chestUI','pause','lobbyPanel','results','clickResume'];
+const OVERLAYS=['jOpt','lbPanel','dressPanel','menu','optPanel','onlinePanel','packPanel','chestUI','pause','lobbyPanel','results','clickResume'];
 function show(id){$(id).classList.remove('hidden');}function hide(id){$(id).classList.add('hidden');}
 function hideOverlays(){for(const id of OVERLAYS)hide(id);}
-function lockPointer(){if(padActive)return;try{let r=null;try{r=cv.requestPointerLock({unadjustedMovement:true});}catch(e){r=null;}if(r&&r.catch)r.catch(()=>{try{const r2=cv.requestPointerLock();if(r2&&r2.catch)r2.catch(()=>{});}catch(e){}});else if(!r&&!document.pointerLockElement){}}catch(e){}}
+function lockPointer(){if(padActive||touchActive)return;try{let r=null;try{r=cv.requestPointerLock({unadjustedMovement:true});}catch(e){r=null;}if(r&&r.catch)r.catch(()=>{try{const r2=cv.requestPointerLock();if(r2&&r2.catch)r2.catch(()=>{});}catch(e){}});else if(!r&&!document.pointerLockElement){}}catch(e){}}
 let SENS=+(store('bb_sens')||.5),INVY=store('bb_invy')==='1';
 function lookDelta(dx,dy){const f=SENS*.6+.2,k=f*f*f*8*.15*Math.PI/180;player.yaw-=dx*k;player.pitch=clamp(player.pitch-(INVY?-dy:dy)*k,-Math.PI/2,Math.PI/2);}
 function setNetStatus(s){const el=$('status');if(el)el.textContent=s;}
@@ -23,7 +23,7 @@ document.addEventListener('keydown',e=>{
   if(!player||MATCH.state==='menu')return;
   if(e.code.startsWith('Digit')){const n=+e.code.slice(5);if(n>=1&&n<=9&&player.alive){player.sel=n-1;player.using=null;selShow=2;if(chestOpen)renderChest();}}
   if(e.code==='KeyE'){if(chestOpen)chestClose(true);else if(player.alive&&MATCH.state==='play'){if(!tryOpenChest())openInv();}else if(!player.alive){spectate.mode='follow';spectate.idx++;}}
-  if(e.code==='KeyQ'){if(!player.alive){spectate.mode='follow';spectate.idx--;}else if(locked&&MATCH.state!=='lobby'){const s=player.inv[player.sel];if(s){const d=fwd(player);requestDrop([player.pos[0],player.pos[1]+.4,player.pos[2]],s.id,1,[d[0]*6,d[1]*6+2,d[2]*6]);consume(player,player.sel);}}}
+  if(e.code==='KeyQ'){if(!player.alive){spectate.mode='follow';spectate.idx--;}else if((locked||touchActive||padActive)&&MATCH.state!=='lobby'){const s=player.inv[player.sel];if(s){const d=fwd(player);requestDrop([player.pos[0],player.pos[1]+.4,player.pos[2]],s.id,1,[d[0]*6,d[1]*6+2,d[2]*6]);consume(player,player.sel);}}}
   if(e.code==='KeyF'&&!player.alive)spectate.mode='bat';
   if(e.code==='Space'&&chestOpen&&SET.takeAll)chestOp('all');
   if(e.code==='KeyR'&&MATCH.state==='lobby'){toggleReady();}
@@ -35,28 +35,29 @@ function toggleReady(){player.ready=!player.ready;netSend(N.READY,{r:player.read
 // ---------- local player ----------
 function updatePlayer(dt){
   const p=player;if(!p)return;
-  const canMove=!chestOpen&&(locked||padActive)&&!(MATCH.state==='play'&&MATCH.preT>0);
+  const canMove=!chestOpen&&(locked||padActive||touchActive)&&!(MATCH.state==='play'&&MATCH.preT>0);
   if(!p.alive){ // bat spectator: free flight
     if(spectate.mode==='bat'){const f=fwd(p),r=[Math.cos(p.yaw),0,-Math.sin(p.yaw)];let v=[0,0,0];const sp=8;
-      if(canMove){if(keys.KeyW)v=v.map((x,i)=>x+f[i]);if(keys.KeyS)v=v.map((x,i)=>x-f[i]);if(keys.KeyD)v=v.map((x,i)=>x+r[i]);if(keys.KeyA)v=v.map((x,i)=>x-r[i]);if(keys.Space)v[1]+=1;if(keys.ShiftLeft)v[1]-=1;}
+      if(canMove){if(keys.KeyW)v=v.map((x,i)=>x+f[i]);if(keys.KeyS)v=v.map((x,i)=>x-f[i]);if(keys.KeyD)v=v.map((x,i)=>x+r[i]);if(keys.KeyA)v=v.map((x,i)=>x-r[i]);if(keys.Space)v[1]+=1;if(keys.ShiftLeft)v[1]-=1;
+        if(touchActive){v=v.map((x,i)=>x+f[i]*touchIn.fw+r[i]*touchIn.st);if(touchIn.jump)v[1]+=1;if(touchIn.sneak)v[1]-=1;}}
       const L=Math.hypot(...v)||1;for(let i=0;i<3;i++){p.vel[i]+=(v[i]/L*sp-p.vel[i])*Math.min(1,dt*6);p.pos[i]+=p.vel[i]*dt;}
       p.pos[0]=clamp(p.pos[0],1,WX-1);p.pos[2]=clamp(p.pos[2],1,WZ-1);p.pos[1]=clamp(p.pos[1],(mapInfo?mapInfo.voidY:0)+4,WY+20);}
-    if(lmbEdge&&(locked||padActive)){lmbEdge=false;sfx('squeak');netSend(N.SQUEAK,{id:p.id});spawnParticles(p.pos[0],p.pos[1],p.pos[2],4,[.3,.2,.15],1.5);}
+    if(lmbEdge&&(locked||padActive||touchActive)){lmbEdge=false;sfx('squeak');netSend(N.SQUEAK,{id:p.id});spawnParticles(p.pos[0],p.pos[1],p.pos[2],4,[.3,.2,.15],1.5);}
     return;
   }
   // Java controls: WASD, Space jump/swim/climb-out, Shift sneak, Ctrl or double-tap W sprint
   let fw=0,st=0;if(canMove){if(keys.KeyW||keys.ArrowUp)fw+=1;if(keys.KeyS||keys.ArrowDown)fw-=1;if(keys.KeyD||keys.ArrowRight)st+=1;if(keys.KeyA||keys.ArrowLeft)st-=1;}
-  if(padActive&&canMove){fw+=padIn.fw;st+=padIn.st;const m=Math.hypot(fw,st);if(m>1){fw/=m;st/=m;}}
+  if(padActive&&canMove){fw+=padIn.fw;st+=padIn.st;}if(touchActive&&canMove){fw+=touchIn.fw;st+=touchIn.st;}{const m=Math.hypot(fw,st);if(m>1){fw/=m;st/=m;}}
   const f=[-Math.sin(p.yaw),-Math.cos(p.yaw)],r=[Math.cos(p.yaw),-Math.sin(p.yaw)];const wx=f[0]*fw+r[0]*st,wz=f[1]*fw+r[1]*st;
-  p.sneak=canMove&&!!(keys.ShiftLeft||keys.ShiftRight||(padActive&&padIn.sneak));
+  p.sneak=canMove&&!!(keys.ShiftLeft||keys.ShiftRight||(padActive&&padIn.sneak)||(touchActive&&touchIn.sneak));
   const canSprint=fw>0&&!p.sneak&&!p.using&&p.food>6&&!p.effects.blind;
-  if(!canSprint||p.collidedH)p.sprint=false;else if((keys.ControlLeft||keys.ControlRight||sprintTap||(padActive&&padIn.sprint&&fw>.8))&&canSprint)p.sprint=true;
+  if(!canSprint||p.collidedH)p.sprint=false;else if((keys.ControlLeft||keys.ControlRight||sprintTap||(padActive&&padIn.sprint&&fw>.8)||(touchActive&&touchIn.sprint&&fw>.8))&&canSprint)p.sprint=true;
   if(!p.sprint)sprintTap=false;
-  p.jump=canMove&&!!(keys.Space||(padActive&&padIn.jump));
+  p.jump=canMove&&!!(keys.Space||(padActive&&padIn.jump)||(touchActive&&touchIn.jump));
   const moved=physics(p,dt,wx,wz);
   if(MATCH.state==='play'||MATCH.state==='over')tickOwned(p,dt,moved);
   if(!p.alive)return;
-  if(MATCH.state!=='play'||!(locked||padActive)||MATCH.preT>0){rmbEdge=false;lmbEdge=false;if(p.using&&!rmb)p.using=null;return;}
+  if(MATCH.state!=='play'||!(locked||padActive||touchActive)||MATCH.preT>0){rmbEdge=false;lmbEdge=false;if(p.using&&!rmb)p.using=null;return;}
   // left mouse: attack, or mine blocks in Battle Royale
   if(lmb&&!p.using){const tgt=meleeTarget(p,3.2);
     if(tgt||MATCH.mode!=='br'){mining=null;if(lmbEdge)doAttack(p,tgt||null);}
@@ -120,7 +121,7 @@ $('mapChecks').innerHTML=MAPS.map(m=>`<label title="${m.desc}"><input type="chec
 try{const s=JSON.parse(store('bb_set')||'null');if(s)Object.assign(SET,s,{maps:Object.assign({},SET.maps,s.maps||{})});}catch(e){}
 writeOptions();
 let optReturn='menu';
-$('optBtn').addEventListener('click',()=>{sfx('click');optReturn='menu';hide('menu');show('optPanel');});
+$('optBtn').addEventListener('click',()=>{sfx('click');optReturn='menu';openOptions('menu');});
 $('practiceBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();online=false;if(net){net.leave();net=null;}player=null;ents=[];enterLobby();chatMsg('Movement playground to the east: ice, slime, soul sand,','#ffff55',false);chatMsg('cobwebs, ladder, slabs, stairs and a pool.','#ffff55',false);});
 // console-style menu navigation
 const MBTN=()=>[...document.querySelectorAll('#menuList .lbtn')].filter(b=>!b.classList.contains('hidden'));let mSel=0;
@@ -142,7 +143,13 @@ function drawLogo(){const c=$('logo'),g=c.getContext('2d');g.clearRect(0,0,c.wid
 drawLogo();
 // custom title logo: logo.png beside the page, or one picked in Resource Packs (kept in this browser)
 function setLogoImage(img){const c=$('logo');const w=Math.min(1024,img.naturalWidth||img.width),h=Math.round(w*(img.naturalHeight||img.height)/(img.naturalWidth||img.width));
-  c.width=w;c.height=h;const g=c.getContext('2d');g.imageSmoothingEnabled=true;g.clearRect(0,0,w,h);g.drawImage(img,0,0,w,h);c.style.imageRendering='auto';$('edition').classList.add('hidden');$('splash').classList.add('onlogo');}
+  c.width=w;c.height=h;const g=c.getContext('2d');g.imageSmoothingEnabled=true;g.clearRect(0,0,w,h);g.drawImage(img,0,0,w,h);
+  // logos saved without transparency: clear the plain white/black backdrop by flood-filling from the edges
+  try{const d=g.getImageData(0,0,w,h),D=d.data;const at=(x,y)=>(y*w+x)*4;const c0=at(0,0);
+    if(D[c0+3]===255){const bg=[D[c0],D[c0+1],D[c0+2]];const near=i=>D[i+3]>0&&Math.abs(D[i]-bg[0])+Math.abs(D[i+1]-bg[1])+Math.abs(D[i+2]-bg[2])<60;const seen=new Uint8Array(w*h),st=[];
+      for(let x=0;x<w;x++){st.push(x,0,x,h-1);}for(let y=0;y<h;y++){st.push(0,y,w-1,y);}
+      while(st.length){const y=st.pop(),x=st.pop();const k=y*w+x;if(seen[k])continue;seen[k]=1;const i=k*4;if(!near(i))continue;D[i+3]=0;if(x>0)st.push(x-1,y);if(x<w-1)st.push(x+1,y);if(y>0)st.push(x,y-1);if(y<h-1)st.push(x,y+1);}
+      g.putImageData(d,0,0);}}catch(e){}c.style.imageRendering='auto';$('edition').classList.add('hidden');$('splash').classList.add('onlogo');}
 function loadLogoURL(url,save){return new Promise(res=>{const im=new Image();im.onload=()=>{setLogoImage(im);if(save)try{store('bb_logo',url);}catch(e){}res(true);};im.onerror=()=>res(false);im.src=url;});}
 (async()=>{const saved=store('bb_logo');if(saved&&await loadLogoURL(saved,false))return;if(location.protocol!=='file:')for(const n of ['logo.png','logo.webp','logo.jpg'])if(await loadLogoURL(n,false))return;})();
 $('logoFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>loadLogoURL(r.result,true).then(ok=>{$('packList').textContent=ok?'Title logo set.':'Could not read that image.';});r.readAsDataURL(f);});
@@ -189,7 +196,7 @@ function openLobbyPanel(){document.exitPointerLock&&document.exitPointerLock();s
   $('lobbyStart').classList.toggle('hidden',!host);$('lobbyOpts').classList.toggle('hidden',!host);}
 $('lobbyReady').addEventListener('click',()=>{toggleReady();openLobbyPanel();});
 $('lobbyStart').addEventListener('click',()=>{if(isHost()){hide('lobbyPanel');hostStartMatch();}});
-$('lobbyOpts').addEventListener('click',()=>{optReturn='lobbyPanel';hide('lobbyPanel');show('optPanel');});
+$('lobbyOpts').addEventListener('click',()=>{optReturn='lobbyPanel';openOptions('lobbyPanel','rules');});
 $('lobbyClose').addEventListener('click',()=>{hide('lobbyPanel');lockPointer();});
 function showDeathPanel(killer){announce(killer?'Slain by '+killer.name:'You died!','You are now a bat. Squeak at the living!',3.5,false);}
 function showResults(m){

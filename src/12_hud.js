@@ -31,6 +31,7 @@ function project(p){const q=xform(VP,p);if(q[3]<=0)return null;return [(q[0]/q[3
 function nameTag(e,col){const p=project([e.pos[0],e.pos[1]+(e.bat?.6:2.05),e.pos[2]]);if(!p)return;hc.font="18px "+HFONT;const tw=hc.measureText(e.name).width;
   hc.fillStyle='rgba(0,0,0,.45)';hc.fillRect(p[0]-tw/2-4,p[1]-15,tw+8,18);hc.textAlign='center';hc.fillStyle=col||'#fff';hc.fillText(e.name,p[0],p[1]-2);}
 function drawHUD(){
+  if(OPT.showFps&&MATCH.state!=='menu')drawFps();
   hc.setTransform(DPR,0,0,DPR,0,0);hc.clearRect(0,0,W,H);hc.imageSmoothingEnabled=false;
   if(MATCH.state==='menu'||!player)return;
   // name tags: lobby shows everyone; in Battle they are hidden until Showdown reveals the survivors

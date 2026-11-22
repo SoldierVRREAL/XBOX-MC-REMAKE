@@ -1,6 +1,7 @@
 // ================= blocks =================
 const B={ICE:33,SLIME:34,SOUL:35,WEB:36,LADDER:37,SLAB:41,STAIRS:42,TGRASS:30,POPPY:31,DANDELION:32,AIR:0,GRASS:1,DIRT:2,STONE:3,LOG:4,LEAVES:5,PLANKS:6,SAND:7,CHEST:8,COBBLE:9,BRICK:10,GLASS:11,WOOL:12,GRAVEL:13,MOSSY:14,
-  WATER:15,LAVA:16,GLOW:17,BONE:18,SANDSTONE:19,SBRICK:20,MSBRICK:21,CHISELED:22,GOLDB:23,DIAMONDB:24,EMERALDB:25,OBSIDIAN:26,NETHERRACK:27,BARRIER:28,BEACON:29};
+  WATER:15,LAVA:16,GLOW:17,BONE:18,SANDSTONE:19,SBRICK:20,MSBRICK:21,CHISELED:22,GOLDB:23,DIAMONDB:24,EMERALDB:25,OBSIDIAN:26,NETHERRACK:27,BARRIER:28,BEACON:29,
+  OAK_STAIRS:46,OAK_SLAB:50,SPRUCE_LOG:51,SPRUCE_PLANKS:52,FENCE:53,TORCH:54,CARPET:55,IRON_BARS:56,QUARTZ:57,JLEAVES:58,COAL:59,CRACKED:60,CSANDSTONE:61,SSANDSTONE:62,REDSTONE:63,JLOG:64,SST_SLAB:65,SBR_SLAB:66,SBR_STAIRS:67,WOOL_W:71,SPRUCE_STAIRS:72};
 const BD=[];
 function def(id,top,side,bottom,o={}){BD[id]=Object.assign({top,side,bottom,front:side,solid:true,opaque:true,liquid:false,light:0,render:true},o);}
 def(1,0,1,2);def(2,2,2,2);def(3,3,3,3);def(4,5,4,5);def(5,6,6,6,{opaque:false});def(6,7,7,7);def(7,8,8,8);
@@ -17,15 +18,34 @@ def(33,38,38,38,{opaque:false});def(34,39,39,39,{opaque:false});def(35,40,40,40,
 for(let k=0;k<4;k++)def(37+k,42,42,42,{opaque:false,ladder:true,shape:[sideBox(k,1/16)],col:[sideBox(k,.125)]});
 def(41,44,43,44,{opaque:false,shape:[[0,0,0,1,.5,1]],col:[[0,0,0,1,.5,1]]});
 for(let k=0;k<4;k++)def(42+k,12,12,12,{opaque:false,shape:[[0,0,0,1,.5,1],stairTop(k)],col:[[0,0,0,1,.5,1],stairTop(k)]});
+// map-building blocks
+for(let k=0;k<4;k++)def(46+k,7,7,7,{opaque:false,shape:[[0,0,0,1,.5,1],stairTop(k)],col:[[0,0,0,1,.5,1],stairTop(k)]});
+def(50,7,7,7,{opaque:false,shape:[[0,0,0,1,.5,1]],col:[[0,0,0,1,.5,1]]});
+def(51,46,45,46);def(52,47,47,47);
+def(53,7,7,7,{opaque:false,fence:true,shape:[[6/16,0,6/16,10/16,1,10/16]],col:[[6/16,0,6/16,10/16,1.5,10/16]]});
+def(54,48,48,48,{solid:false,opaque:false,light:14,shape:[[7/16,0,7/16,9/16,10/16,9/16]]});
+def(55,15,15,15,{opaque:false,shape:[[0,0,0,1,1/16,1]],col:[[0,0,0,1,1/16,1]]});
+def(56,49,49,49,{opaque:false,shape:[[7/16,0,0,9/16,1,1],[0,0,7/16,1,1,9/16]],col:[[7/16,0,0,9/16,1,1],[0,0,7/16,1,1,9/16]]});
+def(57,51,50,51);def(58,52,52,52,{opaque:false});def(59,53,53,53);def(60,54,54,54);def(61,24,55,24);def(62,24,56,24);def(63,57,57,57);def(64,5,58,5);
+def(65,24,23,24,{opaque:false,shape:[[0,0,0,1,.5,1]],col:[[0,0,0,1,.5,1]]});def(66,25,25,25,{opaque:false,shape:[[0,0,0,1,.5,1]],col:[[0,0,0,1,.5,1]]});
+for(let k=0;k<4;k++)def(67+k,25,25,25,{opaque:false,shape:[[0,0,0,1,.5,1],stairTop(k)],col:[[0,0,0,1,.5,1],stairTop(k)]});
+def(71,59,59,59);
+for(let k=0;k<4;k++)def(72+k,47,47,47,{opaque:false,shape:[[0,0,0,1,.5,1],stairTop(k)],col:[[0,0,0,1,.5,1],stairTop(k)]});
 def(8,10,9,10,{front:11,opaque:false,render:false,tileEnt:true,shape:[[1/16,0,1/16,15/16,14/16,15/16]],col:[[1/16,0,1/16,15/16,14/16,15/16]]});
+// fences join to neighbouring fences and full blocks
+function fenceJoin(x,y,z){const n=getB(x,y,z);return !!n&&(BD[n].fence||(BD[n].solid&&BD[n].opaque));}
+function fenceBoxes(x,y,z,col){const top=col?1.5:1;const out=[[6/16,0,6/16,10/16,top,10/16]];
+  const add=(x0,z0,x1,z1)=>{if(col)out.push([x0,0,z0,x1,1.5,z1]);else{out.push([x0,12/16,z0,x1,15/16,z1]);out.push([x0,6/16,z0,x1,9/16,z1]);}};
+  if(fenceJoin(x+1,y,z))add(10/16,7/16,1,9/16);if(fenceJoin(x-1,y,z))add(0,7/16,6/16,9/16);if(fenceJoin(x,y,z+1))add(7/16,10/16,9/16,1);if(fenceJoin(x,y,z-1))add(7/16,0,9/16,6/16);return out;}
 const BLOCK_NAMES={1:'Grass Block',2:'Dirt',3:'Stone',4:'Oak Log',5:'Oak Leaves',6:'Oak Planks',7:'Sand',9:'Cobblestone',10:'Bricks',11:'Glass',12:'Red Wool',13:'Gravel',14:'Mossy Cobblestone',
-  17:'Glowstone',18:'Bone Block',19:'Sandstone',20:'Stone Bricks',21:'Mossy Stone Bricks',22:'Chiseled Stone Bricks',23:'Block of Gold',24:'Block of Diamond',25:'Block of Emerald',26:'Obsidian',27:'Netherrack'};
+  17:'Glowstone',18:'Bone Block',19:'Sandstone',20:'Stone Bricks',21:'Mossy Stone Bricks',22:'Chiseled Stone Bricks',23:'Block of Gold',24:'Block of Diamond',25:'Block of Emerald',26:'Obsidian',27:'Netherrack',46:'Oak Stairs',50:'Oak Slab',51:'Spruce Wood',52:'Spruce Planks',53:'Oak Fence',54:'Torch',55:'Red Carpet',56:'Iron Bars',57:'Block of Quartz',58:'Jungle Leaves',59:'Block of Coal',60:'Cracked Stone Bricks',61:'Chiseled Sandstone',62:'Smooth Sandstone',63:'Block of Redstone',64:'Jungle Wood',65:'Sandstone Slab',66:'Stone Brick Slab',67:'Stone Brick Stairs',71:'White Wool',72:'Spruce Stairs'};
 const BLOCK_COL={1:'#5f9f35',2:'#866043',3:'#7f7f7f',4:'#665032',5:'#3a8228',6:'#a2824e',7:'#dbcfa3',8:'#9c6c2c',9:'#7a7a7a',10:'#964a3a',11:'#d8f0f5',12:'#cc3430',13:'#8c8682',14:'#62784a',
-  15:'#3f6fe0',16:'#e8701a',17:'#f2d07a',18:'#e6e0cc',19:'#d8cb94',20:'#7c7c7c',21:'#6c7a5a',22:'#7a7a7a',23:'#f5d43a',24:'#5fe3d6',25:'#3fd46a',26:'#1c1426',27:'#7a2e2e',29:'#7fe9e0'};
+  15:'#3f6fe0',16:'#e8701a',17:'#f2d07a',18:'#e6e0cc',19:'#d8cb94',20:'#7c7c7c',21:'#6c7a5a',22:'#7a7a7a',23:'#f5d43a',24:'#5fe3d6',25:'#3fd46a',26:'#1c1426',27:'#7a2e2e',29:'#7fe9e0',46:'#a2824e',47:'#a2824e',48:'#a2824e',49:'#a2824e',50:'#a2824e',51:'#3d2c18',52:'#69492c',53:'#a2824e',54:'#ffd060',55:'#cc3430',56:'#8a8a8a',57:'#ebe6dc',58:'#3c8020',59:'#1a1a1a',60:'#6a6a6a',61:'#d8cb94',62:'#d8cb94',63:'#b01a0e',64:'#5a481c',65:'#d8cb94',66:'#7c7c7c',67:'#7c7c7c',68:'#7c7c7c',69:'#7c7c7c',70:'#7c7c7c',71:'#ebebeb',72:'#69492c',73:'#69492c',74:'#69492c',75:'#69492c'};
 // pack texture names for each atlas tile
 const TILE_PACK=['grass_block_top','grass_block_side','dirt','stone','oak_log','oak_log_top','oak_leaves','oak_planks','sand','~chest_side','~chest_top','~chest_front','cobblestone','bricks','glass','red_wool',
   'gravel','mossy_cobblestone','water_still','lava_still','glowstone','bone_block_side','bone_block_top','sandstone','sandstone_top','stone_bricks','mossy_stone_bricks','chiseled_stone_bricks','gold_block','diamond_block','emerald_block','obsidian',
-  'netherrack','sandstone_bottom','beacon','short_grass','poppy','dandelion','ice','slime_block','soul_sand','cobweb','ladder','smooth_stone_slab_side','smooth_stone'];
+  'netherrack','sandstone_bottom','beacon','short_grass','poppy','dandelion','ice','slime_block','soul_sand','cobweb','ladder','smooth_stone_slab_side','smooth_stone',
+  'spruce_log','spruce_log_top','spruce_planks','torch','iron_bars','quartz_block_side','quartz_block_top','jungle_leaves','coal_block','cracked_stone_bricks','chiseled_sandstone','cut_sandstone','redstone_block','jungle_log','white_wool'];
 let TILE=16;const ACOLS=8;
 let atlasCanvas=null;
 // vanilla-style 16x16 tiles: small palettes + clustered noise, drawn from scratch
@@ -36,7 +56,8 @@ const P={grass:PAL('4f7d29 5e9132 6aa03a 77ad42 84ba4b'),dirt:PAL('593d26 6b4a30
   moss:PAL('3f5f2a 4d7134 5b833e'),water:PAL('2c55c8 3361d4 3a6ddd 4479e6'),lava:PAL('b83a08 d4540c e8701a f39a2a fbc84a'),glow:PAL('8a5a22 b98130 e2b54a f5d77a fff0b0'),
   bone:PAL('cfc8b0 dcd6c0 e6e0cc efeadb'),sst:PAL('cbb97c d5c48a ddcd96 e4d6a2'),sbr:PAL('6a6a6a 767676 828282 8d8d8d'),gold:PAL('c9a21c e2bd2a f5d43a fbe86a fff5b0'),
   dia:PAL('1c9e96 2fbdb4 4fd8cf 7ae8e0 c8fff8'),eme:PAL('0e7a32 17a043 2bc25a 5ee088 b6ffd0'),obs:PAL('0d0a14 150f20 1d1530 2a1e45 3d2a66'),nr:PAL('5a1e1e 6e2626 7e2d2d 8e3434 a04040'),
-  tg:PAL('3c6a20 4b7d29 5c9132 6fa63e')};
+  tg:PAL('3c6a20 4b7d29 5c9132 6fa63e'),sbark:PAL('2a1d10 342414 3d2c18 4a3720'),splank:PAL('4a3420 5a3f26 69492c 785433 86603a'),jleaf:PAL('2a5a12 33701a 3c8020 4a9028 56a032'),
+  qz:PAL('d9d2c6 e3ddd2 ebe6dc f2eee6'),coal:PAL('101010 181818 202020 2a2a2a'),rs:PAL('7a0a02 98120a b01a0e c82612'),jbark:PAL('4a3a14 5a481c 6a5624 7a6430')};
 const pk=(pal,v)=>pal[Math.min(pal.length-1,Math.max(0,Math.floor(v*pal.length)))];
 const cl=(x,y,s,sc=4)=>fbm(x/sc,y/sc,s,2)*.65+hash2(x,y,s+99)*.35; // clustered noise 0..1
 function cobbleAt(x,y,seed){ // voronoi stones with dark outlines
@@ -90,6 +111,21 @@ function procTile(t,x,y){
   case 43:return pk(P.stone,y==0||y==15?.85:y==7||y==8?.1:.55+h(x,y,46)*.2);
   case 44:return pk(P.stone,x==0||y==0||x==15||y==15?.2:.6+h(x,y,47)*.15);
   case 37:{if(x>=7&&x<=8&&y>=8)return [62,110,30];if(y==11&&(x==6||x==9))return [62,110,30];const d=Math.hypot(x-7.5,y-5.5);if(d<2.8)return d<1.1?[240,170,20]:[250,225,40];return [0,0,0,0];}
+  case 45:{const col=Math.floor(x+h(Math.floor(y/4),x>>2,57)*2);return pk(P.sbark,(x%4==0?.05:.45)+h(col,Math.floor(y/3),58)*.55);}
+  case 46:{if(x==0||y==0||x==15||y==15)return pk(P.sbark,h(x,y,59)*.8);const d=Math.max(Math.abs(x-7.5),Math.abs(y-7.5));return pk(P.splank,((d|0)%2?.2:.7)+h(x,y,60)*.25);}
+  case 47:{const row=y>>2;const seam=y%4==3;const end=(x+(row*7)%16)%16==0;if(seam)return pk(P.splank,0);if(end)return pk(P.splank,.1);return pk(P.splank,.35+cl(x*3,row,61,4)*.6);}
+  case 48:{if(x>=7&&x<=8&&y>=6){if(y<=7)return y==6?[255,240,140]:[255,190,60];return pk(P.plank,.4+h(x,y,62)*.3);}return [0,0,0,0];}
+  case 49:{const bar=x==1||x==7||x==8||x==14||y==1||y==14;return bar?(x==7||y==1?[170,170,170]:[110,110,110]):[0,0,0,0];}
+  case 50:return pk(P.qz,(x==0||y==0||x==15||y==15)?.2:.4+h(x,y,63)*.6);
+  case 51:return pk(P.qz,.35+cl(x,y,64,3)*.65);
+  case 52:{const v=cl(x,y,65,2);if(h(x,y,66)<.15&&v<.5)return [0,0,0,0];return pk(P.jleaf,v);}
+  case 53:return pk(P.coal,h(x,y,67)*.6+cl(x,y,68,2)*.4);
+  case 54:{const row=y>>2,off=(row%2)*4;const mortar=y%4==3||((x+off)%8==7);const crack=Math.abs(x-6-(y>>1))<1&&h(x,y,69)<.7;if(mortar||crack)return [70,70,70];return pk(P.sbr,.25+h((x+off)>>3,row,70)*.5);}
+  case 55:{const b=y<=1||y>=14;const glyph=(x>=4&&x<=11&&y>=4&&y<=11)&&((x+y)%4==0||x==4||x==11||y==4||y==11);return pk(P.sst,b?.15:glyph?.05:.55+h(x,y,71)*.3);}
+  case 56:return pk(P.sst,y==0||y==15?.1:y==1||y==14?.8:.5+h(x,y,72)*.2);
+  case 57:return pk(P.rs,(x==0||y==0||x==15||y==15)?.1:.35+cl(x,y,73,2)*.65);
+  case 58:{const col=Math.floor(x+h(Math.floor(y/5),x>>2,74)*2);return pk(P.jbark,(x%4==1?.1:.5)+h(col,Math.floor(y/4),75)*.5);}
+  case 59:{const v=.82+h(x,y,76)*.12+cl(x,y,77,1.5)*.06;return [235*v|0,235*v|0,235*v|0];}
   }
   return [255,0,255];
 }

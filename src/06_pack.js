@@ -57,7 +57,9 @@ function availableSkins(){return CUSTOM_SKINS.concat(PACK.skins.length?PACK.skin
 // -------- loading --------
 // 1.8-era file names for the same tiles (blocks/ folder)
 const TILE_ALT={grass_block_top:'grass_top',grass_block_side:'grass_side',oak_log:'log_oak',oak_log_top:'log_oak_top',oak_leaves:'leaves_oak',oak_planks:'planks_oak',bricks:'brick',red_wool:'wool_colored_red',
-  mossy_cobblestone:'cobblestone_mossy',sandstone:'sandstone_normal',stone_bricks:'stonebrick',mossy_stone_bricks:'stonebrick_mossy',chiseled_stone_bricks:'stonebrick_carved',short_grass:'tallgrass',poppy:'flower_rose',dandelion:'flower_dandelion',slime_block:'slime',cobweb:'web',smooth_stone:'stone_slab_top',smooth_stone_slab_side:'stone_slab_side'};
+  mossy_cobblestone:'cobblestone_mossy',sandstone:'sandstone_normal',stone_bricks:'stonebrick',mossy_stone_bricks:'stonebrick_mossy',chiseled_stone_bricks:'stonebrick_carved',short_grass:'tallgrass',poppy:'flower_rose',dandelion:'flower_dandelion',slime_block:'slime',cobweb:'web',smooth_stone:'stone_slab_top',smooth_stone_slab_side:'stone_slab_side',
+  spruce_log:'log_spruce',spruce_log_top:'log_spruce_top',spruce_planks:'planks_spruce',torch:'torch_on',quartz_block_side:'quartz_block_side',quartz_block_top:'quartz_block_top',jungle_leaves:'leaves_jungle',
+  cracked_stone_bricks:'stonebrick_cracked',chiseled_sandstone:'sandstone_carved',cut_sandstone:'sandstone_smooth',jungle_log:'log_jungle',white_wool:'wool_colored_white',bone_block_side:'quartz_block_side',bone_block_top:'quartz_block_top'};
 const ITEM_ALT={bow:['bow_standby'],cooked_beef:['beef_cooked'],cooked_porkchop:['porkchop_cooked'],cooked_chicken:['chicken_cooked'],baked_potato:['potato_baked'],melon_slice:['melon'],golden_apple:['apple_golden']};
 function itemCandidates(k,it){const base=it.tex.replace(/^item\//,'');const out=['textures/item/'+base+'.png','textures/items/'+base+'.png'];
   const alt=(ITEM_ALT[k]||[]).concat([base.replace(/^wooden_/,'wood_').replace(/^golden_/,'gold_')]);if(it.type==='potion')alt.push('potion_bottle_drinkable');if(it.type==='splash')alt.push('potion_bottle_splash');
@@ -83,7 +85,7 @@ async function loadPackBuffer(buf,label){
     const nc=mkCanvas(ACOLS*maxRes,ACOLS*maxRes),g=nc.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(atlasCanvas,0,0,nc.width,nc.height);
     for(const t in tiles){const img=tiles[t];const tx=(t%ACOLS)*maxRes,ty=Math.floor(t/ACOLS)*maxRes;g.clearRect(tx,ty,maxRes,maxRes);
       const cell=imgToCanvas(img,maxRes,maxRes,0,0,img.width,img.width);const n=TILE_PACK[t];
-      const gray=isGray(img);if(gray&&(n==='grass_block_top'||n==='short_grass'))tintCanvas(cell,'#79c05a');if(gray&&n==='oak_leaves')tintCanvas(cell,'#59ae30');if(gray&&n==='water_still')tintCanvas(cell,'#3f76e4');
+      const gray=isGray(img);if(gray&&(n==='grass_block_top'||n==='short_grass'))tintCanvas(cell,'#79c05a');if(gray&&n==='oak_leaves')tintCanvas(cell,'#59ae30');if(gray&&n==='jungle_leaves')tintCanvas(cell,'#30bb0b');if(gray&&n==='water_still')tintCanvas(cell,'#3f76e4');
       if(n==='grass_block_side'&&grassOv&&isGray(grassOv)){const ov=tintCanvas(imgToCanvas(grassOv,maxRes,maxRes),'#79c05a');cell.getContext('2d').drawImage(ov,0,0);}
       if(n==='water_still'){const cg=cell.getContext('2d');const d=cg.getImageData(0,0,maxRes,maxRes);for(let i=3;i<d.data.length;i+=4)d.data[i]=Math.min(d.data[i],180);cg.putImageData(d,0,0);}
       g.drawImage(cell,tx,ty);}
@@ -111,7 +113,8 @@ async function loadPackBuffer(buf,label){
     Object.assign(G,{heart_container:cut(16,0,9,9),heart_full:cut(52,0,9,9),heart_half:cut(61,0,9,9),heart_poison_full:cut(88,0,9,9),heart_poison_half:cut(97,0,9,9),heart_abs_full:cut(160,0,9,9),heart_abs_half:cut(169,0,9,9),
       armor_empty:cut(16,9,9,9),armor_half:cut(25,9,9,9),armor_full:cut(34,9,9,9),food_empty:cut(16,27,9,9),food_half:cut(61,27,9,9),food_full:cut(52,27,9,9),crosshair:cut(0,0,15,15)});found++;}
   const btnM=await get('textures/gui/sprites/widget/button.png'),btnH=await get('textures/gui/sprites/widget/button_highlighted.png');if(btnM)G.btn=imgToCanvas(btnM,200,20,0,0,btnM.width,btnM.height);if(btnH)G.btn_hover=imgToCanvas(btnH,200,20,0,0,btnH.width,btnH.height);
-  const widgets=await get('textures/gui/widgets.png');if(widgets&&!G.btn){const s=widgets.width/256;G.btn=imgToCanvas(widgets,200,20,0,66*s,200*s,20*s);G.btn_hover=imgToCanvas(widgets,200,20,0,86*s,200*s,20*s);}if(widgets&&!G.hotbar){const s=widgets.width/256;G.hotbar=imgToCanvas(widgets,182,22,0,0,182*s,22*s);G.hotbar_sel=imgToCanvas(widgets,24,24,0,22*s,24*s,24*s);found++;}
+  const widgets=await get('textures/gui/widgets.png');if(widgets&&!G.btn){const s=widgets.width/256;G.btn=imgToCanvas(widgets,200,20,0,66*s,200*s,20*s);G.btn_hover=imgToCanvas(widgets,200,20,0,86*s,200*s,20*s);G.btn_off=imgToCanvas(widgets,200,20,0,46*s,200*s,20*s);}
+  {const bd=await get('textures/gui/sprites/widget/button_disabled.png');if(bd)G.btn_off=imgToCanvas(bd,200,20,0,0,bd.width,bd.height);}if(widgets&&!G.hotbar){const s=widgets.width/256;G.hotbar=imgToCanvas(widgets,182,22,0,0,182*s,22*s);G.hotbar_sel=imgToCanvas(widgets,24,24,0,22*s,24*s,24*s);found++;}
   // skins (1.21 ships nine default skins)
   for(const variant of ['wide','slim'])for(const n of ['steve','alex','ari','efe','kai','makena','noor','sunny','zuri']){const img=await get(`textures/entity/player/${variant}/${n}.png`);
     if(img&&!PACK.skins.some(s=>s.name===n)){PACK.skins.push({name:n,slim:variant==='slim',img:imgToCanvas(img,64,64,0,0,img.width,img.height)});found++;}}

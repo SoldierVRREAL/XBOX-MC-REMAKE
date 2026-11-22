@@ -1,10 +1,11 @@
 // ================= audio: pack sounds (1.8 and modern names) with Minecraft-like procedural fallback =================
 let actx=null,clickBuf=null,noiseBuf=null;const sndCache={};
-function initAudio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume&&actx.resume();if(PACK.click&&!clickBuf)decodeClick();
+let masterOut=null;
+function initAudio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(!masterOut){masterOut=actx.createGain();masterOut.gain.value=OPT.vol;masterOut.connect(actx.destination);}actx.resume&&actx.resume();if(PACK.click&&!clickBuf)decodeClick();
   if(!noiseBuf){noiseBuf=actx.createBuffer(1,actx.sampleRate,actx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}}catch(e){}}
 function decodeClick(){if(!actx||!PACK.click)return;actx.decodeAudioData(PACK.click.slice().buffer).then(b=>clickBuf=b).catch(()=>{});}
 const MAT_MOD={grass:'grass',stone:'stone',wood:'wood',sand:'sand',gravel:'gravel',cloth:'wool',glass:'glass',ladder:'ladder',slime:'slime_block',snow:'snow'};
-function blockMat(b){if(!b)return 'stone';if([1,2,5,30,31,32,36].includes(b))return 'grass';if([4,6,8,37,38,39,40].includes(b))return 'wood';if(b===7||b===35)return 'sand';if(b===13)return 'gravel';if(b===12)return 'cloth';if(b===11||b===33)return 'glass';if(b===34)return 'slime';return 'stone';}
+function blockMat(b){if(!b)return 'stone';if([1,2,5,30,31,32,36,58].includes(b))return 'grass';if([4,6,8,37,38,39,40,46,47,48,49,50,51,52,53,64,72,73,74,75].includes(b))return 'wood';if(b===55||b===71)return 'cloth';if(b===7||b===35)return 'sand';if(b===13)return 'gravel';if(b===12)return 'cloth';if(b===11||b===33)return 'glass';if(b===34)return 'slime';return 'stone';}
 const SND_NAMES={burn:['damage/hit','entity/player/hurt'],drown:['damage/hit','entity/player/hurt'],hit:['damage/hit','entity/player/hurt'],hurt:['damage/hit','entity/player/hurt'],death:['damage/hit','entity/player/hurt'],bow:['random/bow','entity/arrow/shoot'],arrowhit:['random/bowhit','entity/arrow/hit'],
   chest:['random/chestopen','block/chest/open'],chestclose:['random/chestclosed','block/chest/close'],eat:['random/eat','entity/generic/eat'],burp:['random/burp','entity/player/burp'],drink:['random/drink','entity/generic/drink'],
   pick:['random/pop','entity/item/pickup'],click:['random/click','ui/button/click'],glass:['random/glass','block/glass/break'],squeak:['mob/bat/idle','entity/bat/ambient'],batdeath:['mob/bat/death','entity/bat/death'],
@@ -18,17 +19,17 @@ const SND_EVENTS={hit:['entity.player.hurt'],hurt:['entity.player.hurt'],death:[
 function packEvent(evs){if(!PACK.events||!PACK.sounds)return null;for(const ev of evs){const l=PACK.events[ev];if(!l)continue;const ok=l.filter(x=>PACK.sounds[x.name]);if(!ok.length)continue;
   let tot=0;for(const x of ok)tot+=x.weight;let r=Math.random()*tot;for(const x of ok){r-=x.weight;if(r<=0)return x;}return ok[0];}return null;}
 function packGroup(names){if(!PACK.sgroups)return null;for(const n of names){const g=PACK.sgroups[n];if(g&&g.length)return g;}return null;}
-function playBytes(key,vol,pitch){const c=sndCache[key];const go=b=>{const s=actx.createBufferSource(),g=actx.createGain();s.buffer=b;s.playbackRate.value=pitch;g.gain.value=vol;s.connect(g);g.connect(actx.destination);s.start();};
+function playBytes(key,vol,pitch){const c=sndCache[key];const go=b=>{const s=actx.createBufferSource(),g=actx.createGain();s.buffer=b;s.playbackRate.value=pitch;g.gain.value=vol;s.connect(g);g.connect(masterOut||actx.destination);s.start();};
   if(c&&c.buf)return go(c.buf);if(c)return;sndCache[key]={};actx.decodeAudioData(PACK.sounds[key].slice().buffer).then(b=>{sndCache[key].buf=b;go(b);}).catch(()=>{});}
 function noiseHit(dur,f,q,vol,type='bandpass',pitchDrop){const t=actx.currentTime;const s=actx.createBufferSource();s.buffer=noiseBuf;s.playbackRate.value=.6+Math.random()*.8;const fl=actx.createBiquadFilter();fl.type=type;fl.frequency.value=f;fl.Q.value=q;
-  const g=actx.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);s.connect(fl);fl.connect(g);g.connect(actx.destination);s.start(t,Math.random()*.5);s.stop(t+dur+.02);
+  const g=actx.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);s.connect(fl);fl.connect(g);g.connect(masterOut||actx.destination);s.start(t,Math.random()*.5);s.stop(t+dur+.02);
   if(pitchDrop){fl.frequency.setValueAtTime(f,t);fl.frequency.exponentialRampToValueAtTime(f*pitchDrop,t+dur);}}
-function tone(type,f1,f2,dur,vol){const t=actx.currentTime;const o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);o.type=type;o.frequency.setValueAtTime(f1,t);o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+function tone(type,f1,f2,dur,vol){const t=actx.currentTime;const o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(masterOut||actx.destination);o.type=type;o.frequency.setValueAtTime(f1,t);o.frequency.exponentialRampToValueAtTime(f2,t+dur);
   g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.start(t);o.stop(t+dur+.02);}
 const MAT_F={grass:[900,.9],stone:[2600,1.2],wood:[700,3],sand:[3500,.5],gravel:[1500,.8],cloth:[600,.6],glass:[3000,2],ladder:[800,3],slime:[300,2],snow:[2500,.5]};
 function sfx(type,o={}){
   if(!actx)return;let vol=o.vol==null?1:o.vol;if(o.pos&&camPos){const d=dist(o.pos,camPos);if(d>16)return;vol*=1-d/16;}if(vol<=.01)return;
-  if(type==='click'&&clickBuf){const s=actx.createBufferSource();s.buffer=clickBuf;s.connect(actx.destination);s.start();return;}
+  if(type==='click'&&clickBuf){const s=actx.createBufferSource();s.buffer=clickBuf;s.connect(masterOut||actx.destination);s.start();return;}
   const mat=o.mat||'stone',mm=MAT_MOD[mat]||mat;
   let names=SND_NAMES[type];
   if(type==='step')names=['step/'+mat,'block/'+mm+'/step'];else if(type==='dig')names=['dig/'+(mat==='glass'?'stone':mat),'block/'+mm+'/break'];else if(type==='mine')names=['step/'+mat,'block/'+mm+'/hit'];
@@ -97,15 +98,15 @@ function render(){
   gl.viewport(0,0,cv.width,cv.height);const wantBlur=MATCH.state==='menu'?'blur(3px) brightness(.95)':'';if(cv.style.filter!==wantBlur)cv.style.filter=wantBlur;
   camera();
   const info=mapInfo||{sky:[.53,.74,.96],fog:[.53,.74,.96],fogDist:110};skyCol=info.sky;
-  const fogF=MATCH.state==='menu'?150:info.fogDist;curFog={c:info.fog,n:fogF*.55,f:fogF};
+  const fogF=MATCH.state==='menu'?150:info.fogDist*[.45,.7,1,1.35][OPT.rd];curFog={c:info.fog,n:fogF*.55,f:fogF};
   gl.clearColor(...info.sky,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   // EntityRenderer: smoothed FOV modifier (sprint/speed, bow zoom), view bobbing, hurt camera roll
   let tf=1;if(player&&player.alive){tf=(1+(player.sprint?1.3:1)*speedMul(player))/2;if(player.using==='bow'){let f=Math.min(1,player.useT);f=f*f;tf*=1-f*.15;}if(player.inWater)tf*=.85;}
-  fovMod+=(tf-fovMod)*Math.min(1,dtFrame*10);const fov=70*fovMod*Math.PI/180;const P=M4.persp(fov,W/H,.05,400);
+  fovMod+=((OPT.dynfov===false?1:tf)-fovMod)*Math.min(1,dtFrame*10);const fov=OPT.fov*fovMod*Math.PI/180;const P=M4.persp(fov,W/H,.05,400);
   if(MATCH.state==='menu'&&panoTex){drawPanorama(P,camYaw,camPitch*.3);drawHUD();return;}
   let pre=M4.id();
   if(player&&player.alive&&spectate.mode!=='follow'&&MATCH.state!=='menu'){const sp=player.onGround?Math.min(.1,Math.hypot(player.mot?player.mot[0]:0,player.mot?player.mot[2]:0)):0;bobAmp+=(sp-bobAmp)*Math.min(1,dtFrame*8);
-    const f1=-player.walkT/1.0,a=bobAmp;const ht=player.hurtT>0?Math.sin(Math.pow(player.hurtT/.5,4)*Math.PI)*14*Math.PI/180:0;
+    const f1=-player.walkT/1.0,a=OPT.bob?bobAmp:0;const ht=player.hurtT>0?Math.sin(Math.pow(player.hurtT/.5,4)*Math.PI)*14*Math.PI/180:0;
     pre=chain(M4.rz(-ht),M4.tr(Math.sin(f1*Math.PI)*a*.5,-Math.abs(Math.cos(f1*Math.PI)*a),0),M4.rz(Math.sin(f1*Math.PI)*a*3*Math.PI/180),M4.rx(Math.abs(Math.cos(f1*Math.PI-.2)*a)*5*Math.PI/180));}
   const V=chain(pre,M4.rx(-camPitch),M4.ry(-camYaw),M4.tr(-camPos[0],-camPos[1],-camPos[2]));VP=M4.mul(P,V);
   gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.disable(gl.BLEND);
@@ -148,8 +149,9 @@ function render(){
   gl.depthMask(false);gl.useProgram(PW.p);gl.uniform1f(PW.u.alpha,.99);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,atlasTex);if(!window.__noWater)for(const c of chunks){if(!vis(c)||!c.wcount)continue;bindW(c.wbuf);gl.drawArrays(gl.TRIANGLES,0,c.wcount);}
   gl.disableVertexAttribArray(PW.a.t);gl.disableVertexAttribArray(PW.a.s);
   useBox(VP,camPos);gl.uniform1f(PB.u.lit,0);
-  if(mapInfo.skyLight&&!mapInfo.dark){gl.uniform1f(PB.u.lit,0);drawClouds();useBox(VP,camPos);gl.uniform1f(PB.u.lit,0);}
-  if(mapInfo.center&&MATCH.state!=='lobby'){const [bx,by,bz]=mapInfo.center;const a=.35+.08*Math.sin(perfT*3);box(chain(M4.tr(bx+.5,by+60,bz+.5),M4.ry(perfT*.6),M4.sc(.5,120,.5)),[.75,1,1],a);box(chain(M4.tr(bx+.5,by+60,bz+.5),M4.ry(-perfT*.4),M4.sc(.8,120,.8)),[.6,.95,1],a*.35);}
+  if(mapInfo.skyLight&&!mapInfo.dark){gl.uniform1f(PB.u.lit,0);if(OPT.clouds)drawClouds();useBox(VP,camPos);gl.uniform1f(PB.u.lit,0);}
+  if(mapInfo.stars)drawStars();
+  if(mapInfo.center&&!mapInfo.noBeam&&MATCH.state!=='lobby'){const [bx,by,bz]=mapInfo.center;const a=.35+.08*Math.sin(perfT*3);box(chain(M4.tr(bx+.5,by+60,bz+.5),M4.ry(perfT*.6),M4.sc(.5,120,.5)),[.75,1,1],a);box(chain(M4.tr(bx+.5,by+60,bz+.5),M4.ry(-perfT*.4),M4.sc(.8,120,.8)),[.6,.95,1],a*.35);}
   if(MATCH.mode==='br'&&br&&br.border&&br.border.cx<1e6&&MATCH.state!=='lobby'){const h=brSize()/2,cx=br.border.cx,cz=br.border.cz,a=.2+.06*Math.sin(perfT*2.5);const col=br.border.to<brSize()-.01?[1,.35,.25]:[.25,.6,1];
     box(chain(M4.tr(cx,28,cz-h),M4.sc(h*2,80,.05)),col,a);box(chain(M4.tr(cx,28,cz+h),M4.sc(h*2,80,.05)),col,a);box(chain(M4.tr(cx-h,28,cz),M4.sc(.05,80,h*2)),col,a);box(chain(M4.tr(cx+h,28,cz),M4.sc(.05,80,h*2)),col,a);}
   gl.depthMask(true);gl.disable(gl.BLEND);gl.uniform1f(PB.u.lit,1);
@@ -158,7 +160,7 @@ function render(){
   // underwater / lava tint
   drawHUD();
 }
-function setEntLight(p){const x=Math.floor(p[0]),z=Math.floor(p[2]),y=Math.floor(p[1]+.5);const a=lightAt(x,y,z),b=lightAt(x,y+1,z);const L=Math.max(a>>4,b>>4)<<4|Math.max(a&15,b&15);const v=Math.max(LB[(L>>4)&15]*(mapInfo&&mapInfo.dark?0:1),LB[L&15],mapInfo&&mapInfo.dark?.12:.2);gl.uniform1f(PT.u.bright,v);}
+function setEntLight(p){const x=Math.floor(p[0]),z=Math.floor(p[2]),y=Math.floor(p[1]+.5);const a=lightAt(x,y,z),b=lightAt(x,y+1,z);const L=Math.max(a>>4,b>>4)<<4|Math.max(a&15,b&15);const v=Math.max(LB[(L>>4)&15]*(mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1),LB[L&15],mapInfo&&mapInfo.dark?.12:.2);gl.uniform1f(PT.u.bright,v);}
 function drawHumanoid(e){
   const invis=e.effects.invis;const S=skinTex(e.skin);const M=S.slim?MODELS.slim:MODELS.wide;
   const rp=e.rpos||e.pos;const by=e.bodyYaw==null?e.yaw:e.bodyYaw;const base=chain(M4.tr(rp[0],rp[1]-(e.sneak?.12:0),rp[2]),M4.ry(by),M4.sc(.9/1,.9,.9));const headTurn=e.yaw-by;
@@ -192,6 +194,12 @@ function tickChestLids(){for(const [k,c] of chests){c.lidPrev=c.lid;if(c.botOpen
     const open=chestOpen===c||(c.botOpen>0)||ents.some(e=>!e.isLocal&&e.alive&&e.openChest===k);
     if(open&&c.lid===0&&chestOpen!==c&&c.rot!=null)sfx('chest',{pos:[c.x+.5,c.y+.5,c.z+.5]});
     const was=c.lid;c.lid=clamp(c.lid+(open?.1:-.1),0,1);if(!open&&was>=.5&&c.lid<.5&&chestOpen!==c&&c.rot!=null&&!c.selfClose)sfx('chestclose',{pos:[c.x+.5,c.y+.5,c.z+.5]});if(c.lid===0)c.selfClose=false;}}
+// night sky over Crucible: fixed star field far away (not fogged)
+let STARS=null;
+function drawStars(){if(!STARS){STARS=[];let r=12345;const rnd=()=>{r=(r*16807)%2147483647;return r/2147483647;};for(let i=0;i<420;i++){const u=rnd()*2-1,t=rnd()*Math.PI*2;const y=Math.abs(u)*.92+.08;const q=Math.sqrt(1-y*y);STARS.push([Math.cos(t)*q,y,Math.sin(t)*q,.5+rnd()*1.1,.55+rnd()*.45]);}}
+  gl.uniform1f(PB.u.lit,0);gl.uniform1f(PB.u.fogN,1e6);gl.uniform1f(PB.u.fogF,2e6);
+  for(const [x,y,z,sz,b] of STARS){const tw=b*(.85+.15*Math.sin(perfT*2+x*40));box(chain(M4.tr(camPos[0]+x*300,camPos[1]+y*300,camPos[2]+z*300),M4.sc(sz,sz,sz)),[tw,tw,tw*1.05]);}
+  gl.uniform1f(PB.u.fogN,curFog.n);gl.uniform1f(PB.u.fogF,curFog.f);}
 function drawBat(e){
   const flap=Math.sin(perfT*18+e.pos[0])*1.1;const base=chain(M4.tr(e.pos[0],e.pos[1]+Math.sin(perfT*3)*.1,e.pos[2]),M4.ry(e.yaw),M4.rz(Math.PI),M4.sc(.35,.35,.35));const M=MODELS.bat;setEntLight(e.pos);
   for(const k of ['head','rear','lear','body'])drawMesh(M[k],base,BAT_TEX);

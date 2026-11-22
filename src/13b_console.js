@@ -12,10 +12,10 @@ function pollPad(dt){
   if(!padActive&&(Object.values(B).some(Boolean)||Math.abs(lx)+Math.abs(ly)+Math.abs(rx)+Math.abs(ry)>.3)){padActive=true;if(locked)document.exitPointerLock();}
   if(!padActive){padPrev=B;return;}
   const menuOpen=!$('menu').classList.contains('hidden');
-  const panel=['optPanel','onlinePanel','packPanel','lobbyPanel','results','pause','lbPanel','dressPanel'].find(id=>!$(id).classList.contains('hidden'));
+  const panel=['jOpt','optPanel','onlinePanel','packPanel','lobbyPanel','results','pause','lbPanel','dressPanel'].find(id=>!$(id).classList.contains('hidden'));
   padRepeat-=dt;const nav=ly<-.5||B.up?-1:ly>.5||B.down?1:0;const navX=lx<-.5||B.left?-1:lx>.5||B.right?1:0;
   if(menuOpen&&!panel){if(nav&&padRepeat<=0){setMSel(mSel+nav);sfx('click');padRepeat=.22;}if(!nav)padRepeat=0;if(E('a')){MBTN()[mSel].click();}if(E('b'))menuBack();if(E('x'))openDress();}
-  else if(panel){if(E('b')){const back={lbPanel:'lbClose',dressPanel:'dressClose',optPanel:'optClose',onlinePanel:'onlineClose',packPanel:'packClose',lobbyPanel:'lobbyClose',results:'menuBtn',pause:'resumeBtn'}[panel];$(back).click();}
+  else if(panel){if(E('b')){const back={jOpt:'jDoneHidden',lbPanel:'lbClose',dressPanel:'dressClose',optPanel:'optClose',onlinePanel:'onlineClose',packPanel:'packClose',lobbyPanel:'lobbyClose',results:'menuBtn',pause:'resumeBtn'}[panel];$(back).click();}
     if(panel==='pause'&&E('a'))$('resumeBtn').click();if(panel==='results'&&E('a')&&!$('nextBtn').classList.contains('hidden'))$('nextBtn').click();if(panel==='lobbyPanel'&&E('a'))$('lobbyReady').click();}
   else if(chestOpen){ // chest screen: stick/d-pad cursor, A take or put back, LB take everything, B exit
     if((nav||navX)&&padRepeat<=0){const total=CHEST_SLOTS+9,lo=chestOpen.inv?CHEST_SLOTS:0,n=total-lo;let c=chestCursor-lo;if(navX)c+=navX;if(nav)c+=nav*9;chestCursor=lo+((c%n)+n)%n;renderChest();sfx('click');padRepeat=.16;}if(!nav&&!navX)padRepeat=0;
@@ -61,19 +61,19 @@ function promptLabels(){
   return out;
 }
 const PAD_COL={A:'#5cb85c',B:'#d9534f',X:'#428bca',Y:'#f0ad4e'};
-function drawPrompts(){if(chestOpen)return;const list=promptLabels();let x=16;const y=H-18;
+function drawPrompts(){if(chestOpen||touchActive)return;const list=promptLabels();let x=16;const y=H-18;
   for(const [k,label] of list){const col=PAD_COL[k];hc.font="18px "+HFONT;const kw=Math.max(22,hc.measureText(k).width+12);
     if(col){hc.fillStyle=col;hc.beginPath();hc.arc(x+11,y-6,11,0,7);hc.fill();hc.fillStyle='#fff';hc.textAlign='center';hc.fillText(k,x+11,y);x+=26;}
     else{hc.fillStyle='rgba(230,230,230,.95)';hc.fillRect(x,y-17,kw,22);hc.fillStyle='#333';hc.textAlign='center';hc.fillText(k,x+kw/2,y);x+=kw+6;}
     txt(label,x,y,14,'#fff');hc.font="18px "+HFONT;x+=(FONT?bmpWidth(label,2):hc.measureText(label).width)+24;}}
 
 // ---------- ambience: cave sounds in dark maps, music from a loaded pack ----------
-let ambT=30+Math.random()*60,musicT=10,musicSrc=null;
+let ambT=30+Math.random()*60,musicT=10,musicSrc=null,musicGain=null;
 function tickAmbience(dt){
   if(!actx)return;
   if(mapInfo&&mapInfo.dark&&MATCH.state==='play'){ambT-=dt;if(ambT<=0){ambT=40+Math.random()*80;const g=packGroup(['ambient/cave/cave'])||packEventList('ambient.cave');if(g){playBytes(g[Math.random()*g.length|0],.6,.8+Math.random()*.2);}}}
   musicT-=dt;if(musicT<=0&&!musicSrc){musicT=60+Math.random()*120;const grp=MATCH.state==='menu'?(packGroup(['music/menu/menu'])||packGroup(['music/menu'])):(packGroup(['music/game/calm','music/game/hal','music/game/nuance','music/game/piano'])||packGroup(['music/game']));
-    if(grp){const k=grp[Math.random()*grp.length|0];actx.decodeAudioData(PACK.sounds[k].slice().buffer).then(b=>{const s=actx.createBufferSource(),g=actx.createGain();s.buffer=b;g.gain.value=.35;s.connect(g);g.connect(actx.destination);s.onended=()=>{musicSrc=null;};musicSrc=s;s.start();}).catch(()=>{});}}
+    if(grp){const k=grp[Math.random()*grp.length|0];actx.decodeAudioData(PACK.sounds[k].slice().buffer).then(b=>{const s=actx.createBufferSource(),g=actx.createGain();s.buffer=b;g.gain.value=.35*OPT.music;s.connect(g);g.connect(masterOut||actx.destination);musicGain=g;s.onended=()=>{musicSrc=null;};musicSrc=s;s.start();}).catch(()=>{});}}
 }
 function packEventList(ev){if(!PACK.events||!PACK.events[ev])return null;const l=PACK.events[ev].map(x=>x.name).filter(n=>PACK.sounds[n]);return l.length?l:null;}
 

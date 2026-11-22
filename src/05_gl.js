@@ -26,14 +26,17 @@ function mkTex(src,repeat){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t;}
 let atlasTex=mkTex(atlasCanvas);
-function reuploadAtlas(){gl.deleteTexture(atlasTex);atlasTex=mkTex(atlasCanvas);}
+function reuploadAtlas(){gl.deleteTexture(atlasTex);let src=atlasCanvas;
+  if(!OPT.fancy){src=mkCanvas(atlasCanvas.width,atlasCanvas.height);const g=src.getContext('2d');g.drawImage(atlasCanvas,0,0);const T=atlasCanvas.width/ACOLS;   // Fast graphics: opaque leaves
+    for(const t of [6,52]){const x=(t%ACOLS)*T,y=Math.floor(t/ACOLS)*T;g.globalCompositeOperation='destination-over';g.fillStyle=t===6?'#1f3d12':'#17400a';g.fillRect(x,y,T,T);}g.globalCompositeOperation='source-over';}
+  atlasTex=mkTex(src);}
 
 // ---- world chunk meshes (opaque/cutout + translucent water) ----
 let chunks=[];
 const FSHADE=[.8,.8,1,.5,.65,.65],AOK=[.5,.66,.83,1];
-const LB=[];for(let l=0;l<16;l++)LB[l]=.05+.95*Math.pow(.8,15-l);
+const LB=[];function rebuildLB(){const g=OPT.bright;for(let l=0;l<16;l++){const v=.05+.95*Math.pow(.8,15-l);LB[l]=v+(1-Math.pow(1-v,4)-v)*g;}}rebuildLB();
 function buildChunk(ci,cj){
-  const out=[],wat=[];const x0=ci*16,z0=cj*16,x1=Math.min(WX,x0+16),z1=Math.min(WZ,z0+16);const AS=ACOLS*TILE;const skyMul=mapInfo&&mapInfo.dark?0:1;
+  const out=[],wat=[];const x0=ci*16,z0=cj*16,x1=Math.min(WX,x0+16),z1=Math.min(WZ,z0+16);const AS=ACOLS*TILE;const skyMul=mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1;
   for(let y=0;y<WY;y++)for(let z=z0;z<z1;z++)for(let x=x0;x<x1;x++){
     const b=world[idx(x,y,z)];if(!b)continue;const D=BD[b];if(!D.render)continue;
     if(D.cross){const tx=(D.side%ACOLS)*TILE,ty=Math.floor(D.side/ACOLS)*TILE;const L=lightAt(x,y,z);const lv=Math.max(LB[(L>>4)&15]*skyMul,LB[L&15],.12)*.9;const j=(hash2(x,z,5)-.5)*.3;
@@ -41,7 +44,7 @@ function buildChunk(ci,cj){
       for(const [ax,az,bx,bz] of [[.15,.15,.85,.85],[.15,.85,.85,.15]]){const q=[[x+ax+j,y+1,z+az,u0,v0],[x+bx+j,y+1,z+bz,u1,v0],[x+bx+j,y,z+bz,u1,v1],[x+ax+j,y,z+az,u0,v1]];
         for(const i of [0,1,2,0,2,3])out.push(q[i][0],q[i][1],q[i][2],q[i][3],q[i][4],lv);}continue;}
     if(D.shape){const Lo=lightAt(x,y,z),Lu=lightAt(x,y+1,z);const lvB=Math.max(LB[Math.max(Lo>>4,Lu>>4)&15]*skyMul,LB[Math.max(Lo&15,Lu&15)],mapInfo&&mapInfo.dark?.07:.12);
-      for(const bx of D.shape)for(let f=0;f<6;f++){const d=f>>1,s=(f&1)?-1:1;const u=(d+1)%3,v=(d+2)%3;const lo=[bx[0],bx[1],bx[2]],hi=[bx[3],bx[4],bx[5]];
+      for(const bx of (D.fence?fenceBoxes(x,y,z,false):D.shape))for(let f=0;f<6;f++){const d=f>>1,s=(f&1)?-1:1;const u=(d+1)%3,v=(d+2)%3;const lo=[bx[0],bx[1],bx[2]],hi=[bx[3],bx[4],bx[5]];
         const plane=s>0?hi[d]:lo[d];
         if((s>0&&plane>=1)||(s<0&&plane<=0)){const nx=x+(d==0?s:0),ny=y+(d==1?s:0),nz=z+(d==2?s:0);const nb=getB(nx,ny,nz);if(nb&&BD[nb].opaque&&!BD[nb].shape)continue;}
         const tile=bx[6]!=null?bx[6]:d==1?(s>0?D.top:D.bottom):(f==4?D.front:D.side);const tx=(tile%ACOLS)*TILE,ty=Math.floor(tile/ACOLS)*TILE;const vs=[];
@@ -63,7 +66,7 @@ function buildChunk(ci,cj){
       const vs=[];const aos=[];
       for(const [cu,cv2] of [[0,0],[1,0],[1,1],[0,1]]){
         const l=[0,0,0];l[d]=s>0?1:0;l[u]=cu;l[v]=cv2;
-        let ao=3;if(!D.light&&!D.liquid){const su=cu?1:-1,sv=cv2?1:-1;const a=F.slice(),c=F.slice(),e=F.slice();a[u]+=su;c[v]+=sv;e[u]+=su;e[v]+=sv;
+        let ao=3;if(!D.light&&!D.liquid&&OPT.smooth){const su=cu?1:-1,sv=cv2?1:-1;const a=F.slice(),c=F.slice(),e=F.slice();a[u]+=su;c[v]+=sv;e[u]+=su;e[v]+=sv;
           const s1=opaqueAt(a[0],a[1],a[2])?1:0,s2=opaqueAt(c[0],c[1],c[2])?1:0,cc=opaqueAt(e[0],e[1],e[2])?1:0;ao=(s1&&s2)?0:3-(s1+s2+cc);}
         aos.push(ao);
         let tu,tv;if(d==1){tu=l[0];tv=l[2];}else if(d==0){tu=l[2];tv=1-l[1];}else{tu=l[0];tv=1-l[1];}

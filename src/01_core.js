@@ -26,6 +26,9 @@ const hdist=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
 const fmtTime=t=>{t=Math.max(0,Math.ceil(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0');};
 function mkCanvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(e){return null;}}
+// player settings (Options screens)
+const OPT=Object.assign({fov:70,rd:2,clouds:true,bob:true,smooth:true,fancy:true,particles:2,fps:0,bright:0,vol:1,music:.6,gui:0,mobile:'auto',full:false},(()=>{try{return JSON.parse(store('bb_opt')||'{}')||{};}catch(e){return {};}})());
+function saveOpt(){store('bb_opt',JSON.stringify(OPT));}
 
 // ---------- minimal zip/jar reader (stored + deflate via DecompressionStream) ----------
 async function readZip(buf){

@@ -27,27 +27,38 @@ class LocalNet{
   list(){return [...this.members.values()].map(m=>({id:m.id,name:m.name}));}
   leave(){clearInterval(this.hb);try{this.ch.postMessage({t:'bye',from:this.myId});this.ch.close();}catch(e){}}
 }
+// Photon payloads go through a JSON round trip so the binary protocol never sees undefined/NaN/typed arrays
+const netClean=v=>v===undefined?null:JSON.parse(JSON.stringify(v));
+function photonHelp(code,msg){const m=`Photon error ${code}${msg?': '+msg:''}. `;
+  if(code>=2001&&code<=2004)return m+'The game server dropped the connection. Usual causes: the AppId is not a Realtime/PUN app (Fusion, Chat and Voice AppIds do not work here; create a "Realtime" app in the Photon dashboard), the free 20-player (CCU) limit is full, or this network blocks Photon (school/work Wi-Fi often does).';
+  if(code===1101||code===3101||code===4101||code===32767)return m+'Photon rejected the AppId. Check it is copied exactly and that custom authentication is off for that app.';
+  if(code>=4001&&code<=4004)return m+'Could not reach Photon\'s name server. The network may block it, or the region is wrong.';
+  if(code>=1001&&code<=1004)return m+'Could not reach the Photon master server. Try another region or network.';
+  return m;}
 class PhotonNet{
-  constructor(appId,region,room,name,onReady,onFail){
-    this.kind='photon';const LBC=Photon.LoadBalancing.LoadBalancingClient;this.LBC=LBC;
-    const c=this.c=new LBC(Photon.ConnectionProtocol.Wss,appId,'blockbattle-1.0');this.room=room;this.joining=false;this.myId=-1;
-    c.onStateChange=s=>{this.stateName=LBC.StateToName?LBC.StateToName(s):String(s);setNetStatus('Photon: '+this.stateName);
-      if((s===LBC.State.JoinedLobby||s===LBC.State.ConnectedToMaster)&&!this.joining){this.joining=true;c.joinRoom(room,{createIfNotExists:true},{maxPlayers:16});}};
-    c.onJoinRoom=()=>{this.myId=c.myActor().actorNr;this._h=this.hostId();onReady&&onReady();};
+  constructor(appId,region,room,name,onReady,onFail){this.kind='photon';this.room=room;this.myId=-1;this.retries=0;this.left=false;this.joined=false;this.cfg={appId,region,room,name,onReady,onFail};this.connect();}
+  connect(){const {appId,region,room,name,onReady,onFail}=this.cfg;const LBC=Photon.LoadBalancing.LoadBalancingClient;this.LBC=LBC;
+    const c=this.c=new LBC(Photon.ConnectionProtocol.Wss,appId,'blockbattle-1.0');this.joining=false;
+    c.onStateChange=s=>{if(c!==this.c)return;this.stateName=LBC.StateToName?LBC.StateToName(s):String(s);setNetStatus('Photon: '+this.stateName);
+      if((s===LBC.State.JoinedLobby||s===LBC.State.ConnectedToMaster)&&!this.joining&&!this.joined){this.joining=true;c.joinRoom(room,{createIfNotExists:true},{maxPlayers:16,isVisible:true,isOpen:true});}};
+    c.onJoinRoom=()=>{if(c!==this.c)return;this.joined=true;this.retries=0;this.myId=c.myActor().actorNr;this._h=this.hostId();setNetStatus('Photon: joined room '+room);onReady&&onReady();};
     c.onActorJoin=a=>{if(a.actorNr!==this.myId)this.onJoin&&this.onJoin(a.actorNr,a.name);this.checkHost();};
     c.onActorLeave=a=>{this.onLeave&&this.onLeave(a.actorNr);this.checkHost();};
     c.onEvent=(code,content,actorNr)=>{this.onEvent&&this.onEvent(code,content,actorNr);};
-    c.onError=(code,msg)=>{onFail&&onFail('Photon error '+code+': '+msg);};
-    try{c.myActor().setName(name);}catch(e){}
-    c.connectToRegionMaster(region||'us');
+    c.onError=(code,msg)=>{if(c!==this.c||this.left)return;
+      // a dropped game-server connection before we got into the room: try again a couple of times
+      if(!this.joined&&code>=2001&&code<=2004&&this.retries<2){this.retries++;setNetStatus(`Photon: game server dropped the connection, retrying (${this.retries}/2)...`);try{c.disconnect();}catch(e){}setTimeout(()=>{if(!this.left)this.connect();},1500);return;}
+      onFail&&onFail(photonHelp(code,msg));};
+    try{c.myActor().setName(String(name||'Player').slice(0,16));}catch(e){}
+    try{c.connectToRegionMaster(region||'us');}catch(e){onFail&&onFail('Photon failed to start: '+e.message);}
   }
   hostId(){try{return this.c.myRoom().masterClientId;}catch(e){return -1;}}
   isHost(){return this.inRoom()&&this.hostId()===this.myId;}
   checkHost(){const h=this.hostId();if(this._h!==h){this._h=h;this.onHostChange&&this.onHostChange(h);}}
   inRoom(){try{return this.c.isJoinedToRoom();}catch(e){return false;}}
-  send(code,data,to){const o={};if(to)o.targetActors=to;this.c.raiseEvent(code,data,o);}
+  send(code,data,to){const o={};if(to)o.targetActors=to;this.c.raiseEvent(code,netClean(data),o);}
   list(){const a=this.c.myRoomActors();return Object.keys(a).map(k=>({id:a[k].actorNr,name:a[k].name||('Player '+a[k].actorNr)}));}
-  leave(){try{this.c.disconnect();}catch(e){}}
+  leave(){this.left=true;try{this.c.disconnect();}catch(e){}}
 }
 function loadScript(u){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
 async function loadPhotonSDK(custom){

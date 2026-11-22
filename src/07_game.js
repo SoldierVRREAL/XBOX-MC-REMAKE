@@ -198,5 +198,5 @@ function updateDrops(dt){
 function invRoom(e,id){const it=ITEMS[id];if(it.type==='armor')return true;if(e.inv.some(s=>!s))return true;return it.stack>1&&e.inv.some(s=>s&&s.id===id&&s.count<it.stack);}
 
 // ---------- particles ----------
-function spawnParticles(x,y,z,n,col,sp){for(let i=0;i<n;i++)particles.push({p:[x,y,z],v:[(Math.random()-.5)*sp,Math.random()*sp,(Math.random()-.5)*sp],t:.4+Math.random()*.5,col});if(particles.length>600)particles.splice(0,particles.length-600);}
+function spawnParticles(x,y,z,n,col,sp){n=Math.ceil(n*[.2,.5,1][OPT.particles]);for(let i=0;i<n;i++)particles.push({p:[x,y,z],v:[(Math.random()-.5)*sp,Math.random()*sp,(Math.random()-.5)*sp],t:.4+Math.random()*.5,col});if(particles.length>600)particles.splice(0,particles.length-600);}
 function updateParticles(dt){for(const p of particles){p.t-=dt;p.v[1]-=9*dt;for(let k=0;k<3;k++)p.p[k]+=p.v[k]*dt;}particles=particles.filter(p=>p.t>0);}

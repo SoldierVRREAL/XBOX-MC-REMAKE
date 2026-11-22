@@ -1,6 +1,6 @@
 // ================= Java Edition movement physics (fixed 20 TPS, values from 1.8 EntityLivingBase / Entity) =================
 const TICK=1/20,STEP_HEIGHT=.6,FULLBOX=[[0,0,0,1,1,1]];
-function blockBoxes(x,y,z){const b=getB(x,y,z);if(!b)return null;const D=BD[b];if(D.col)return D.col;return D.solid?FULLBOX:null;}
+function blockBoxes(x,y,z){const b=getB(x,y,z);if(!b)return null;const D=BD[b];if(D.fence)return fenceBoxes(x,y,z,true);if(D.col)return D.col;return D.solid?FULLBOX:null;}
 function collisionBoxes(a){
   const out=[];const x0=Math.floor(a[0]),x1=Math.floor(a[3]-1e-9),y0=Math.floor(a[1])-1,y1=Math.floor(a[4]-1e-9),z0=Math.floor(a[2]),z1=Math.floor(a[5]-1e-9);
   for(let y=y0;y<=y1;y++)for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++){

@@ -4,7 +4,7 @@ function newAI(){return {goal:null,target:null,think:Math.random()*.3,mode:'loot
 const blockCount=e=>e.inv.reduce((n,s)=>n+(s&&ITEMS[s.id].type==='block'?s.count:0),0);
 function nearestChest(b){let best=null,bd=1e9;const nb=blockCount(b);
   for(const c of chests.values()){if(!c.items.some(Boolean))continue;if(c.claim&&c.claim!==b&&c.claim.alive&&c.claimT>0)continue;if(c.skipFor===b&&c.skipT>MATCH.gameT)continue;
-    const ground=surf(c.x,c.z);const need=c.y-ground-1;if(MATCH.mode==='br'){if(need>1&&nb<need)continue;if(!inZone([c.x,0,c.z],true,.9))continue;}else if(need>8&&c.y-b.pos[1]>8)continue;
+    const ground=surf(c.x,c.z);const need=c.y-ground-1;if(MATCH.mode==='br'){if(need>1&&nb<need)continue;if(!inZone([c.x,0,c.z],true,.9))continue;}else if(!c.center&&(c.y-b.pos[1]>2.5||b.pos[1]-c.y>6))continue; // no pathfinding: leave chests up on ledges/boardwalks to the players
     const d=dist(b.pos,[c.x+.5,c.y,c.z+.5]);if(d<bd){bd=d;best=c;}}
   return bd<(MATCH.mode==='br'?100:70)?best:null;}
 function groundAhead(x,y,z,maxD=5){for(let i=0;i<maxD;i++){const b=getB(Math.floor(x),Math.floor(y)-1-i,Math.floor(z));if(b===B.LAVA)return false;if(b&&BD[b].solid)return true;if(b===B.WATER)return true;}return false;}

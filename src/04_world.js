@@ -63,8 +63,8 @@ function barrierWalls(){for(let y=0;y<WY;y++)for(let i=0;i<WX;i++){setB(i,y,0,B.
 
 const MAPS=[
   {id:'cavern',name:'Cavern',desc:'Underground arena under the bones of a giant beast. Lava, sand dunes, ledges.'},
-  {id:'cove',name:'Cove',desc:'Islands, a shipwreck and a lighthouse. Docks link the islets.'},
-  {id:'crucible',name:'Crucible',desc:'Jungle ruins on a floating plateau, a stepped temple and a lava pit.'},
+  {id:'cove',name:'Cove',desc:'A pirate cove inside a cliff bowl: beach, lagoon, shipwreck, waterfalls and boardwalk huts.'},
+  {id:'crucible',name:'Crucible',desc:'A lava colosseum at night under the bones of a giant beast, with a sandstone pyramid at its heart.'},
   {id:'skyhold',name:'Skyhold',desc:'A floating island with a temple. Knock people into the void.'},
 ];
 
@@ -125,7 +125,7 @@ function genCavern(){
   return {sky:[.04,.035,.05],fog:[.05,.045,.06],fogDist:72,skyLight:false,voidY:-12,central,spawns:ringSpawns(22,16),center:[CX,base+4,CZ],dark:true};
 }
 
-function genCove(){
+function genCoveOld(){
   setDims(84,40,84);const s=4242;rs=s;const WL=12;
   const islets=[[CX+24,CZ-18,8],[CX-25,CZ+14,7],[CX+18,CZ+26,6],[CX-20,CZ-24,7]];
   for(let z=1;z<WZ-1;z++)for(let x=1;x<WX-1;x++){
@@ -164,7 +164,7 @@ function genCove(){
   return {sky:[.47,.65,1],fog:[.74,.84,1],fogDist:110,skyLight:true,voidY:-12,central,spawns:ringSpawns(20,16),center:[CX,H0+1,CZ]};
 }
 
-function genCrucible(){
+function genCrucibleOld(){
   setDims(84,52,84);const s=9001;rs=s;const R=38;
   for(let z=0;z<WZ;z++)for(let x=0;x<WX;x++){
     const d=Math.hypot(x-CX,z-CZ)/R+fbm(x*.07,z*.07,s)*.25-.12;if(d>1)continue;const t=1-d;
