@@ -1,5 +1,7 @@
 # Xbox Minecraft Battle Mode Browser Edition
 
+![Minecraft Xbox Battle mode](https://i.ytimg.com/vi/rK0_e5PxOhw/maxresdefault.jpg)
+
 Xbox Minecraft Battle Mode Browser Edition is a fan-made, browser-based tribute to the Legacy Console Edition **Battle** mini game, plus a Battle Royale mode ported from the MCBR datapack. Single HTML file, WebGL, no build step needed to play.
 
 > Not affiliated with Mojang or Microsoft. All code and built-in art are original; Minecraft textures and sounds are only used if you load your own resource pack.
@@ -46,6 +48,8 @@ Open `index.html` in a browser, or host it with GitHub Pages (below).
 Players can load any Java Edition resource pack (`.zip`) or a client `.jar` they own from **Resource Packs**. Packs are kept in that browser only. Both 1.8 and modern file names are supported, including `sounds.json` sound events.
 
 If you have the rights to share a pack, you can also place it beside `index.html` as `pack.zip` (textures) and/or `sounds.zip` (sounds) and it loads automatically for everyone. These names are git-ignored by default.
+
+**Dressing Room:** the player preview beside the title menu opens the Dressing Room, where you can set your name and import your own skin (64x64 or legacy 64x32 PNG). Imported skins are saved in your browser and sent to other players in online games.
 
 **Title logo:** put an image named `logo.png` beside `index.html` (or pick one under Resource Packs → Title logo image) and it replaces the drawn logo on the title screen. `logo.png` is git-ignored too, since logos usually belong to someone else.
 
