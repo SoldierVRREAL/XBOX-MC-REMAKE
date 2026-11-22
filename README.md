@@ -63,6 +63,8 @@ Players can load any Java Edition resource pack (`.zip`) or a client `.jar` they
 
 **Java keys:** F5 cycles first person / third person behind / in front, F1 hides the GUI, F3 shows the debug screen, T (or /) opens chat in multiplayer.
 
+**Mouse:** Controls > Raw Mouse Input picks between raw input (no OS acceleration) and normal input. Auto uses normal input on Macs, where raw input speeds up the camera while a mouse button is held, and raw input everywhere else.
+
 **Options & mobile:** Help & Options opens Java-style Options screens (Video Settings, Music & Sounds, Controls, Game Rules, Maps). Mobile Controls (Auto/ON/OFF) adds a touch joystick, drag-to-look, tap-to-attack, hold-to-use and buttons for jump, sneak, sprint, inventory and drop. Settings are saved in the browser.
 
 **Default packs:** `pack.zip` (Template Resource Pack 1.8) and `sounds.zip` (Enhanced Audio r7) sit beside `index.html` and load automatically when the page is hosted (GitHub Pages, or any local web server). Browsers block this when you double-click `index.html` from disk, so either host it or load the packs once from the Texture Packs menu.

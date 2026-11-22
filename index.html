@@ -2818,7 +2818,11 @@ let sprintTap=false,lastWUp=-1;const keys={};let lmb=false,rmb=false,rmbEdge=fal
 const OVERLAYS=['jOpt','lbPanel','dressPanel','menu','optPanel','onlinePanel','packPanel','chestUI','pause','lobbyPanel','results','clickResume'];
 function show(id){$(id).classList.remove('hidden');}function hide(id){$(id).classList.add('hidden');}
 function hideOverlays(){for(const id of OVERLAYS)hide(id);}
-function lockPointer(){if(padActive||touchActive)return;try{let r=null;try{r=cv.requestPointerLock({unadjustedMovement:true});}catch(e){r=null;}if(r&&r.catch)r.catch(()=>{try{const r2=cv.requestPointerLock();if(r2&&r2.catch)r2.catch(()=>{});}catch(e){}});else if(!r&&!document.pointerLockElement){}}catch(e){}}
+// raw mouse input (unadjustedMovement) skips OS acceleration, but on macOS it inflates movement while a mouse button is held,
+// so Auto uses normal input on Macs and raw input elsewhere; Controls > Raw Mouse Input overrides it either way
+const IS_MAC=/Mac|iPhone|iPad/i.test((navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||navigator.userAgent||'');
+const rawMouse=()=>OPT.rawMouse==='on'||(OPT.rawMouse!=='off'&&!IS_MAC);
+function lockPointer(){if(padActive||touchActive)return;try{let r=null;try{r=rawMouse()?cv.requestPointerLock({unadjustedMovement:true}):cv.requestPointerLock();}catch(e){r=null;}if(r&&r.catch)r.catch(()=>{try{const r2=cv.requestPointerLock();if(r2&&r2.catch)r2.catch(()=>{});}catch(e){}});else if(!r&&!document.pointerLockElement){}}catch(e){}}
 let SENS=+(store('bb_sens')||.5),INVY=store('bb_invy')==='1';
 function lookDelta(dx,dy){const f=SENS*.6+.2,k=f*f*f*8*.15*Math.PI/180;player.yaw-=dx*k;player.pitch=clamp(player.pitch-(INVY?-dy:dy)*k,-Math.PI/2,Math.PI/2);}
 function setNetStatus(s){const el=$('status');if(el)el.textContent=s;}
@@ -2827,7 +2831,10 @@ document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockEl
   else if((MATCH.state==='play'||MATCH.state==='lobby')&&!chestOpen&&!chatUI&&$('lobbyPanel').classList.contains('hidden')&&$('results').classList.contains('hidden')){if(!online)paused=true;show('pause');}});
 cv.addEventListener('click',()=>{if((MATCH.state==='play'||MATCH.state==='lobby')&&!locked&&!chestOpen)lockPointer();});
 $('clickResume').addEventListener('click',()=>lockPointer());
-document.addEventListener('mousemove',e=>{if(!locked||!player)return;if(!player.alive&&spectate.mode==='follow')return;const dx=e.movementX,dy=e.movementY;if(Math.abs(dx)>350||Math.abs(dy)>350)return;lookDelta(dx,dy);});
+// mouse look; some browsers deliver the same drag movement twice while a button is held, so an exact repeat (same time, same deltas) is skipped
+let lastMove={t:-1,dx:0,dy:0};
+document.addEventListener('mousemove',e=>{if(!locked||!player)return;if(!player.alive&&spectate.mode==='follow')return;const dx=e.movementX,dy=e.movementY;if(!dx&&!dy)return;
+  if(e.timeStamp===lastMove.t&&dx===lastMove.dx&&dy===lastMove.dy)return;lastMove={t:e.timeStamp,dx,dy};if(Math.abs(dx)>350||Math.abs(dy)>350)return;lookDelta(dx,dy);});
 document.addEventListener('mousedown',e=>{if(!locked)return;if(e.button===0){lmb=true;lmbEdge=true;}if(e.button===2){rmb=true;rmbEdge=true;}});
 document.addEventListener('mouseup',e=>{if(e.button===0)lmb=false;if(e.button===2)rmb=false;});
 document.addEventListener('contextmenu',e=>e.preventDefault());
@@ -3319,7 +3326,7 @@ $('tStickZone').addEventListener('pointerup',stickEnd);$('tStickZone').addEventL
 const looks=new Map();
 $('tLook').addEventListener('pointerdown',e=>{e.preventDefault();try{e.target.setPointerCapture(e.pointerId);}catch(_){}
   // tapping the hotbar selects a slot
-  const S=Math.min(46,(W-20)/9.5),hx=Math.round(W/2-S*4.5),hy=Math.round(H-S-12);
+  const G=hudGeom(),S=G.S,hx=G.hx,hy=G.hy;   // same layout the HUD draws
   if(player&&e.clientY>=hy-4&&e.clientY<=hy+S+4&&e.clientX>=hx&&e.clientX<=hx+S*9){player.sel=clamp(Math.floor((e.clientX-hx)/S),0,8);player.using=null;selShow=2;return;}
   const L={x:e.clientX,y:e.clientY,t:performance.now(),moved:0,held:false};L.timer=setTimeout(()=>{if(L.moved<10){L.held=true;rmb=true;rmbEdge=true;}},380);looks.set(e.pointerId,L);});
 $('tLook').addEventListener('pointermove',e=>{const L=looks.get(e.pointerId);if(!L||!player)return;const dx=e.clientX-L.x,dy=e.clientY-L.y;L.x=e.clientX;L.y=e.clientY;L.moved+=Math.abs(dx)+Math.abs(dy);
@@ -3384,7 +3391,8 @@ JPAGES.sound=()=>({title:'Music & Sound Options',items:[
 JPAGES.controls=()=>{const keys=[['Attack','Left Click'],['Use Item','Right Click'],['Forward / Back','W / S'],['Left / Right','A / D'],['Jump','Space'],['Sneak','Shift'],['Sprint','Ctrl or W W'],['Inventory','E'],['Drop Item','Q'],['Hotbar','1-9, Wheel'],['Ready (lobby)','R'],['Player List','Tab']];
   return {title:'Controls',items:[
   jSlider(()=>SENS<=0?'Sensitivity: *yawn*':SENS>=1?'Sensitivity: HYPERSPEED!!!':'Sensitivity: '+Math.round(SENS*200)+'%',()=>SENS,v=>{SENS=v;store('bb_sens',SENS);if($('o_sens'))$('o_sens').value=Math.round(SENS*200);},40),
-  jBtn(()=>'Invert Mouse: '+onOff(INVY),()=>{INVY=!INVY;store('bb_invy',INVY?'1':'0');if($('o_invy'))$('o_invy').checked=INVY;})].concat(keys.map(([a,k])=>jBtn(`${a}: ${k}`,null,'off')))};};
+  jBtn(()=>'Invert Mouse: '+onOff(INVY),()=>{INVY=!INVY;store('bb_invy',INVY?'1':'0');if($('o_invy'))$('o_invy').checked=INVY;}),
+  jBtn(()=>'Raw Mouse Input: '+({on:'ON',off:'OFF'}[OPT.rawMouse]||'Auto ('+(IS_MAC?'OFF':'ON')+')'),()=>{OPT.rawMouse=OPT.rawMouse==='on'?'off':OPT.rawMouse==='off'?'auto':'on';saveOpt();if(document.pointerLockElement)document.exitPointerLock();})].concat(keys.map(([a,k])=>jBtn(`${a}: ${k}`,null,'off')))};};
 JPAGES.rules=()=>({title:'Game Rules',items:[ruleBtn('o_mode','Mode'),ruleBtn('o_round','Round Length'),ruleBtn('o_hunger','Hunger Rate'),ruleBtn('o_refill','Item Respawn'),ruleBtn('o_grace','Grace Period'),
   ruleBtn('o_show','Showdown'),ruleBtn('o_take','Take Everything'),ruleBtn('o_central','Central Spawn'),ruleBtn('o_bots','Bots'),ruleBtn('o_diff','Bot Difficulty'),ruleBtn('o_brlen','Battle Royale Length'),ruleBtn('o_brx','BR Extra Loot'),ruleBtn('o_ench','Enchanted Loot')]});
 JPAGES.maps=()=>({title:'Maps',items:MAPS.map(m=>jBtn(()=>`${m.name}: ${onOff($('map_'+m.id).checked)}`,()=>{const el=$('map_'+m.id);el.checked=!el.checked;if(!MAPS.some(q=>$('map_'+q.id).checked))el.checked=true;readOptions();}))});
