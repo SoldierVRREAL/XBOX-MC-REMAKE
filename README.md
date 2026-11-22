@@ -1,6 +1,6 @@
-# Block Battle
+# Xbox Minecraft Battle Mode Browser Edition
 
-A fan-made, browser-based tribute to the Legacy Console Edition **Battle** mini game, plus a Battle Royale mode ported from the MCBR datapack. Single HTML file, WebGL, no build step needed to play.
+Xbox Minecraft Battle Mode Browser Edition is a fan-made, browser-based tribute to the Legacy Console Edition **Battle** mini game, plus a Battle Royale mode ported from the MCBR datapack. Single HTML file, WebGL, no build step needed to play.
 
 > Not affiliated with Mojang or Microsoft. All code and built-in art are original; Minecraft textures and sounds are only used if you load your own resource pack.
 
