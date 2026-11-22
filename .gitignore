@@ -1,9 +1,6 @@
-# Resource packs contain Mojang / third-party assets - keep them out of a public repo
-pack.zip
-sounds.zip
+# default packs (pack.zip = textures, sounds.zip = sounds) are included on purpose
 resourcepack.zip
 *.jar
 all.js
 __pycache__/
 .DS_Store
-logo.png

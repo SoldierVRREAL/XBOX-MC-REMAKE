@@ -47,11 +47,13 @@ Open `index.html` in a browser, or host it with GitHub Pages (below).
 
 Players can load any Java Edition resource pack (`.zip`) or a client `.jar` they own from **Resource Packs**. Packs are kept in that browser only. Both 1.8 and modern file names are supported, including `sounds.json` sound events.
 
-If you have the rights to share a pack, you can also place it beside `index.html` as `pack.zip` (textures) and/or `sounds.zip` (sounds) and it loads automatically for everyone. These names are git-ignored by default.
+**Options & mobile:** Help & Options opens Java-style Options screens (Video Settings, Music & Sounds, Controls, Game Rules, Maps). Mobile Controls (Auto/ON/OFF) adds a touch joystick, drag-to-look, tap-to-attack, hold-to-use and buttons for jump, sneak, sprint, inventory and drop. Settings are saved in the browser.
+
+**Default packs:** `pack.zip` (Template Resource Pack 1.8) and `sounds.zip` (Enhanced Audio r7) sit beside `index.html` and load automatically when the page is hosted (GitHub Pages, or any local web server). Browsers block this when you double-click `index.html` from disk, so either host it or load the packs once from the Texture Packs menu.
 
 **Dressing Room:** the player preview beside the title menu opens the Dressing Room, where you can set your name and import your own skin (64x64 or legacy 64x32 PNG). Imported skins are saved in your browser and sent to other players in online games.
 
-**Title logo:** put an image named `logo.png` beside `index.html` (or pick one under Resource Packs → Title logo image) and it replaces the drawn logo on the title screen. `logo.png` is git-ignored too, since logos usually belong to someone else.
+**Title logo:** `logo.png` beside `index.html` is the default title logo (loaded automatically when hosted). Replace it with another image, or pick one under Texture Packs → Title logo image.
 
 ## Editing the code
 
