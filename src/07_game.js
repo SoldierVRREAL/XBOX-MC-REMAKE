@@ -31,21 +31,23 @@ const entBox=(e,p=.1)=>[[e.pos[0]-HW-p,e.pos[1]-p,e.pos[2]-HW-p],[e.pos[0]+HW+p,
 
 // ---------- inventory ----------
 const armorPts=e=>e.armor.reduce((s,a)=>s+(a?ITEMS[a].pts:0),0);
+const enchProt=e=>e.armor.reduce((s,a)=>s+enchLvl(a,'protection'),0);
 function addItem(e,id,count){
   const it=ITEMS[id];if(!it)return 0;
-  if(it.type==='armor'){const cur=e.armor[it.slot];if(!cur||ITEMS[cur].pts<it.pts){e.armor[it.slot]=id;if(cur)addItem(e,cur,1);return 0;}} // auto-equip from chests
+  if(it.type==='armor'){const cur=e.armor[it.slot];if(!cur||ITEMS[cur].pts<it.pts||(ITEMS[cur].pts===it.pts&&enchScore(id)>enchScore(cur))){e.armor[it.slot]=id;if(cur)addItem(e,cur,1);return 0;}} // auto-equip from chests
   if(it.stack>1)for(const s of e.inv){if(s&&s.id===id&&s.count<it.stack){const m=Math.min(count,it.stack-s.count);s.count+=m;count-=m;if(!count)return 0;}}
   for(let i=0;i<9;i++)if(!e.inv[i]){const m=Math.min(count,it.stack);e.inv[i]={id,count:m};count-=m;if(!count)return 0;}
   return count;
 }
 const hasItem=(e,id)=>e.inv.findIndex(s=>s&&s.id===id);
 function consume(e,i){const s=e.inv[i];if(!s)return;s.count--;if(s.count<=0)e.inv[i]=null;}
-function weaponDmg(e){const s=e.inv[e.sel];let d=s&&ITEMS[s.id].type==='weapon'?ITEMS[s.id].dmg:1;const st=e.effects.strength,wk=e.effects.weakness;if(wk)d-=.5*(wk.amp+1);if(st)d*=1+1.3*(st.amp+1);return Math.max(0,d);}
+function weaponDmg(e){const s=e.inv[e.sel];let d=s&&ITEMS[s.id].type==='weapon'?ITEMS[s.id].dmg:1;const st=e.effects.strength,wk=e.effects.weakness;if(wk)d-=.5*(wk.amp+1);if(st)d*=1+1.3*(st.amp+1);if(s&&ITEMS[s.id].type==='weapon')d+=1.25*enchLvl(s.id,'sharpness');return Math.max(0,d);}
 
 // ---------- effects ----------
 function giveEffect(e,name,dur,amp){
   if(name==='heal'){e.health=Math.min(maxHP(e),e.health+(4<<amp));return;}
   if(name==='harm'){hurt(e,6<<amp,null,'magic',null,true,true);return;}
+  if(name==='ignite'){if(!e.effects.fireres&&!e.inWater)e.fire=Math.max(e.fire||0,dur);return;}   // Fire Aspect / Flame
   const cur=e.effects[name];if(cur&&cur.amp>amp&&cur.t>dur)return;e.effects[name]={t:dur,amp,tick:0};
   if(name==='absorption')e.absorb=Math.max(e.absorb,4*(amp+1));if(name==='fireres')e.fire=0;
 }
@@ -77,7 +79,7 @@ function hurt(e,amt,src,cause,kb,raw,ignoreInvuln){
   if(e.invuln>0&&!ignoreInvuln){if(amt<=(e.lastDmg||0))return false;const d=amt-(e.lastDmg||0);e.lastDmg=amt;amt=d;fresh=false;} // EntityLivingBase.attackEntityFrom
   else{e.lastDmg=amt;e.invuln=.5;e.hurtT=.5;}
   if(!raw&&e.using==='block'&&src)amt=(1+amt)*.5;                       // sword blocking
-  if(!raw)amt*=1-Math.min(20,armorPts(e))*.04;                            // armour: 4% per point
+  if(!raw){amt*=1-Math.min(20,armorPts(e))*.04;const ep=enchProt(e);if(ep)amt*=1-Math.min(20,ep)*.04;}                            // armour: 4% per point
   if(e.absorb>0){const a2=Math.min(e.absorb,amt);e.absorb-=a2;amt-=a2;}
   e.health-=amt;e.lastHurt=0;exhaust(e,.3);
   if(src&&src!==e){e.lastAttacker=src;e.lastAttackT=0;creditDamage(src,amt);}
@@ -135,17 +137,17 @@ function doAttack(e,target){
   if(e.atkCD>0)return;e.atkCD=e.isLocal?0:.12;e.swing=1;
   const t=target!==undefined?target:meleeTarget(e,3);if(!t)return;exhaust(e,.3);
   let dmg=weaponDmg(e);const crit=(e.fallDist||0)>0&&!e.onGround&&!onLadder(e)&&!e.inWater;if(crit){dmg*=1.5;spawnParticles(t.pos[0],t.pos[1]+1.2,t.pos[2],14,[1,1,1],4,'crit');}
-  const extra=e.sprint?1:0;if(e.sprint){e.sprint=false;if(e.mot){e.mot[0]*=.6;e.mot[2]*=.6;}}
+  const held=e.inv[e.sel],hid=held&&held.id;const extra=(e.sprint?1:0)+enchLvl(hid,'knockback'),fa=enchLvl(hid,'fire_aspect');if(e.sprint){e.sprint=false;if(e.mot){e.mot[0]*=.6;e.mot[2]*=.6;}}
   if(e.effects.invis)delete e.effects.invis;
-  damage(t,dmg,e,'melee',[t.pos[0]-e.pos[0],t.pos[2]-e.pos[2],extra,-Math.sin(e.yaw),-Math.cos(e.yaw)]);
+  damage(t,dmg,e,'melee',[t.pos[0]-e.pos[0],t.pos[2]-e.pos[2],extra,-Math.sin(e.yaw),-Math.cos(e.yaw)],false,fa?[['ignite',4*fa,0]]:undefined);
 }
 
 // ---------- projectiles (arrows, splash potions) ----------
 function spawnProj(kind,pos,vel,owner,dmg,pot,net=true){projs.push({kind,pos,vel,owner,dmg,pot,age:0,stuck:false});if(net&&owner&&owned(owner))netSend(N.PROJ,{k:kind,p:pos,v:vel,o:owner.id,d:dmg,pot});}
 const bowCharge=sec=>{const t=sec;return Math.min(1,(t*t+2*t)/3);};
-function fireBow(e,f){if(f<.1)return;const ai=hasItem(e,'arrow');if(ai<0)return;consume(e,ai);const d=fwd(e),o=eye(e);const g=()=>(Math.random()+Math.random()+Math.random()-1.5)*.0075*1.2;
+function fireBow(e,f){if(f<.1)return;const ai=hasItem(e,'arrow');if(ai<0)return;const bs=e.inv[e.sel],inf=enchLvl(bs&&bs.id,'infinity');if(!inf)consume(e,ai);const d=fwd(e),o=eye(e);const g=()=>(Math.random()+Math.random()+Math.random()-1.5)*.0075*1.2;
   const v=[d[0]+g(),d[1]+g(),d[2]+g()];const L=Math.hypot(...v);const sp=f*3;
-  spawnProj('arrow',[o[0]-Math.cos(e.yaw)*.16,o[1]-.1,o[2]+Math.sin(e.yaw)*.16],[v[0]/L*sp,v[1]/L*sp,v[2]/L*sp],e,f>=1?1:0);sfx('bow',{pos:e.pos});}
+  spawnProj('arrow',[o[0]-Math.cos(e.yaw)*.16,o[1]-.1,o[2]+Math.sin(e.yaw)*.16],[v[0]/L*sp,v[1]/L*sp,v[2]/L*sp],e,f>=1?1:0);{const pr=projs[projs.length-1],bi=bs&&ITEMS[bs.id];if(bi&&bi.ench)pr.en=bi.ench;if(inf)pr.noPick=true;}sfx('bow',{pos:e.pos});}
 function throwSplash(e,id){const p=e.pitch+20*Math.PI/180;const d=[-Math.sin(e.yaw)*Math.cos(p),Math.sin(p),-Math.cos(e.yaw)*Math.cos(p)],o=eye(e),sp=.5;spawnProj('splash',[o[0],o[1]-.1,o[2]],[d[0]*sp,d[1]*sp,d[2]*sp],e,0,id);sfx('bow',{pos:e.pos});}
 function splashImpact(p){
   const it=ITEMS[p.pot];spawnParticles(p.pos[0],p.pos[1],p.pos[2],30,hexRGB(it.color),4);sfx('glass',{pos:p.pos});
@@ -157,8 +159,8 @@ function splashImpact(p){
 }
 function updateProjs(dt){
   for(const a of projs){a.age+=dt;
-    if(a.stuck){if(a.kind==='arrow'&&a.age>.5)for(const e of ents){if(!e.alive||!owned(e))continue;if(dist([e.pos[0],e.pos[1]+.9,e.pos[2]],a.pos)<1.4&&invRoom(e,'arrow')){addItem(e,'arrow',1);a.dead=true;if(e===player)sfx('pick');break;}}continue;}
-    a.tacc=(a.tacc||0)+dt;
+    if(a.stuck){if(a.kind==='arrow'&&a.age>.5&&!a.noPick)for(const e of ents){if(!e.alive||!owned(e))continue;if(dist([e.pos[0],e.pos[1]+.9,e.pos[2]],a.pos)<1.4&&invRoom(e,'arrow')){addItem(e,'arrow',1);a.dead=true;if(e===player)sfx('pick');break;}}continue;}
+    a.tacc=(a.tacc||0)+dt;if(a.en&&a.en.flame&&a.kind==='arrow'&&Math.random()<.6)spawnParticles(a.pos[0],a.pos[1],a.pos[2],1,[1,.5,.1],.5);
     while(a.tacc>=TICK&&!a.dead&&!a.stuck){a.tacc-=TICK;
       const sp=Math.hypot(...a.vel);const n=Math.max(1,Math.ceil(sp/.25));
       for(let i=0;i<n&&!a.dead;i++){
@@ -168,8 +170,8 @@ function updateProjs(dt){
         for(const e of ents){if(!e.alive||(e===a.owner&&a.age<.25))continue;const bb=entBox(e,.15);
           if(a.pos[0]>bb[0][0]&&a.pos[0]<bb[1][0]&&a.pos[1]>bb[0][1]&&a.pos[1]<bb[1][1]&&a.pos[2]>bb[0][2]&&a.pos[2]<bb[1][2]){
             if(a.kind==='splash')splashImpact(a);
-            else if(owned(a.owner)){let dmg=Math.ceil(sp*2);if(a.dmg)dmg+=Math.floor(Math.random()*(dmg/2+2));
-              const src=a.owner;damage(e,dmg,src,'shot',[a.vel[0],a.vel[2],0,0,0]);sfx('arrowhit',{pos:a.pos});}
+            else if(owned(a.owner)){let dmg=Math.ceil(sp*2);if(a.dmg)dmg+=Math.floor(Math.random()*(dmg/2+2));const en=a.en||{};if(en.power)dmg+=en.power*.5+.5;
+              const src=a.owner;damage(e,dmg,src,'shot',[a.vel[0],a.vel[2],en.punch||0,0,0],false,en.flame?[['ignite',5,0]]:undefined);sfx('arrowhit',{pos:a.pos});}
             a.dead=true;break;}}
       }
       if(a.dead||a.stuck)break;

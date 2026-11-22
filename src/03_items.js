@@ -28,6 +28,24 @@ SPLASH.forEach(([k,N,c,fx])=>item('splash_'+k,{name:'Splash Potion of '+N,type:'
 const EFFECT_NAMES={regen:'Regeneration',speed:'Speed',strength:'Strength',fireres:'Fire Resistance',invis:'Invisibility',absorption:'Absorption',poison:'Poison',slowness:'Slowness',weakness:'Weakness'};
 const EFFECT_COL={regen:'#cd5cab',speed:'#7cafc6',strength:'#932423',fireres:'#e49a3a',invis:'#7f8392',absorption:'#2552a5',poison:'#4e9331',slowness:'#5a6c81',weakness:'#484d48'};
 for(const id in BLOCK_NAMES)item('b'+id,{name:BLOCK_NAMES[id],type:'block',block:+id,stack:64,color:BLOCK_COL[id]});
+
+// ---------- enchanted items ----------
+// Every enchanted version is its own item id (base id + '_e_' + enchants, e.g. iron_sword_e_sharpness2). That way chests, drops, armour slots,
+// death loot and online sync all carry it with no extra data. ITEMS[id].ench = {enchantment: level}, ITEMS[id].base = the plain item.
+const ENCH_NAMES={sharpness:'Sharpness',knockback:'Knockback',fire_aspect:'Fire Aspect',protection:'Protection',power:'Power',punch:'Punch',flame:'Flame',infinity:'Infinity'};
+const ROMAN=['','I','II','III','IV'];
+const ENCH_PRESETS={
+  melee:[[['sharpness',1]],[['sharpness',2]],[['sharpness',3]],[['knockback',1]],[['knockback',2]],[['fire_aspect',1]],[['sharpness',3],['fire_aspect',1]]],
+  bow:[[['power',1]],[['power',2]],[['power',3]],[['punch',1]],[['punch',2]],[['flame',1]],[['infinity',1]],[['power',3],['flame',1]]],
+  armor:[[['protection',1]],[['protection',2]],[['protection',3]]]};
+const enchKey=p=>p.map(([k,l])=>k+l).join('_');
+const enchId=(base,key)=>base+'_e_'+key;
+for(const k of Object.keys(ITEMS)){const it=ITEMS[k];
+  const set=it.type==='weapon'&&(it.tool==='sword'||it.tool==='axe')?ENCH_PRESETS.melee:it.type==='bow'?ENCH_PRESETS.bow:it.type==='armor'?ENCH_PRESETS.armor:null;
+  if(set)for(const p of set)ITEMS[enchId(k,enchKey(p))]=Object.assign({},it,{base:k,ench:Object.fromEntries(p)});}
+const enchLvl=(id,k)=>{const it=id&&ITEMS[id];return(it&&it.ench&&it.ench[k])||0;};
+const enchScore=id=>{const it=id&&ITEMS[id];return it&&it.ench?Object.values(it.ench).reduce((a,b)=>a+b,0):0;};
+const itemTipLines=id=>Object.entries((ITEMS[id]&&ITEMS[id].ench)||{}).map(([k,l])=>ENCH_NAMES[k]+(k==='flame'||k==='infinity'?'':' '+ROMAN[l]));
 const MINE_T={1:.6,2:.5,3:2.2,4:1.4,5:.25,6:1.4,7:.5,9:2.6,10:2.6,11:.4,12:.9,13:.6,14:2.6,17:.6,18:2,19:1.2,20:2.4,21:2.4,22:2.4};
 const MINE_DROP={1:'b2',2:'b2',3:'b9',4:'b4',5:null,6:'b6',7:'b7',9:'b9',10:'b10',11:null,12:'b12',13:'b13',14:'b14',17:'b17',18:'b18',19:'b19',20:'b20',21:'b21',22:'b22'};
 
@@ -64,8 +82,12 @@ function procIcon(id){
     else{R(4,14,8,12,c2);R(4,22,11,6,c2);R(19,14,8,12,c2);R(19,22,11,6,c2);R(5,15,6,10,c1);R(20,15,6,10,c1);}}
   return c;
 }
-const ICONS={};
-function rebuildIcons(){for(const k in ITEMS)ICONS[k]=(PACK.icons&&PACK.icons[k])||procIcon(k);}
+const ICONS={},ICON_RAW={};
+// enchanted icons get a purple sheen baked in (ICON_RAW keeps the plain art for the 3D item models, which get an animated glint in the shader instead)
+function glintIcon(raw){const w=raw.width||32,h=raw.height||32,c=mkCanvas(w,h),g=c.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(raw,0,0,w,h);
+  g.globalCompositeOperation='source-atop';g.fillStyle='rgba(110,50,210,.22)';g.fillRect(0,0,w,h);g.strokeStyle='rgba(185,120,255,.55)';g.lineWidth=Math.max(2,w*.1);
+  for(let i=-h;i<w+h;i+=Math.max(5,w*.4)){g.beginPath();g.moveTo(i,h);g.lineTo(i+h,0);g.stroke();}return c;}
+function rebuildIcons(){for(const k in ITEMS){const it=ITEMS[k],b=it.base||k;const raw=(PACK.icons&&(PACK.icons[k]||PACK.icons[b]))||procIcon(b);ICON_RAW[k]=raw;ICONS[k]=it.ench?glintIcon(raw):raw;}}
 
 // ---------- loot ----------
 const LOOT_EDGE=[['wood_sword',7],['stone_sword',5],['iron_sword',1.4],['golden_sword',2],['wood_axe',5],['stone_axe',4],['iron_axe',1.5],['stone_pickaxe',3],['iron_pickaxe',1.2],
@@ -76,9 +98,18 @@ const LOOT_EDGE=[['wood_sword',7],['stone_sword',5],['iron_sword',1.4],['golden_
 const LOOT_CENTER=[['stone_sword',5],['iron_sword',5],['diamond_sword',1.5],['iron_axe',4],['diamond_axe',1.5],['bow',5],['arrow',8,6,16],['golden_apple',2.5],['cooked_beef',5,2,4],['bread',4,2,4],
  ['chainmail_chestplate',3],['chainmail_leggings',3],['iron_helmet',3],['iron_chestplate',2],['iron_leggings',2],['iron_boots',3],['diamond_helmet',.8],['diamond_chestplate',.5],['diamond_leggings',.6],['diamond_boots',.8],
  ['potion_healing',2],['potion_strength',1.5],['potion_regeneration',1.5],['potion_invisibility',.8],['splash_harming',1.5],['splash_poison',1.2]];
+// enchanted finds: rare at the edges, common enough in the centre chests to be worth the run (turn off with the Enchanted Loot rule)
+const E_=(b,k)=>enchId(b,k);
+const ENCH_LOOT_EDGE=[[E_('wood_sword','sharpness1'),1.2],[E_('stone_sword','sharpness1'),1],[E_('stone_sword','knockback1'),.6],[E_('iron_sword','sharpness1'),.5],[E_('golden_sword','sharpness2'),.5],
+  [E_('bow','power1'),.8],[E_('bow','punch1'),.5],[E_('bow','flame1'),.15],[E_('leather_chestplate','protection1'),.6],[E_('leather_boots','protection2'),.5],[E_('chainmail_chestplate','protection1'),.4],
+  [E_('iron_helmet','protection1'),.3],[E_('iron_boots','protection1'),.3]].filter(e=>ITEMS[e[0]]);
+const ENCH_LOOT_CENTER=[[E_('iron_sword','sharpness2'),1.5],[E_('iron_sword','knockback1'),1],[E_('iron_sword','fire_aspect1'),.8],[E_('diamond_sword','sharpness1'),.8],[E_('diamond_sword','sharpness2'),.4],[E_('iron_axe','sharpness2'),.8],
+  [E_('bow','power2'),1.2],[E_('bow','power3'),.5],[E_('bow','flame1'),.6],[E_('bow','infinity1'),.3],[E_('bow','punch2'),.5],[E_('iron_chestplate','protection2'),.7],[E_('iron_helmet','protection2'),.8],
+  [E_('iron_leggings','protection2'),.7],[E_('iron_boots','protection2'),.8],[E_('diamond_chestplate','protection1'),.3],[E_('diamond_helmet','protection1'),.3],[E_('diamond_leggings','protection1'),.3],
+  [E_('diamond_boots','protection2'),.3],[E_('chainmail_chestplate','protection2'),.6]].filter(e=>ITEMS[e[0]]);
 const CHEST_SLOTS=27;
 function rollLoot(center){
-  const T=center?LOOT_CENTER:LOOT_EDGE,tot=T.reduce((s,e)=>s+e[1],0);const items=new Array(CHEST_SLOTS).fill(null);
+  const T=(center?LOOT_CENTER:LOOT_EDGE).concat(SET.enchants===false?[]:center?ENCH_LOOT_CENTER:ENCH_LOOT_EDGE),tot=T.reduce((s,e)=>s+e[1],0);const items=new Array(CHEST_SLOTS).fill(null);
   const n=(center?4:3)+(Math.random()*3|0);
   for(let i=0;i<n;i++){let r=Math.random()*tot,e=T[0];for(const t of T){r-=t[1];if(r<=0){e=t;break;}}
     const cnt=e[2]?e[2]+(Math.random()*(e[3]-e[2]+1)|0):1;let s;do{s=Math.random()*CHEST_SLOTS|0;}while(items[s]);items[s]={id:e[0],count:cnt};}
@@ -86,6 +117,6 @@ function rollLoot(center){
 }
 function rollEaster(){ // MCBR easter.json
   const items=new Array(CHEST_SLOTS).fill(null);const put=it=>{let s;do{s=Math.random()*CHEST_SLOTS|0;}while(items[s]);items[s]=it;};
-  const r=Math.random()*6;put({id:r<3?'iron_sword':r<5?'golden_sword':'diamond_sword',count:1});
+  const r=Math.random()*6;let sid=r<3?'iron_sword':r<5?'golden_sword':'diamond_sword';if(SET.enchants!==false&&Math.random()<.5)sid=enchId(sid,Math.random()<.5?'sharpness2':'knockback1');put({id:sid,count:1});
   put({id:'arrow',count:4+(Math.random()*13|0)});if(Math.random()<.4)put({id:'bow',count:1});return items;
 }

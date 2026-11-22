@@ -18,8 +18,8 @@ void main(){float f=clamp((vd-fogN)/(fogF-fogN),0.,1.);vec3 c=col.rgb*mix(1.,l,l
 // textured meshes: skins, armor, bats, extruded items
 const PT=prog(`attribute vec3 p;attribute vec3 n;attribute vec2 t;uniform mat4 vp;uniform mat4 m;uniform vec3 cam;varying vec2 vt;varying float l;varying float vd;
 void main(){vec4 w=m*vec4(p,1.);gl_Position=vp*w;vec3 nn=normalize((m*vec4(n,0.)).xyz);l=.55+.45*max(dot(nn,normalize(vec3(.4,1.,.3))),0.)+.1*nn.y;vd=length(w.xyz-cam);vt=t;}`,
-`precision mediump float;uniform sampler2D tex;uniform vec4 tint;uniform float hurt;uniform float bright;${FOG_GLSL}varying vec2 vt;varying float l;varying float vd;
-void main(){vec4 c=texture2D(tex,vt);if(c.a<.1)discard;c*=tint;vec3 rgb=mix(c.rgb*l*bright,vec3(1.,.15,.1),hurt*.55);float f=clamp((vd-fogN)/(fogF-fogN),0.,1.);gl_FragColor=vec4(mix(rgb,fogC,f),c.a);}`);
+`precision mediump float;uniform sampler2D tex;uniform vec4 tint;uniform float hurt;uniform float bright;uniform float glint;uniform float gph;uniform vec2 gs;${FOG_GLSL}varying vec2 vt;varying float l;varying float vd;
+void main(){vec4 c=texture2D(tex,vt);if(c.a<.1)discard;c*=tint;if(glint>0.){float k=(vt.x*gs.x+vt.y*gs.y)*1.5+gph;float s=.5+.5*sin(k*6.2831);s=s*s*s;c.rgb+=vec3(.45,.22,.9)*glint*(.18+.85*s);}vec3 rgb=mix(c.rgb*l*bright,vec3(1.,.15,.1),hurt*.55);float f=clamp((vd-fogN)/(fogF-fogN),0.,1.);gl_FragColor=vec4(mix(rgb,fogC,f),c.a);}`);
 const PS=prog(`attribute vec3 p;uniform mat4 vp;varying vec3 d;void main(){d=p;vec4 q=vp*vec4(p,1.);gl_Position=q.xyww;}`,
 `precision mediump float;uniform sampler2D tex;varying vec3 d;uniform float face;void main(){gl_FragColor=texture2D(tex,vec2(0.,0.));}`);
 function mkTex(src,repeat){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
@@ -139,10 +139,10 @@ function makeChestModel(){const P={};const A=(name,fn)=>{const o=[];fn(o);P[name
 const MODELS={wide:makePlayerModel(false),slim:makePlayerModel(true),armor:makeArmorModel(),bat:makeBatModel(),chest:makeChestModel()};
 
 // ---- extruded item meshes (like held items in Minecraft) built from 32x32 icons, stored in an item atlas ----
-const ITEM_CELL=32,ITEM_COLS=16;let itemAtlas=mkCanvas(ITEM_CELL*ITEM_COLS,ITEM_CELL*ITEM_COLS),itemTex=null,itemMesh={},itemSlot={};
+const ITEM_CELL=32,ITEM_COLS=16,ITEM_ROWS=32;let itemAtlas=mkCanvas(ITEM_CELL*ITEM_COLS,ITEM_CELL*ITEM_ROWS),itemTex=null,itemMesh={},itemSlot={};
 function rebuildItemAtlas(){
   const g=itemAtlas.getContext('2d');g.clearRect(0,0,itemAtlas.width,itemAtlas.height);g.imageSmoothingEnabled=false;let i=0;itemSlot={};
-  for(const k in ITEMS){const cx=(i%ITEM_COLS)*ITEM_CELL,cy=Math.floor(i/ITEM_COLS)*ITEM_CELL;g.drawImage(ICONS[k],cx,cy,ITEM_CELL,ITEM_CELL);itemSlot[k]=[cx,cy];i++;}
+  for(const k in ITEMS){const cx=(i%ITEM_COLS)*ITEM_CELL,cy=Math.floor(i/ITEM_COLS)*ITEM_CELL;g.drawImage(ICON_RAW[k]||ICONS[k],cx,cy,ITEM_CELL,ITEM_CELL);itemSlot[k]=[cx,cy];i++;}
   if(itemTex)gl.deleteTexture(itemTex);itemTex=mkTex(itemAtlas);for(const k in itemMesh)gl.deleteBuffer(itemMesh[k].buf);itemMesh={};
 }
 // block items render as little 3D blocks (their real shape), everything else as extruded sprites
@@ -181,7 +181,11 @@ function useBox(vp,cam){gl.useProgram(PB.p);gl.bindBuffer(gl.ARRAY_BUFFER,cubeBu
   gl.uniformMatrix4fv(PB.u.vp,false,vp);gl.uniform3fv(PB.u.cam,cam);gl.uniform3fv(PB.u.fogC,curFog.c);gl.uniform1f(PB.u.fogN,curFog.n);gl.uniform1f(PB.u.fogF,curFog.f);gl.uniform1f(PB.u.lit,1);}
 function box(m,col,a=1){gl.uniformMatrix4fv(PB.u.m,false,m);gl.uniform4f(PB.u.col,col[0],col[1],col[2],a);gl.drawArrays(gl.TRIANGLES,0,36);}
 function useTex(vp,cam){gl.useProgram(PT.p);gl.uniformMatrix4fv(PT.u.vp,false,vp);gl.uniform3fv(PT.u.cam,cam);gl.uniform3fv(PT.u.fogC,curFog.c);gl.uniform1f(PT.u.fogN,curFog.n);gl.uniform1f(PT.u.fogF,curFog.f);
-  gl.uniform4f(PT.u.tint,1,1,1,1);gl.uniform1f(PT.u.hurt,0);gl.uniform1f(PT.u.bright,1);gl.activeTexture(gl.TEXTURE0);gl.uniform1i(PT.u.tex,0);}
+  gl.uniform4f(PT.u.tint,1,1,1,1);gl.uniform1f(PT.u.hurt,0);gl.uniform1f(PT.u.bright,1);gl.uniform1f(PT.u.glint,0);gl.activeTexture(gl.TEXTURE0);gl.uniform1i(PT.u.tex,0);}
+// enchantment glint: a drifting purple shimmer added in the entity shader (gs = how many texture 'cells' span the UV range, so the bands suit the item/armour size)
+const ITEM_GS=[ITEM_COLS,ITEM_ROWS],ARMOR_GS=[4,4];
+function glintOn(gs){gl.uniform1f(PT.u.glint,1);gl.uniform2f(PT.u.gs,gs[0],gs[1]);gl.uniform1f(PT.u.gph,(perfT*.7)%1);}
+function glintOff(){gl.uniform1f(PT.u.glint,0);}
 function drawMesh(mesh,m,tex){gl.bindTexture(gl.TEXTURE_2D,tex);gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buf);
   gl.enableVertexAttribArray(PT.a.p);gl.vertexAttribPointer(PT.a.p,3,gl.FLOAT,false,32,0);gl.enableVertexAttribArray(PT.a.n);gl.vertexAttribPointer(PT.a.n,3,gl.FLOAT,false,32,12);
   gl.enableVertexAttribArray(PT.a.t);gl.vertexAttribPointer(PT.a.t,2,gl.FLOAT,false,32,24);gl.uniformMatrix4fv(PT.u.m,false,m);gl.drawArrays(gl.TRIANGLES,0,mesh.count);}

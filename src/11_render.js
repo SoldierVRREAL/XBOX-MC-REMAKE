@@ -138,7 +138,7 @@ function render(){
     drawMesh(M.base,base,CHEST_TEX);const lm=chain(base,M4.tr(0,9/16,7/16),M4.rx(f*Math.PI/2));drawMesh(M.lid,lm,CHEST_TEX);drawMesh(M.knob,lm,CHEST_TEX);}
   drawShadows();useTex(VP,camPos);
   // dropped items and projectiles
-  for(const d of drops){const hm=heldMesh(d.id);const sc=hm.block?.25:.5;const m=chain(M4.tr(d.pos[0],d.pos[1]+Math.sin(d.spin*1.5)*.1+.1+sc/2,d.pos[2]),M4.ry(d.spin),M4.sc(sc,sc,sc));setEntLight(d.pos);drawMesh(hm.mesh,m,hm.tex);}
+  for(const d of drops){const hm=heldMesh(d.id);const sc=hm.block?.25:.5;const m=chain(M4.tr(d.pos[0],d.pos[1]+Math.sin(d.spin*1.5)*.1+.1+sc/2,d.pos[2]),M4.ry(d.spin),M4.sc(sc,sc,sc));setEntLight(d.pos);const dg=ITEMS[d.id]&&ITEMS[d.id].ench&&!hm.block;if(dg)glintOn(ITEM_GS);drawMesh(hm.mesh,m,hm.tex);if(dg)glintOff();}
   for(const a of projs){if(a.kind==='splash'){setEntLight(a.pos);drawMesh(getItemMesh(a.pot),chain(M4.tr(...a.pos),M4.ry(perfT*8),M4.sc(.4,.4,.4)),itemTex);continue;}
     const l=Math.hypot(...a.vel)||1;const yw=Math.atan2(-a.vel[0],-a.vel[2]),pt=Math.asin(clamp(a.vel[1]/l,-1,1));setEntLight(a.pos);
     drawMesh(getItemMesh('arrow'),chain(M4.tr(...a.pos),M4.ry(yw),M4.rx(pt),M4.ry(Math.PI/2),M4.rz(-Math.PI/4),M4.sc(.7,.7,.7)),itemTex);}
@@ -194,12 +194,12 @@ function drawHumanoid(e){
   const inHead=Math.hypot(camPos[0]-rp[0],camPos[1]-(rp[1]+(e.sneak?1.5:1.64)),camPos[2]-rp[2])<.6;
   if(!invis){for(const [m,ov] of [['head','hat'],['body','jacket'],['rarm','rsleeve'],['larm','lsleeve'],['rleg','rpants'],['lleg','lpants']]){if(inHead&&m==='head')continue;drawMesh(M[m],parts[m],S.tex);drawMesh(M[ov],parts[m],S.tex);}}
   // armor layers
-  const A=MODELS.armor;e.armor.forEach((a,i)=>{if(!a||!ITEMS[a])return;const it=ITEMS[a];const T=ARMOR_TEX[it.tier];if(!T)return;if(T.tint)gl.uniform4f(PT.u.tint,...T.tint,1);
+  const A=MODELS.armor;e.armor.forEach((a,i)=>{if(!a||!ITEMS[a])return;const it=ITEMS[a];const T=ARMOR_TEX[it.tier];if(!T)return;if(T.tint)gl.uniform4f(PT.u.tint,...T.tint,1);if(it.ench)glintOn(ARMOR_GS);
     if(i===0&&!inHead)drawMesh(A.head,parts.head,T.l1);
     if(i===1){drawMesh(A.body,parts.body,T.l1);drawMesh(A.rarm,parts.rarm,T.l1);drawMesh(A.larm,parts.larm,T.l1);}
     if(i===2){drawMesh(A.body2,parts.body,T.l2);drawMesh(A.rleg2,parts.rleg,T.l2);drawMesh(A.lleg2,parts.lleg,T.l2);}
     if(i===3){drawMesh(A.rleg,parts.rleg,T.l1);drawMesh(A.lleg,parts.lleg,T.l1);}
-    gl.uniform4f(PT.u.tint,1,1,1,1);});
+    gl.uniform4f(PT.u.tint,1,1,1,1);if(it.ench)glintOff();});
   // held item (LayerHeldItem 1.8: translate to the hand, then the model's third-person display transform)
   if(held&&ITEMS[held.id]){const hm=heldMesh(held.id),it=ITEMS[held.id],R=Math.PI/180;
     // back into vanilla model space (y down), then LayerHeldItem + the item model's "thirdperson" display, verbatim
@@ -209,7 +209,7 @@ function drawHumanoid(e){
       :it.type==='bow'?chain(hand,...disp([.75,0,.25],[5,80,-45],1))
       :it.type==='weapon'?chain(hand,...disp([0,1.25,-3.5],[0,90,-35],.85))
       :chain(hand,...disp([0,1,-3],[-90,0,0],.55));
-    drawMesh(hm.mesh,chain(m,M4.sc(.5,.5,.5)),hm.tex);}
+    const hg=it.ench&&!hm.block;if(hg)glintOn(ITEM_GS);drawMesh(hm.mesh,chain(m,M4.sc(.5,.5,.5)),hm.tex);if(hg)glintOff();}
   gl.uniform1f(PT.u.hurt,0);
   if(e.fire>0){useBox(VP,camPos);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.uniform1f(PB.u.lit,0);for(let i=0;i<3;i++)box(chain(M4.tr(e.pos[0],e.pos[1]+.9+Math.sin(perfT*9+i)*.2,e.pos[2]),M4.ry(perfT*2+i*2),M4.sc(.7,1.6,.7)),[1,.5+.2*i,.1],.18);gl.disable(gl.BLEND);useTex(VP,camPos);}
 }
@@ -283,5 +283,5 @@ function drawHand(proj,pre){
   // RenderItem: scale 2, then the model's firstperson display (items: [0,-135,25] / [0,4,2] / 1.7; blocks: none), then the 0.5 model scale
   if(hm.block)m=chain(m,M4.sc(2,2,2),M4.sc(.5,.5,.5));
   else m=chain(m,M4.sc(2,2,2),M4.tr(0,.25,.125),M4.ry(-135*R),M4.rz(25*R),M4.sc(1.7,1.7,1.7),M4.sc(.5,.5,.5));
-  drawMesh(hm.mesh,m,hm.tex);
+  const hg=it.ench&&!hm.block;if(hg)glintOn(ITEM_GS);drawMesh(hm.mesh,m,hm.tex);if(hg)glintOff();
 }
