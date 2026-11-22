@@ -11,7 +11,7 @@ Xbox Minecraft Battle Mode Browser Edition is a fan-made, browser-based tribute 
 Open `index.html` in a browser, or host it with GitHub Pages (below).
 
 - **Play Game**: Battle vs bots on Cavern, Cove, Crucible or Skyhold
-- **Play Online**: Photon Realtime rooms (or "same browser, other tabs" for testing)
+- **Play Online** (in Mini Games): online rooms through the game's own server or relay (or "same browser, other tabs" for testing)
 - **Practice**: lobby town with a movement playground (ice, slime, soul sand, cobwebs, ladders, slabs, stairs, water)
 - **Help & Options**: name, skin, round length, hunger rate, item respawn, grace period, Showdown, Take Everything, central spawn, bots, maps, Battle Royale settings
 
@@ -37,19 +37,27 @@ Open `index.html` in a browser, or host it with GitHub Pages (below).
 2. In the repo: **Settings > Pages > Build and deployment**, set **Source** to *Deploy from a branch*, branch `main`, folder `/ (root)`.
 3. After a minute the game is live at `https://<your-username>.github.io/<repo-name>/`.
 
-### Online multiplayer
+### Online multiplayer (our own system, no Photon)
 
-**Built-in relay (default, no setup):** Mini Games → Play Online → "Internet (built-in relay)", everyone types the same room code and presses Connect. The game has its own small multiplayer system: it sends game messages through free public MQTT-over-WebSocket servers (EMQX, HiveMQ, Mosquitto test broker; it tries them in that order). No account, AppId or SDK file needed. Anyone who knows the room code can join, so use an unusual one. To use your own MQTT broker instead, open the page with `?relay=wss://your-broker:port/mqtt`.
+The game has its own multiplayer system: a small room relay that every player in a room talks to. The first player in a room is the host and runs the bots, chests and round timer; if they leave, the next player takes over.
 
-### Online multiplayer (Photon, optional)
+**Option A: run the game's own server (best).** `server/server.js` is one Node.js file with no packages to install. It serves the game *and* the multiplayer relay on the same address:
 
-1. Create a free **Photon Realtime** app at dashboard.photonengine.com and copy its AppId.
-2. Download the **Realtime JavaScript SDK** from photonengine.com (SDKs page, sign in) and copy `lib/photon.min.js` from it next to `index.html` (or paste its URL in Play Online). Use this official, current file: older copies of the SDK connect to the master server and then get dropped by the game server with error 2003.
-3. Put the AppId in Play Online (it's remembered), or change `DEFAULT_APPID` in `src/13_ui.js` and rebuild.
+```
+node server/server.js          # or: npm start   (needs Node.js 18+)
+```
+
+Open `http://localhost:8080` (or your PC's address, e.g. `http://192.168.1.20:8080`, for friends on the same Wi-Fi). Players who open the game from that address connect to it automatically. Free hosts that run Node apps (Render, Railway, Fly.io, Glitch, a Replit, your own PC with port forwarding) work too: point them at this repo with the start command `npm start`. Check `/health` on the server to see rooms and players.
+
+**Option B: GitHub Pages with no server.** Mini Games → Play Online → Connect also works on GitHub Pages: if there's no game server, it falls back to free public relays (EMQX, HiveMQ, Mosquitto test broker). Anyone who knows the room code can join those, so pick an unusual code.
+
+To use a game server from the GitHub Pages copy, type its address in **Game server (optional)** on the Play Online screen, or open the page with `?relay=wss://your-server/mqtt`.
 
 ### Resource packs
 
 Players can load any Java Edition resource pack (`.zip`) or a client `.jar` they own from **Resource Packs**. Packs are kept in that browser only. Both 1.8 and modern file names are supported, including `sounds.json` sound events.
+
+**Java keys:** F5 cycles first person / third person behind / in front, F1 hides the GUI, F3 shows the debug screen, T (or /) opens chat in multiplayer.
 
 **Options & mobile:** Help & Options opens Java-style Options screens (Video Settings, Music & Sounds, Controls, Game Rules, Maps). Mobile Controls (Auto/ON/OFF) adds a touch joystick, drag-to-look, tap-to-attack, hold-to-use and buttons for jump, sneak, sprint, inventory and drop. Settings are saved in the browser.
 
@@ -77,7 +85,7 @@ python3 build.py
 | `06_pack.js` | Resource pack loader |
 | `07_game.js` | Entities, combat, hunger, effects, projectiles, drops |
 | `07b_mcphys.js` | Java Edition movement physics (20 TPS) |
-| `08_net.js` | Photon / BroadcastChannel networking |
+| `08_net.js` | Multiplayer: room relay client (MQTT over WebSocket) and same-browser tabs |
 | `09_flow.js` | Match flow, lobby, chests, MCBR timeline, net events |
 | `10_bots.js` | Bot AI |
 | `11_render.js` | Audio and rendering |

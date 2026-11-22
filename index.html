@@ -133,6 +133,9 @@ table.res{border-collapse:collapse;margin:8px auto;font-size:22px}table.res td{p
 #tInv{right:12vh;top:2vh;width:8vh;height:8vh}#tDrop{right:22vh;top:2vh;width:8vh;height:8vh}#tPause{right:2vh;top:2vh;width:8vh;height:8vh}
 #tReady{right:21vh;bottom:18vh}#tList{right:4vh;bottom:26vh}
 body.touch #clickResume{display:none!important}
+#xhair{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;mix-blend-mode:difference;z-index:3}
+#xhair i,#xhair b{position:absolute;background:#fff;display:block}#xhair i{left:-9px;top:-1px;width:18px;height:2px}#xhair b{left:-1px;top:-9px;width:2px;height:18px}
+#chatBar{position:fixed;left:4px;right:4px;bottom:4px;z-index:6}#chatIn{width:100%;box-sizing:border-box;background:rgba(0,0,0,.5);border:0;color:#fff;font:20px 'VT323',monospace;padding:3px 6px;outline:none}
 .lbt{border-collapse:collapse}.lbt td{padding:calc(var(--S)*2px) calc(var(--S)*6px)}.lbt tr:first-child td{border-bottom:calc(var(--S)*1px) solid #8b8b8b}
 </style>
 </head>
@@ -204,14 +207,12 @@ body.touch #clickResume{display:none!important}
 <div id="onlinePanel" class="screen hidden"><div class="panel">
   <h3>Play Online</h3>
   <div class="form">
-    <label for="n_kind">Connection</label><select id="n_kind"><option value="relay">Internet (built-in relay, no setup)</option><option value="photon">Photon Realtime (your AppId)</option><option value="local">Same browser, other tabs (test)</option></select>
-    <label for="n_app" class="ph">Photon AppId</label><input class="ph" id="n_app" type="password" placeholder="Realtime AppId from dashboard.photonengine.com">
-    <label for="n_region" class="ph">Region</label><select class="ph" id="n_region"><option>us</option><option>usw</option><option>eu</option><option>asia</option><option>jp</option><option>au</option><option>sa</option><option>kr</option><option>in</option></select>
+    <label for="n_kind">Connection</label><select id="n_kind"><option value="relay">Internet</option><option value="local">Same browser, other tabs (test)</option></select>
     <label for="n_room">Room code</label><input id="n_room" type="text" maxlength="24" value="battle">
-    <label for="n_sdk" class="ph">Photon SDK URL (optional)</label><input class="ph" id="n_sdk" type="text" placeholder="photon.min.js next to this page">
+    <label for="n_server">Game server (optional)</label><input id="n_server" type="text" maxlength="120" placeholder="e.g. my-battle.onrender.com or 192.168.1.20:8080">
   </div>
-  <div class="note" id="relayNote">Everyone types the same room code and presses Connect. The built-in relay needs no account: it uses free public servers, so pick an unusual room code to keep strangers out. The first player in a room hosts: it runs the bots, chests and round timer.</div>
-  <div class="note ph">Photon needs your own free Realtime AppId and the Photon JavaScript SDK (put <code>photon.min.js</code> beside this page, or give its URL). Hosted pages work; this preview blocks outside connections, so use "Same browser, other tabs" here. The first player in a room hosts: it runs the bots, chests and round timer.</div>
+  <div class="note">Everyone types the same room code and presses Connect. The first player in a room hosts: it runs the bots, chests and round timer.
+  If you run the game's own server (<code>node server/server.js</code>), players on it connect to it automatically, or type its address above. Without one, the game uses free public relays, so pick an unusual room code.</div>
   <div id="status"></div>
   <div class="row"><button class="btn small" id="connectBtn">Connect</button><button class="btn small" id="onlineClose">Back</button></div>
 </div></div>
@@ -238,6 +239,8 @@ body.touch #clickResume{display:none!important}
 <div id="pause" class="screen hidden"><div class="lhead" id="pauseTitle" data-t="Game menu" style="margin-bottom:calc(var(--S)*14px)">Game menu</div><div class="menuList" style="margin-top:0">
   <button class="lbtn" id="resumeBtn">Back to Game</button><button class="lbtn" id="pauseOpts">Options...</button><button class="lbtn" id="leaveBtn">Leave Game</button></div></div>
 <div id="jOpt" class="screen hidden jscreen"><div id="jTitle"></div><div id="jGrid"></div><div id="jFoot"></div></div>
+<div id="xhair" class="hidden"><i></i><b></b></div>
+<div id="chatBar" class="hidden"><input id="chatIn" type="text" maxlength="100" autocomplete="off" aria-label="Chat message"></div>
 <div id="touchUI" class="hidden"><div id="tLook"></div><div id="tStickZone"><div id="tStickBase"><div id="tStickKnob"></div></div></div>
   <button class="tb" id="tPause" aria-label="Pause"><b>II</b></button><button class="tb" id="tInv" aria-label="Inventory"><b>E</b></button><button class="tb" id="tDrop" aria-label="Drop item"><b>Q</b></button>
   <button class="tb" id="tSneak" aria-label="Sneak"><b>&#8615;</b></button><button class="tb" id="tSprint" aria-label="Sprint"><b>&#187;</b></button><button class="tb" id="tUse" aria-label="Use"><b>&#9995;</b></button>
@@ -1161,6 +1164,19 @@ function rebuildItemAtlas(){
   for(const k in ITEMS){const cx=(i%ITEM_COLS)*ITEM_CELL,cy=Math.floor(i/ITEM_COLS)*ITEM_CELL;g.drawImage(ICONS[k],cx,cy,ITEM_CELL,ITEM_CELL);itemSlot[k]=[cx,cy];i++;}
   if(itemTex)gl.deleteTexture(itemTex);itemTex=mkTex(itemAtlas);for(const k in itemMesh)gl.deleteBuffer(itemMesh[k].buf);itemMesh={};
 }
+// block items render as little 3D blocks (their real shape), everything else as extruded sprites
+const blockItemMesh={};
+function heldMesh(id){const it=ITEMS[id];const b=it&&it.type==='block'?it.block:0;const D=b&&BD[b];
+  if(!D||D.cross||D.liquid||!D.render&&!D.tileEnt||b===B.CHEST)return {mesh:getItemMesh(id),tex:itemTex,block:false};
+  if(!blockItemMesh[b]){const o=[];const boxes=D.fence?[[6/16,0,6/16,10/16,1,10/16]]:D.shape||[[0,0,0,1,1,1]];
+    const uvT=(t,u,v)=>[((t%ACOLS)+.002+u*.996)/ACOLS,(Math.floor(t/ACOLS)+.002+v*.996)/ACOLS];
+    for(const bx of boxes){const [x0,y0,z0,x1,y1,z1]=bx;const tile=f=>bx[6]!=null?bx[6]:f===2?D.top:f===3?D.bottom:f===4?(D.front!=null?D.front:D.side):D.side;
+      const faces=[[[x1,y1,z1],[x1,y1,z0],[x1,y0,z0],[x1,y0,z1],[1,0,0],0],[[x0,y1,z0],[x0,y1,z1],[x0,y0,z1],[x0,y0,z0],[-1,0,0],1],[[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1],[0,1,0],2],
+        [[x0,y0,z1],[x1,y0,z1],[x1,y0,z0],[x0,y0,z0],[0,-1,0],3],[[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x1,y0,z0],[0,0,-1],4],[[x0,y1,z1],[x1,y1,z1],[x1,y0,z1],[x0,y0,z1],[0,0,1],5]];
+      for(const [P0,P1,P2,P3,n,fi] of faces){const t=tile(fi);const uv=q=>{if(fi<2)return uvT(t,fi===0?1-q[2]:q[2],1-q[1]);if(fi<4)return uvT(t,q[0],fi===2?q[2]:1-q[2]);return uvT(t,fi===4?1-q[0]:q[0],1-q[1]);};
+        for(const q of [P0,P1,P2,P0,P2,P3]){o.push(q[0]-.5,q[1]-.5,q[2]-.5,...n,...uv(q));}}}
+    blockItemMesh[b]=meshFrom(o);}
+  return {mesh:blockItemMesh[b],tex:atlasTex,block:true};}
 function getItemMesh(id){
   if(itemMesh[id])return itemMesh[id];const [cx,cy]=itemSlot[id];const data=itemAtlas.getContext('2d').getImageData(cx,cy,ITEM_CELL,ITEM_CELL).data;
   const N=ITEM_CELL,A=(x,y)=>x>=0&&y>=0&&x<N&&y<N&&data[(y*N+x)*4+3]>40;const o=[];const W=itemAtlas.width,H=itemAtlas.height;const th=1/N;const S=1/N;
@@ -1241,7 +1257,7 @@ function skinTex(key){
 function initEntityTextures(){
   for(const k in SKIN_TEX)gl.deleteTexture(SKIN_TEX[k].tex);SKIN_TEX={};
   ARMOR_TEX=ARMOR_TIERS.map(([t,,col,mat],ti)=>{const p=PACK.armor[mat]||{};return {l1:mkTex(p.l1||procArmor(ti,1)),l2:mkTex(p.l2||procArmor(ti,2)),tint:mat==='leather'&&p.l1?hexRGB('#a06540'):null};});
-  BAT_TEX=mkTex(PACK.bat||procBat());CHEST_TEX=mkTex(PACK.chestTex||procChest());
+  initSkyTextures();if(typeof initParticleTex==='function'&&PART_TEX)initParticleTex();BAT_TEX=mkTex(PACK.bat||procBat());CHEST_TEX=mkTex(PACK.chestTex||procChest());
 }
 function availableSkins(){return CUSTOM_SKINS.concat(PACK.skins.length?PACK.skins.map(s=>'pack:'+s.name):[]);}
 
@@ -1316,6 +1332,7 @@ async function loadPackBuffer(buf,label){
   for(const [,,,mat] of ARMOR_TIERS){const l1=await get(`textures/entity/equipment/humanoid/${mat}.png`)||await get(`textures/models/armor/${mat}_layer_1.png`);
     const l2=await get(`textures/entity/equipment/humanoid_leggings/${mat}.png`)||await get(`textures/models/armor/${mat}_layer_2.png`);
     if(l1||l2){PACK.armor[mat]={l1:l1?imgToCanvas(l1,64,32,0,0,l1.width,l1.height):null,l2:l2?imgToCanvas(l2,64,32,0,0,l2.width,l2.height):null};found++;}}
+  for(const [k,pth] of [['sun','textures/environment/sun.png'],['moon','textures/environment/moon_phases.png'],['shadow','textures/misc/shadow.png'],['particles','textures/particle/particles.png']]){const im=await get(pth);if(im){PACK[k]=imgToCanvas(im,im.width,im.height,0,0,im.width,im.height);found++;}}
   const bat=await get('textures/entity/bat.png');if(bat){PACK.bat=imgToCanvas(bat,64,64,0,0,bat.width,bat.height);found++;}
   const clouds=await get('textures/environment/clouds.png');if(clouds){PACK.clouds=imgToCanvas(clouds,256,256,0,0,clouds.width,clouds.height);found++;}
   const cracks=[];for(let i=0;i<10;i++){const im=await get(`textures/block/destroy_stage_${i}.png`)||await get(`textures/blocks/destroy_stage_${i}.png`);if(im)cracks.push(imgToCanvas(im,16,16,0,0,im.width,im.width));}
@@ -1430,7 +1447,7 @@ function hurt(e,amt,src,cause,kb,raw,ignoreInvuln){
   if(fresh){
     if(kb)knockback(e,kb[0],kb[1],kb[2]||0,kb[3]||0,kb[4]||0);
     sfx(cause==='fall'?(amt>4?'fallbig':'fall'):cause==='fire'||cause==='lava'?'burn':cause==='drown'?'drown':'hurt',{pos:e.pos});
-    spawnParticles(e.pos[0],e.pos[1]+1,e.pos[2],6,[.7,.1,.1],2);
+    if(cause==='fall'&&amt>0){const b=getB(Math.floor(e.pos[0]),Math.floor(e.pos[1]-.2),Math.floor(e.pos[2]));if(b)blockParticles(Math.floor(e.pos[0]),Math.floor(e.pos[1]-.2),Math.floor(e.pos[2]),b,Math.min(40,8+amt*4));}
   }
   if(e.health<=0)kill(e,src,cause);
   return true;
@@ -1466,7 +1483,7 @@ function onDeath(m){
   feed.unshift({t:7,txt:deathText(e,killer,m.c)});if(feed.length>6)feed.pop();
   if(isHost()){for(const s of m.inv)hostSpawnDrop(m.pos,s.id,s.count);for(const a of m.armor)hostSpawnDrop(m.pos,a,1);}
   e.inv=new Array(9).fill(null);e.armor=[null,null,null,null];
-  spawnParticles(e.pos[0],e.pos[1]+1,e.pos[2],20,[.85,.85,.85],3);
+  spawnParticles(e.pos[0],e.pos[1]+.8,e.pos[2],20,[.85,.85,.85],1.2,'poof');
   if(e===player){sfx('death');chestClose(false);player.bat=true;player.pos[1]+=2.2;player.vel=[0,0,0];spectate.mode='bat';showDeathPanel(killer);}
   if(e.kind==='player'&&e!==player)e.bat=true;
 }
@@ -1480,7 +1497,7 @@ function meleeTarget(e,range){
 function doAttack(e,target){
   if(e.atkCD>0)return;e.atkCD=e.isLocal?0:.12;e.swing=1;
   const t=target!==undefined?target:meleeTarget(e,3);if(!t)return;exhaust(e,.3);
-  let dmg=weaponDmg(e);const crit=(e.fallDist||0)>0&&!e.onGround&&!onLadder(e)&&!e.inWater;if(crit){dmg*=1.5;spawnParticles(t.pos[0],t.pos[1]+1.2,t.pos[2],8,[1,.9,.4],3);}
+  let dmg=weaponDmg(e);const crit=(e.fallDist||0)>0&&!e.onGround&&!onLadder(e)&&!e.inWater;if(crit){dmg*=1.5;spawnParticles(t.pos[0],t.pos[1]+1.2,t.pos[2],14,[1,1,1],4,'crit');}
   const extra=e.sprint?1:0;if(e.sprint){e.sprint=false;if(e.mot){e.mot[0]*=.6;e.mot[2]*=.6;}}
   if(e.effects.invis)delete e.effects.invis;
   damage(t,dmg,e,'melee',[t.pos[0]-e.pos[0],t.pos[2]-e.pos[2],extra,-Math.sin(e.yaw),-Math.cos(e.yaw)]);
@@ -1544,8 +1561,16 @@ function updateDrops(dt){
 function invRoom(e,id){const it=ITEMS[id];if(it.type==='armor')return true;if(e.inv.some(s=>!s))return true;return it.stack>1&&e.inv.some(s=>s&&s.id===id&&s.count<it.stack);}
 
 // ---------- particles ----------
-function spawnParticles(x,y,z,n,col,sp){n=Math.ceil(n*[.2,.5,1][OPT.particles]);for(let i=0;i<n;i++)particles.push({p:[x,y,z],v:[(Math.random()-.5)*sp,Math.random()*sp,(Math.random()-.5)*sp],t:.4+Math.random()*.5,col});if(particles.length>600)particles.splice(0,particles.length-600);}
-function updateParticles(dt){for(const p of particles){p.t-=dt;p.v[1]-=9*dt;for(let k=0;k<3;k++)p.p[k]+=p.v[k]*dt;}particles=particles.filter(p=>p.t>0);}
+// particles are textured billboards like vanilla: kind 'poof' (generic smoke), 'crit', 'magic', or a block id (digging chips); others are tinted generic
+function spawnParticles(x,y,z,n,col,sp,kind){n=Math.ceil(n*[.2,.5,1][OPT.particles]);for(let i=0;i<n;i++){const life=kind==='crit'||kind==='magic'?.6+Math.random()*.4:typeof kind==='number'?.5+Math.random()*1:.4+Math.random()*.5;
+    particles.push({p:[x,y,z],v:[(Math.random()-.5)*sp,Math.random()*sp,(Math.random()-.5)*sp],t:life,t0:life,col,kind,sz:typeof kind==='number'?.1+Math.random()*.08:kind==='crit'||kind==='magic'?.12:.12+Math.random()*.1,q:Math.random()*4|0,
+      g:typeof kind==='number'?16:kind==='crit'||kind==='magic'?2:kind==='poof'?-1.5:9});}
+  if(particles.length>700)particles.splice(0,particles.length-700);}
+function blockParticles(x,y,z,b,n){if(!b||!BD[b])return;n=Math.ceil(n*[.2,.5,1][OPT.particles]);for(let i=0;i<n;i++){const life=.5+Math.random();
+  particles.push({p:[x+Math.random(),y+Math.random(),z+Math.random()],v:[(Math.random()-.5)*3,Math.random()*3,(Math.random()-.5)*3],t:life,t0:life,kind:b,sz:.1+Math.random()*.06,q:Math.random()*4|0,g:16});}}
+function updateParticles(dt){for(const p of particles){p.t-=dt;p.v[1]-=p.g*dt;const drag=Math.pow(.98,dt*20);for(let k=0;k<3;k++){p.v[k]*=drag;p.p[k]+=p.v[k]*dt;}
+    if(typeof p.kind==='number'){const b=getB(Math.floor(p.p[0]),Math.floor(p.p[1]),Math.floor(p.p[2]));if(b&&BD[b].solid){p.p[1]=Math.floor(p.p[1])+1.01;p.v[1]=0;p.v[0]*=.7;p.v[2]*=.7;}}}
+  particles=particles.filter(p=>p.t>0);}
 
 // ================= Java Edition movement physics (fixed 20 TPS, values from 1.8 EntityLivingBase / Entity) =================
 const TICK=1/20,STEP_HEIGHT=.6,FULLBOX=[[0,0,0,1,1,1]];
@@ -1652,7 +1677,7 @@ function physics(e,dt,wx,wz){
 function knockback(e,dx,dz,extra,fx,fz){if(!e.mot)e.mot=[0,0,0];const f=Math.hypot(dx,dz)||1;e.mot[0]/=2;e.mot[1]/=2;e.mot[2]/=2;e.mot[0]+=dx/f*.4;e.mot[1]+=.4;e.mot[2]+=dz/f*.4;if(e.mot[1]>.4)e.mot[1]=.4;
   if(extra){e.mot[0]+=(fx||dx/f)*.5*extra;e.mot[1]+=.1;e.mot[2]+=(fz||dz/f)*.5*extra;}e.onGround=false;e.vel=e.mot.map(v=>v*20);}
 
-// ================= networking: Photon Realtime (online) or BroadcastChannel (same-browser tabs) =================
+// ================= networking: our own room relay (online) or BroadcastChannel (same-browser tabs) =================
 const N={STATE:1,HIT:2,DEATH:3,CHESTREQ:4,CHEST:5,GIVE:6,DROPADD:7,DROPDEL:8,DROPREQ:9,PROJ:10,BOTS:11,PHASE:12,START:13,ANN:14,BLOCK:15,SQUEAK:16,LOBBY:17,READY:18,END:19,DEALT:20,PICK:21,CHAT:22,TOLOBBY:23,HELLO:24,BR:25,CHESTS:26,LEAVE:27,SKIN:28};
 let net=null;
 function isHost(){return !net||net.isHost();}
@@ -1693,18 +1718,24 @@ class MeshNet{
 function bcTransport(room){const t={ch:null,open(ok){this.ch=new BroadcastChannel('blockbattle:'+room);this.ch.onmessage=e=>this.onmessage&&this.onmessage(e.data);ok();},post(o){this.ch&&this.ch.postMessage(o);},close(){this.ch&&this.ch.close();}};return t;}
 class LocalNet extends MeshNet{constructor(room,name){super(room,name,bcTransport(room),{kind:'local',hb:400,timeout:2500,listen:1300});}}
 // internet: our own tiny MQTT 3.1.1-over-WebSocket client talking to free public brokers (no account, no SDK, no setup)
-// a page URL like ?relay=wss://my-broker:8084/mqtt tries your own MQTT broker first
-const RELAY_BROKERS=(new URLSearchParams(location.search).get('relay')||'').split(',').filter(u=>/^wss?:\/\//.test(u)).concat(['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt']);
-function mqttTransport(room,brokers){
+// where to find the room relay, in order: ?relay=... in the page URL, a server typed in Play Online, the server that is hosting
+// this page (server/server.js serves the game and the relay together), then free public relays as a backup
+const PUBLIC_RELAYS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
+function relayList(typed){const out=[];const add=(u,quick)=>{if(u&&/^wss?:\/\//.test(u)&&!out.some(o=>o.url===u))out.push({url:u,quick});};
+  for(const u of (new URLSearchParams(location.search).get('relay')||'').split(','))add(u.trim(),false);
+  if(typed){let t=typed.trim();if(t&&!/^wss?:\/\//.test(t))t=(location.protocol==='https:'||/^[^:]+\.[a-z]{2,}$/i.test(t)?'wss://':'ws://')+t;if(t&&!/\/mqtt$/.test(t))t=t.replace(/\/$/,'')+'/mqtt';add(t,false);}
+  if(location.protocol==='http:'||location.protocol==='https:'){if(!/\.github\.io$/i.test(location.hostname))add((location.protocol==='https:'?'wss://':'ws://')+location.host+'/mqtt',true);}
+  for(const u of PUBLIC_RELAYS)add(u,false);return out;}
+function mqttTransport(room,brokers){ // brokers: [{url,quick}]
   const enc=new TextEncoder(),dec=new TextDecoder();
   const str=s=>{const b=enc.encode(s);return [b.length>>8,b.length&255,...b];};
   const len=n=>{const o=[];do{let d=n%128;n=Math.floor(n/128);if(n>0)d|=128;o.push(d);}while(n>0);return o;};
   const pkt=(h,body)=>new Uint8Array([h,...len(body.length),...body]);
   const topic='xmbbe/v2/'+String(room).toLowerCase().replace(/[^a-z0-9_-]/g,'_').slice(0,40);
   const t={ws:null,buf:new Uint8Array(0),url:null,
-    open(ok,fail){let i=0;const tryNext=()=>{if(i>=brokers.length){fail('Could not reach any free relay server. This network may block it (school/work Wi-Fi often does).');return;}
-        const url=brokers[i++];let done=false;let ws;try{ws=new WebSocket(url,['mqtt']);}catch(e){tryNext();return;}ws.binaryType='arraybuffer';
-        const to=setTimeout(()=>{if(!done){done=true;try{ws.close();}catch(e){}tryNext();}},6000);
+    open(ok,fail){let i=0;const tryNext=()=>{if(i>=brokers.length){fail('Could not reach a game server. Check the server address, or this network may block it (school/work Wi-Fi often does): try home Wi-Fi or a phone hotspot.');return;}
+        const br=brokers[i++],url=br.url;let done=false;let ws;try{ws=new WebSocket(url,['mqtt']);}catch(e){tryNext();return;}ws.binaryType='arraybuffer';t.trying&&t.trying(url);
+        const to=setTimeout(()=>{if(!done){done=true;try{ws.close();}catch(e){}tryNext();}},br.quick?2500:6000);
         ws.onopen=()=>{const cid='xmbbe'+Math.random().toString(36).slice(2,12);
           ws.send(pkt(0x10,[...str('MQTT'),4,0x02,0,60,...str(cid)]));};
         ws.onmessage=e=>{const d=new Uint8Array(e.data);const nb=new Uint8Array(t.buf.length+d.length);nb.set(t.buf);nb.set(d,t.buf.length);t.buf=nb;
@@ -1719,56 +1750,7 @@ function mqttTransport(room,brokers){
       const out=new Uint8Array(1+len(total).length+total);out[0]=0x30;out.set(len(total),1);out.set(head,1+len(total).length);out.set(body,1+len(total).length+head.length);t.ws.send(out);},
     close(){t.closed=true;clearInterval(t.ping);try{t.ws&&t.ws.send(new Uint8Array([0xE0,0]));t.ws&&t.ws.close();}catch(e){}}};
   return t;}
-class RelayNet extends MeshNet{constructor(room,name,brokers){const tr=mqttTransport(room,brokers||RELAY_BROKERS);super(room,name,tr,{kind:'relay',hb:1000,timeout:7000,listen:2600});tr.onlost=()=>this.onFail&&this.onFail('Lost the connection to the relay server.');}}
-// Photon payloads go through a JSON round trip so the binary protocol never sees undefined/NaN/typed arrays
-const netClean=v=>v===undefined?null:JSON.parse(JSON.stringify(v));
-function photonHelp(code,msg){const m=`Photon error ${code}${msg?': '+msg:''}. `;
-  if(code>=2001&&code<=2004)return m+'The game server dropped the connection. Usual causes: the AppId is not a Realtime/PUN app (Fusion, Chat and Voice AppIds do not work here; create a "Realtime" app in the Photon dashboard), the free 20-player (CCU) limit is full, or this network blocks Photon (school/work Wi-Fi often does).';
-  if(code===1101||code===3101||code===4101||code===32767)return m+'Photon rejected the AppId. Check it is copied exactly and that custom authentication is off for that app.';
-  if(code>=4001&&code<=4004)return m+'Could not reach Photon\'s name server. The network may block it, or the region is wrong.';
-  if(code>=1001&&code<=1004)return m+'Could not reach the Photon master server. Try another region or network.';
-  return m;}
-class PhotonNet{
-  constructor(appId,region,room,name,onReady,onFail){this.kind='photon';this.room=room;this.myId=-1;this.retries=0;this.left=false;this.joined=false;this.cfg={appId,region,room,name,onReady,onFail};this.connect();}
-  connect(){const {appId,region,room,name,onReady,onFail}=this.cfg;const LBC=Photon.LoadBalancing.LoadBalancingClient;this.LBC=LBC;
-    const c=this.c=new LBC(Photon.ConnectionProtocol.Wss,appId,'blockbattle-1.0');this.joining=false;
-    c.onStateChange=s=>{if(c!==this.c)return;this.stateName=LBC.StateToName?LBC.StateToName(s):String(s);setNetStatus('Photon: '+this.stateName);
-      if((s===LBC.State.JoinedLobby||s===LBC.State.ConnectedToMaster)&&!this.joining&&!this.joined){this.joining=true;c.joinRoom(room,{createIfNotExists:true},{maxPlayers:16,isVisible:true,isOpen:true});}};
-    c.onJoinRoom=()=>{if(c!==this.c)return;this.joined=true;this.retries=0;this.myId=c.myActor().actorNr;this._h=this.hostId();setNetStatus('Photon: joined room '+room);onReady&&onReady();};
-    c.onActorJoin=a=>{if(a.actorNr!==this.myId)this.onJoin&&this.onJoin(a.actorNr,a.name);this.checkHost();};
-    c.onActorLeave=a=>{this.onLeave&&this.onLeave(a.actorNr);this.checkHost();};
-    c.onEvent=(code,content,actorNr)=>{this.onEvent&&this.onEvent(code,content,actorNr);};
-    c.onError=(code,msg)=>{if(c!==this.c||this.left)return;
-      // a dropped game-server connection before we got into the room: try again a couple of times
-      if(!this.joined&&code>=2001&&code<=2004&&this.retries<2){this.retries++;setNetStatus(`Photon: game server dropped the connection, retrying (${this.retries}/2)...`);try{c.disconnect();}catch(e){}setTimeout(()=>{if(!this.left)this.connect();},1500);return;}
-      onFail&&onFail(photonHelp(code,msg)+(PHOTON_SDK_URL?' [SDK loaded from: '+PHOTON_SDK_URL+']':''));};
-    try{c.myActor().setName(String(name||'Player').slice(0,16));}catch(e){}
-    try{c.connectToRegionMaster(region||'us');}catch(e){onFail&&onFail('Photon failed to start: '+e.message);}
-  }
-  hostId(){try{return this.c.myRoom().masterClientId;}catch(e){return -1;}}
-  isHost(){return this.inRoom()&&this.hostId()===this.myId;}
-  checkHost(){const h=this.hostId();if(this._h!==h){this._h=h;this.onHostChange&&this.onHostChange(h);}}
-  inRoom(){try{return this.c.isJoinedToRoom();}catch(e){return false;}}
-  send(code,data,to){const o={};if(to)o.targetActors=to;this.c.raiseEvent(code,netClean(data),o);}
-  list(){const a=this.c.myRoomActors();return Object.keys(a).map(k=>({id:a[k].actorNr,name:a[k].name||('Player '+a[k].actorNr)}));}
-  leave(){this.left=true;try{this.c.disconnect();}catch(e){}}
-}
-function loadScript(u){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
-// Photon JavaScript SDK: prefer the official SDK file next to the page (lib/photon.min.js from the Realtime JavaScript SDK download).
-// The old 2017 npm copy is no longer tried: an outdated SDK gets past the master server and is then dropped by the game server (error 2003).
-let PHOTON_SDK_URL=null;
-async function loadPhotonSDK(custom){
-  if(window.Photon&&window.Photon.LoadBalancing)return true;
-  const local=[custom,'photon.min.js','photon.js','lib/photon.min.js','Photon-Javascript_SDK.min.js','Photon-Javascript_SDK.js'].filter(Boolean);
-  for(const u of local){try{await loadScript(u);if(window.Photon&&window.Photon.LoadBalancing){PHOTON_SDK_URL=u;return true;}}catch(e){}}
-  // npm build of the current SDK, written for require(): give it a CommonJS shim and pick up its exports
-  for(const u of ['https://cdn.jsdelivr.net/npm/photon-realtime@4/photon.min.js','https://cdn.jsdelivr.net/npm/photon-realtime@4/photon.js','https://cdn.jsdelivr.net/npm/photon-realtime@4']){
-    const hadM='module' in window,hadE='exports' in window;window.module={exports:{}};window.exports=window.module.exports;
-    try{await loadScript(u);const ex=window.module.exports;if(!window.Photon&&ex&&(ex.LoadBalancing||(ex.Photon&&ex.Photon.LoadBalancing)))window.Photon=ex.LoadBalancing?ex:ex.Photon;}catch(e){}
-    if(!hadM)delete window.module;if(!hadE)delete window.exports;
-    if(window.Photon&&window.Photon.LoadBalancing){PHOTON_SDK_URL=u;return true;}}
-  return false;
-}
+class RelayNet extends MeshNet{constructor(room,name,typed){const tr=mqttTransport(room,relayList(typed));super(room,name,tr,{kind:'relay',hb:1000,timeout:7000,listen:2600});tr.onlost=()=>this.onFail&&this.onFail('Lost the connection to the relay server.');}}
 
 // ================= match flow: settings, start/end, lobby hub, phases, chests, MCBR timeline, net handlers =================
 const SET={mode:'battle',roundLen:600,hunger:1,refill:120,grace:15,showdown:true,takeAll:true,central:true,bots:5,difficulty:1,
@@ -1883,10 +1865,10 @@ function hostChestOp(k,op,slot,who,item){
 function chestOp(op,slot,item){if(!chestOpen)return;const k=key(chestOpen.x,chestOpen.y,chestOpen.z);if(isHost())hostChestOp(k,op,slot,player,item);else netSend(N.CHESTREQ,{k,op,slot,item},'host');sfx('pick');}
 
 // ---------- blocks (Battle Royale building) ----------
-function applyBlock(x,y,z,b){setB(x,y,z,b);relightColumn(x,z);rebuildAt(x,z);if(isHost())MATCH.edits.push([x,y,z,b]);}
+function applyBlock(x,y,z,b){const was=getB(x,y,z);if(was&&!b)blockParticles(x,y,z,was,40);setB(x,y,z,b);relightColumn(x,z);rebuildAt(x,z);if(isHost())MATCH.edits.push([x,y,z,b]);}
 function setBlockNet(x,y,z,b){applyBlock(x,y,z,b);netSend(N.BLOCK,[x,y,z,b]);}
 let mining=null;
-function breakBlock(x,y,z,who){const b=getB(x,y,z);if(!b||b===B.CHEST||b===B.BARRIER||b===B.BEACON)return;setBlockNet(x,y,z,0);sfx('dig',{pos:[x,y,z],mat:blockMat(b)});spawnParticles(x+.5,y+.5,z+.5,10,hexRGB(BLOCK_COL[b]||'#888'),2);
+function breakBlock(x,y,z,who){const b=getB(x,y,z);if(!b||b===B.CHEST||b===B.BARRIER||b===B.BEACON)return;setBlockNet(x,y,z,0);sfx('dig',{pos:[x,y,z],mat:blockMat(b)});
   const d=MINE_DROP[b];if(d){const left=addItem(who,d,1);if(left)requestDrop([x+.5,y-.5,z+.5],d,left);}if(b===B.LEAVES&&Math.random()<.05)requestDrop([x+.5,y-.5,z+.5],'apple',1);}
 function placeBlock(x,y,z,id){if(x<1||z<1||y<1||x>=WX-1||z>=WZ-1||y>=WY)return false;const cur=getB(x,y,z);if(cur&&!BD[cur].liquid&&!BD[cur].cross)return false;
   for(const e of ents){if(!e.alive)continue;if(e.pos[0]+HW>x&&e.pos[0]-HW<x+1&&e.pos[2]+HW>z&&e.pos[2]-HW<z+1&&e.pos[1]+EH>y&&e.pos[1]<y+1)return false;}setBlockNet(x,y,z,id);sfx('step',{pos:[x,y,z],mat:blockMat(id),vol:6});return true;}
@@ -1961,7 +1943,7 @@ function onNetEvent(code,d,from){
   case N.BR:if(!br)return;br.T=d.T;br.ev=d.ev;br.border=d.border;br.lastCx=d.lastCx;br.lastCz=d.lastCz;break;
   case N.START:if(!fromHost)return;applyStart(d,d.join||null);showLoading(d.join?'Joining game':'Loading level',null);break;
   case N.ANN:msgs.push({t:d.d,txt:d.t,sub:d.s||''});break;
-  case N.CHAT:chat.push({t:10,txt:String(d.t||'').slice(0,120),col:/^#[0-9a-f]{3,6}$/i.test(d.c)?d.c:'#fff'});if(chat.length>8)chat.shift();break;
+  case N.CHAT:if(d&&d.p){chat.push({t:10,txt:`<${String(d.n||'Player').slice(0,16)}> ${String(d.m||'').slice(0,100)}`,col:'#ffffff'});if(chat.length>8)chat.shift();sfx('click');break;}chat.push({t:10,txt:String(d.t||'').slice(0,120),col:/^#[0-9a-f]{3,6}$/i.test(d.c)?d.c:'#fff'});if(chat.length>8)chat.shift();break;
   case N.BLOCK:applyBlock(d[0],d[1],d[2],d[3]);break;
   case N.SQUEAK:{const e=entById(d.id);if(e){spawnParticles(e.pos[0],e.pos[1],e.pos[2],4,[.3,.2,.15],1.5);if(player&&dist(e.pos,player.pos)<24)sfx('squeak');}break;}
   case N.LOBBY:if(!fromHost)return;if(MATCH.state!=='lobby')enterLobby();MATCH.lobbyCD=d.cd;MATCH.nextMap=d.next;Object.assign(SET,d.set);for(const e of ents)e.ready=d.ready.includes(e.id);break;
@@ -2169,6 +2151,9 @@ function camera(){
       const back=[Math.sin(t.yaw)*4,0,Math.cos(t.yaw)*4];let cp=[t.pos[0]+back[0],t.pos[1]+2.6,t.pos[2]+back[2]];const e=[t.pos[0],t.pos[1]+1.6,t.pos[2]];const d=[cp[0]-e[0],cp[1]-e[1],cp[2]-e[2]],L=Math.hypot(...d);
       const h=raycastBlock(e,[d[0]/L,d[1]/L,d[2]/L],L);if(h){const k=Math.max(.3,h.t-.3)/L;cp=[e[0]+d[0]*k,e[1]+d[1]*k,e[2]+d[2]*k];}camPos=cp;camYaw=t.yaw;camPitch=-.3;return;}spectate.mode='bat';}
   spectate.target=null;const rp=(player.alive&&player.rpos)||player.pos;camPos=[rp[0],rp[1]+eyeH(player),rp[2]];camYaw=player.yaw;camPitch=player.pitch;
+  // F5: third person behind (4 blocks, pulled in by walls) or in front looking back, like EntityRenderer.orientCamera
+  if(camMode&&player.alive){const e=camPos.slice(),cp=Math.cos(player.pitch);let d=[Math.sin(player.yaw)*cp,-Math.sin(player.pitch),Math.cos(player.yaw)*cp];if(camMode===2)d=d.map(v=>-v);
+    let dd=4;const h=raycastBlock(e,d,4);if(h)dd=Math.max(.2,h.t-.2);camPos=[e[0]+d[0]*dd,e[1]+d[1]*dd,e[2]+d[2]*dd];if(camMode===2){camYaw=player.yaw+Math.PI;camPitch=-player.pitch;}}
 }
 let skyCol=[.53,.74,.96];
 function render(){
@@ -2193,6 +2178,7 @@ function render(){
     gl.uniform1f(PB.u.fogN,0);gl.uniform1f(PB.u.fogF,fogF*1.6);box(chain(M4.tr(camPos[0],camPos[1]+16,camPos[2]),M4.sc(1400,.01,1400)),info.sky);
     gl.uniform3fv(PB.u.fogC,info.fog);box(chain(M4.tr(camPos[0],camPos[1]-24,camPos[2]),M4.sc(1400,.01,1400)),[info.fog[0]*.55,info.fog[1]*.6,info.fog[2]*.75]);
     gl.uniform1f(PB.u.lit,1);gl.enable(gl.DEPTH_TEST);}
+  drawSunMoon();
   // world (opaque + cutout)
   gl.useProgram(PW.p);gl.uniformMatrix4fv(PW.u.vp,false,VP);gl.uniform3fv(PW.u.cam,camPos);gl.uniform3fv(PW.u.fogC,curFog.c);gl.uniform1f(PW.u.fogN,curFog.n);gl.uniform1f(PW.u.fogF,curFog.f);gl.uniform1f(PW.u.alpha,1);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,atlasTex);gl.uniform1i(PW.u.tex,0);
@@ -2202,26 +2188,27 @@ function render(){
   gl.disableVertexAttribArray(PW.a.t);gl.disableVertexAttribArray(PW.a.s);
   // entities
   useTex(VP,camPos);
-  for(const e of ents){if(e===player&&player.alive&&spectate.mode!=='follow')continue;if(e===player&&!player.alive&&spectate.mode==='bat')continue;
+  for(const e of ents){if(e===player&&player.alive&&spectate.mode!=='follow'&&!camMode)continue;if(e===player&&!player.alive&&spectate.mode==='bat')continue;
     if(e.bat&&!e.alive){drawBat(e);continue;}if(!e.alive)continue;drawHumanoid(e);}
   // chests are tile-entity models (TileEntityChestRenderer), lid animated
   for(const c of chests.values()){if(getB(c.x,c.y,c.z)!==B.CHEST)continue;if(Math.hypot(c.x+.5-camPos[0],c.z+.5-camPos[2])>fogF+8)continue;
     if(c.rot==null)c.rot=chestFacing(c);const lid=c.lidPrev+(c.lid-c.lidPrev)*tickAlpha();const f=1-Math.pow(1-lid,3);
     setEntLight([c.x+.5,c.y+.5,c.z+.5]);const base=chain(M4.tr(c.x+.5,c.y,c.z+.5),M4.ry(c.rot));const M=MODELS.chest;
     drawMesh(M.base,base,CHEST_TEX);const lm=chain(base,M4.tr(0,9/16,7/16),M4.rx(f*Math.PI/2));drawMesh(M.lid,lm,CHEST_TEX);drawMesh(M.knob,lm,CHEST_TEX);}
+  drawShadows();useTex(VP,camPos);
   // dropped items and projectiles
-  for(const d of drops){const m=chain(M4.tr(d.pos[0],d.pos[1]+Math.sin(d.spin*1.5)*.08+.12,d.pos[2]),M4.ry(d.spin),M4.sc(.45,.45,.45));setEntLight(d.pos);drawMesh(getItemMesh(d.id),m,itemTex);}
+  for(const d of drops){const hm=heldMesh(d.id);const sc=hm.block?.25:.5;const m=chain(M4.tr(d.pos[0],d.pos[1]+Math.sin(d.spin*1.5)*.1+.1+sc/2,d.pos[2]),M4.ry(d.spin),M4.sc(sc,sc,sc));setEntLight(d.pos);drawMesh(hm.mesh,m,hm.tex);}
   for(const a of projs){if(a.kind==='splash'){setEntLight(a.pos);drawMesh(getItemMesh(a.pot),chain(M4.tr(...a.pos),M4.ry(perfT*8),M4.sc(.4,.4,.4)),itemTex);continue;}
     const l=Math.hypot(...a.vel)||1;const yw=Math.atan2(-a.vel[0],-a.vel[2]),pt=Math.asin(clamp(a.vel[1]/l,-1,1));setEntLight(a.pos);
     drawMesh(getItemMesh('arrow'),chain(M4.tr(...a.pos),M4.ry(yw),M4.rx(pt),M4.ry(Math.PI/2),M4.rz(-Math.PI/4),M4.sc(.7,.7,.7)),itemTex);}
   // particles, highlights, beacon beam, borders (solid colour)
   useBox(VP,camPos);
-  for(const p of particles)box(chain(M4.tr(...p.p),M4.sc(.08,.08,.08)),p.col);
+  drawParticles();useBox(VP,camPos);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.uniform1f(PB.u.lit,0);
   if(MATCH.mode==='br'&&MATCH.state==='play'&&player&&player.alive&&locked&&!chestOpen){const h=raycastBlock(eye(player),fwd(player),4.5);
     if(h){const pr=mining&&mining.x===h.x&&mining.y===h.y&&mining.z===h.z?mining.t/MINE_T[mining.b]:0;
       if(crackTex.length&&pr>0){useTex(VP,camPos);gl.uniform1f(PT.u.bright,1);drawMesh(crackCube,chain(M4.tr(h.x+.5,h.y+.5,h.z+.5),M4.sc(1.004,1.004,1.004)),crackTex[Math.min(9,Math.floor(pr*10))]);useBox(VP,camPos);gl.uniform1f(PB.u.lit,0);}
-      else box(chain(M4.tr(h.x+.5,h.y+.5,h.z+.5),M4.sc(1.006,1.006,1.006)),[0,0,0],.08+pr*.55);}}
+      drawSelection(h.x,h.y,h.z);}}
   // water (translucent) after opaque things
   gl.depthMask(false);gl.useProgram(PW.p);gl.uniform1f(PW.u.alpha,.99);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,atlasTex);if(!window.__noWater)for(const c of chunks){if(!vis(c)||!c.wcount)continue;bindW(c.wbuf);gl.drawArrays(gl.TRIANGLES,0,c.wcount);}
   gl.disableVertexAttribArray(PW.a.t);gl.disableVertexAttribArray(PW.a.s);
@@ -2233,19 +2220,34 @@ function render(){
     box(chain(M4.tr(cx,28,cz-h),M4.sc(h*2,80,.05)),col,a);box(chain(M4.tr(cx,28,cz+h),M4.sc(h*2,80,.05)),col,a);box(chain(M4.tr(cx-h,28,cz),M4.sc(.05,80,h*2)),col,a);box(chain(M4.tr(cx+h,28,cz),M4.sc(.05,80,h*2)),col,a);}
   gl.depthMask(true);gl.disable(gl.BLEND);gl.uniform1f(PB.u.lit,1);
   // first-person hand
-  if(player&&player.alive&&MATCH.state!=='menu'){gl.clear(gl.DEPTH_BUFFER_BIT);drawHand(M4.persp(70*Math.PI/180,W/H,.01,10));}
+  if(player&&player.alive&&MATCH.state!=='menu'&&!camMode&&!hideGui){gl.clear(gl.DEPTH_BUFFER_BIT);drawHand(M4.persp(70*Math.PI/180,W/H,.05,10),pre);}
   // underwater / lava tint
   drawHUD();
 }
 function setEntLight(p){const x=Math.floor(p[0]),z=Math.floor(p[2]),y=Math.floor(p[1]+.5);const a=lightAt(x,y,z),b=lightAt(x,y+1,z);const L=Math.max(a>>4,b>>4)<<4|Math.max(a&15,b&15);const v=Math.max(LB[(L>>4)&15]*(mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1),LB[L&15],mapInfo&&mapInfo.dark?.12:.2);gl.uniform1f(PT.u.bright,v);}
+// ModelBiped / ModelPlayer.setRotationAngles (1.8). Our parts are the vanilla model flipped by scale(-1,-1,1), so X and Y rotations change sign.
+function limbTick(e){const dts=dtFrame*20;const v=Math.hypot(e.vel[0],e.vel[2])/20;const tgt=Math.min(1,v*4);
+  e.limbAmt=(e.limbAmt||0)+(tgt-(e.limbAmt||0))*(1-Math.pow(.6,dts));e.limbSwing=(e.limbSwing||0)+e.limbAmt*dts;}
 function drawHumanoid(e){
-  const invis=e.effects.invis;const S=skinTex(e.skin);const M=S.slim?MODELS.slim:MODELS.wide;
-  const rp=e.rpos||e.pos;const by=e.bodyYaw==null?e.yaw:e.bodyYaw;const base=chain(M4.tr(rp[0],rp[1]-(e.sneak?.12:0),rp[2]),M4.ry(by),M4.sc(.9/1,.9,.9));const headTurn=e.yaw-by;
-  const sp=Math.min(1,Math.hypot(e.vel[0],e.vel[2])/4.3);const sw=Math.sin(e.walkT*2.2)*.75*sp;
-  const atk=e.swing>0?-Math.sin(e.swing*Math.PI)*1.6:0;const aim=e.using==='bow'?-Math.PI/2-e.pitch:0;const eat=(e.using==='eat'||e.using==='drink')?-1.2+Math.sin(e.useT*20)*.15:e.using==='block'?-.95:0;
-  const rA=aim||eat||(-sw+atk),lA=aim?aim:sw;
-  const idle=Math.sin(perfT*1.3+e.pos[0])*.05;const parts={head:chain(base,M4.tr(0,1.5,0),M4.ry(headTurn),M4.rx(-e.pitch)),body:chain(base,M4.tr(0,1.5,0)),rarm:chain(base,M4.tr(5/16,22/16,0),M4.rx(rA+idle*.5),M4.rz(aim?0:.05+idle)),larm:chain(base,M4.tr(-5/16,22/16,0),M4.rx(lA-idle*.5),M4.rz(-.05-idle)),
-    rleg:chain(base,M4.tr(1.9/16,.75,0),M4.rx(sw)),lleg:chain(base,M4.tr(-1.9/16,.75,0),M4.rx(-sw))};
+  const invis=e.effects.invis;const S=skinTex(e.skin);const M=S.slim?MODELS.slim:MODELS.wide;limbTick(e);
+  const rp=e.rpos||e.pos;const by=e.bodyYaw==null?e.yaw:e.bodyYaw;const base=chain(M4.tr(rp[0],rp[1]-(e.sneak?.125:0),rp[2]),M4.ry(by),M4.sc(.9375,.9375,.9375));
+  const headYaw=e.yaw-by,headPitch=-e.pitch;  // vanilla: positive pitch looks down
+  const ls=(e.limbSwing||0)*.6662,la=e.limbAmt||0;const age=perfT*20+(e.color||0)*7;
+  let rX=Math.cos(ls+Math.PI)*2*la*.5,lX=Math.cos(ls)*2*la*.5,rY=0,lY=0,rZ=0,lZ=0;const rlX=Math.cos(ls)*1.4*la,llX=Math.cos(ls+Math.PI)*1.4*la;
+  const held=e.inv[e.sel];if(held)rX=rX*.5-Math.PI/10;
+  if(e.using==='block'){rX=rX*.5-Math.PI*.3;rY=-Math.PI/6;}
+  if(e.using==='eat'||e.using==='drink'){rX=-1.2+Math.sin(e.useT*22)*.12;rY=-.3;}
+  let bodyY=0;const sw=e.swing>0?1-e.swing:-1;
+  if(sw>=0){bodyY=Math.sin(Math.sqrt(sw)*Math.PI*2)*.2;rY+=bodyY;lY+=bodyY;lX+=bodyY;let f=1-sw;f=f*f;f=f*f;f=1-f;const f1=Math.sin(f*Math.PI),f2=Math.sin(sw*Math.PI)*-(headPitch-.7)*.75;
+    rX-=f1*1.2+f2;rY+=bodyY*2;rZ+=Math.sin(sw*Math.PI)*-.4;}
+  if(e.sneak){rX+=.4;lX+=.4;}
+  rZ+=Math.cos(age*.09)*.05+.05;lZ-=Math.cos(age*.09)*.05+.05;rX+=Math.sin(age*.067)*.05;lX-=Math.sin(age*.067)*.05;
+  if(e.using==='bow'){rY=-.1+headYaw*-1;lY=.1+headYaw*-1+.4;rX=-Math.PI/2+headPitch;lX=-Math.PI/2+headPitch;rZ=0;lZ=0;}
+  const sk=e.sneak;const P=(x,y,z,X,Y,Z)=>[M4.tr(x/16,y/16,z/16),M4.rz(Z),M4.ry(-Y),M4.rx(-X)];  // vanilla pivot (y up from feet) + Z,Y,X rotation order
+  const body=chain(base,M4.tr(0,24/16,0),M4.ry(-bodyY),M4.rx(sk?-.5:0));
+  const parts={head:chain(base,...P(0,24-(sk?1:0),0,headPitch,-headYaw,0)),body,
+    rarm:chain(base,...P(5*Math.cos(bodyY),22-(S.slim?.5:0),5*Math.sin(bodyY),rX,rY,rZ)),larm:chain(base,...P(-5*Math.cos(bodyY),22-(S.slim?.5:0),-5*Math.sin(bodyY),lX,lY,lZ)),
+    rleg:chain(base,...P(1.9,12+(sk?3:0),sk?4:.1,rlX,0,0)),lleg:chain(base,...P(-1.9,12+(sk?3:0),sk?4:.1,llX,0,0))};
   setEntLight(e.pos);gl.uniform1f(PT.u.hurt,e.hurtT>0?1:0);
   if(!invis){for(const [m,ov] of [['head','hat'],['body','jacket'],['rarm','rsleeve'],['larm','lsleeve'],['rleg','rpants'],['lleg','lpants']]){drawMesh(M[m],parts[m],S.tex);drawMesh(M[ov],parts[m],S.tex);}}
   // armor layers
@@ -2255,9 +2257,16 @@ function drawHumanoid(e){
     if(i===2){drawMesh(A.body2,parts.body,T.l2);drawMesh(A.rleg2,parts.rleg,T.l2);drawMesh(A.lleg2,parts.lleg,T.l2);}
     if(i===3){drawMesh(A.rleg,parts.rleg,T.l1);drawMesh(A.lleg,parts.lleg,T.l1);}
     gl.uniform4f(PT.u.tint,1,1,1,1);});
-  // held item
-  const s=e.inv[e.sel];if(s){const it=ITEMS[s.id];const tool=it.type==='weapon'||it.type==='bow';
-    const m=chain(parts.rarm,M4.tr(-.03,-.62,-.12),M4.rx(tool?-Math.PI/2+.4:-Math.PI/2),M4.ry(Math.PI/2),M4.rz(tool?-Math.PI/4:0),M4.sc(tool?.7:.45,tool?.7:.45,tool?.7:.45));drawMesh(getItemMesh(s.id),m,itemTex);}
+  // held item (LayerHeldItem 1.8: translate to the hand, then the model's third-person display transform)
+  if(held&&ITEMS[held.id]){const hm=heldMesh(held.id),it=ITEMS[held.id],R=Math.PI/180;
+    // back into vanilla model space (y down), then LayerHeldItem + the item model's "thirdperson" display, verbatim
+    const hand=chain(parts.rarm,M4.sc(-1,-1,1),M4.tr(-1/16,7/16,1/16),M4.tr(0,e.sneak?.203125:0,0),M4.sc(2,2,2));
+    const disp=(t,r,sc)=>[M4.tr(t[0]/16,t[1]/16,t[2]/16),M4.ry(r[1]*R),M4.rx(r[0]*R),M4.rz(r[2]*R),M4.sc(sc,sc,sc)];
+    const m=hm.block?chain(hand,...disp([0,1.5,-2.75],[10,-45,170],.375))
+      :it.type==='bow'?chain(hand,...disp([.75,0,.25],[5,80,-45],1))
+      :it.type==='weapon'?chain(hand,...disp([0,1.25,-3.5],[0,90,-35],.85))
+      :chain(hand,...disp([0,1,-3],[-90,0,0],.55));
+    drawMesh(hm.mesh,chain(m,M4.sc(.5,.5,.5)),hm.tex);}
   gl.uniform1f(PT.u.hurt,0);
   if(e.fire>0){useBox(VP,camPos);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.uniform1f(PB.u.lit,0);for(let i=0;i<3;i++)box(chain(M4.tr(e.pos[0],e.pos[1]+.9+Math.sin(perfT*9+i)*.2,e.pos[2]),M4.ry(perfT*2+i*2),M4.sc(.7,1.6,.7)),[1,.5+.2*i,.1],.18);gl.disable(gl.BLEND);useTex(VP,camPos);}
 }
@@ -2277,35 +2286,61 @@ function drawStars(){if(!STARS){STARS=[];let r=12345;const rnd=()=>{r=(r*16807)%
   gl.uniform1f(PB.u.lit,0);gl.uniform1f(PB.u.fogN,1e6);gl.uniform1f(PB.u.fogF,2e6);
   for(const [x,y,z,sz,b] of STARS){const tw=b*(.85+.15*Math.sin(perfT*2+x*40));box(chain(M4.tr(camPos[0]+x*300,camPos[1]+y*300,camPos[2]+z*300),M4.sc(sz,sz,sz)),[tw,tw,tw*1.05]);}
   gl.uniform1f(PB.u.fogN,curFog.n);gl.uniform1f(PB.u.fogF,curFog.f);}
+// ---- billboard particles (EffectRenderer): particles.png sprites, or chips of the block texture ----
+let PART_TEX=null;const partMesh={};
+function procParticles(){const c=mkCanvas(128,128),g=c.getContext('2d');
+  for(let i=0;i<8;i++){const r=3.5-i*.4;g.fillStyle='#fff';for(let y=0;y<8;y++)for(let x=0;x<8;x++){const d=Math.hypot(x-3.5,y-3.5);if(d<r&&hash2(x,y,i)>.15)g.fillRect(i*8+x,y,1,1);}}
+  for(const [col,fill] of [[1,'#fff'],[2,'#fff']]){const ox=col*8,oy=32;g.fillStyle=fill;for(let k=0;k<8;k++){g.fillRect(ox+3,oy+k,2,1);g.fillRect(ox+k,oy+3,1,2);}g.fillRect(ox+1,oy+1,1,1);g.fillRect(ox+6,oy+1,1,1);g.fillRect(ox+1,oy+6,1,1);g.fillRect(ox+6,oy+6,1,1);}
+  return c;}
+function initParticleTex(){if(PART_TEX)gl.deleteTexture(PART_TEX);PART_TEX=mkTex(PACK.particles||procParticles());for(const k in partMesh)delete partMesh[k];}
+function pMesh(key,u0,v0,u1,v1){if(partMesh[key])return partMesh[key];const o=[];const v=[[-.5,.5,u0,v0],[.5,.5,u1,v0],[.5,-.5,u1,v1],[-.5,-.5,u0,v1]];for(const i of [0,1,2,0,2,3])o.push(v[i][0],v[i][1],0,0,0,1,v[i][2],v[i][3]);return partMesh[key]=meshFrom(o);}
+function drawParticles(){if(!particles.length)return;if(!PART_TEX)initParticleTex();useTex(VP,camPos);gl.uniform1f(PT.u.fogF,curFog.f);
+  const R=chain(M4.ry(camYaw),M4.rx(camPitch));
+  for(const p of particles){let mesh,tex,tint=[1,1,1];const a=p.t/p.t0;
+    if(typeof p.kind==='number'){const D=BD[p.kind];const t=D.side;const tx=t%ACOLS,ty=Math.floor(t/ACOLS);const qx=(p.q&1)*.25+.25*Math.random()*0,qy=(p.q>>1)*.25;
+      mesh=pMesh('b'+t+':'+p.q,(tx+qx+.25)/ACOLS,(ty+qy+.25)/ACOLS,(tx+qx+.5)/ACOLS,(ty+qy+.5)/ACOLS);tex=atlasTex;tint=[.6,.6,.6];}
+    else{const idx=p.kind==='crit'?65:p.kind==='magic'?66:Math.min(7,Math.floor((1-a)*8));const cx=idx%16,cy=Math.floor(idx/16);mesh=pMesh('p'+idx,cx/16+.002,cy/16+.002,(cx+1)/16-.002,(cy+1)/16-.002);tex=PART_TEX;
+      tint=p.col||[1,1,1];if(p.kind==='poof'){const g=.7+.3*a;tint=[g,g,g];}}
+    gl.uniform4f(PT.u.tint,tint[0],tint[1],tint[2],1);setEntLight(p.p);const s=p.sz*(p.kind==='poof'?1+(1-a):1);
+    drawMesh(mesh,chain(M4.tr(p.p[0],p.p[1],p.p[2]),R,M4.sc(s,s,s)),tex);}
+  gl.uniform4f(PT.u.tint,1,1,1,1);}
 function drawBat(e){
   const flap=Math.sin(perfT*18+e.pos[0])*1.1;const base=chain(M4.tr(e.pos[0],e.pos[1]+Math.sin(perfT*3)*.1,e.pos[2]),M4.ry(e.yaw),M4.rz(Math.PI),M4.sc(.35,.35,.35));const M=MODELS.bat;setEntLight(e.pos);
   for(const k of ['head','rear','lear','body'])drawMesh(M[k],base,BAT_TEX);
   drawMesh(M.rwing,chain(base,M4.ry(flap)),BAT_TEX);drawMesh(M.lwing,chain(base,M4.ry(-flap)),BAT_TEX);
 }
-function drawHand(proj){
-  const p=player;const s=p.inv[p.sel],it=s&&ITEMS[s.id];
-  const bob=0;const sw=0;
-  // ItemRenderer (1.8): equip progress and swing curves
-  const held=s?s.id:null;if(held!==p.lastHeld){p.lastHeld=held;p.equip=0;}p.equip=Math.min(1,(p.equip==null?1:p.equip)+dtFrame*8);const eq=1-p.equip;
-  const sp=p.swing>0?1-p.swing:0;const r1=Math.sin(Math.sqrt(sp)*Math.PI),r2=Math.sin(sp*sp*Math.PI),r3=Math.sin(Math.sqrt(sp)*Math.PI*2),r4=Math.sin(sp*Math.PI);
-  let base=chain(M4.tr(.56-.4*r1*.5,-.6+.2*r3*.5-eq*.6,-.9-.2*r4*.5),M4.ry(-r2*20*Math.PI/180),M4.rz(-r1*20*Math.PI/180),M4.rx(-r1*70*Math.PI/180));
-  if(p.using==='eat'||p.using==='drink')base=chain(M4.tr(.2,-.38+Math.sin(p.useT*20)*.03,-.55),M4.ry(.7));
-  if(p.using==='block')base=chain(M4.tr(.34,-.42,-.66),M4.ry(.75),M4.rz(.45),M4.rx(-.2));
-  if(p.using==='bow'){const pw=bowCharge(p.useT);base=chain(M4.tr(.18,-.32,-.6+pw*.1),M4.rz(-.2+Math.random()*.01*pw));}
+// ItemRenderer.renderItemInFirstPerson (1.8), step for step. View space: camera at the origin looking down -z.
+function drawHand(proj,pre){
+  const p=player,R=Math.PI/180;const cur=p.inv[p.sel];const key=cur?cur.id+':'+cur.count:null;
+  // updateEquippedItem: lower the old stack, swap below 0.1, raise the new one (0.4 per tick). Any change, even the count, dips the hand like 1.8.
+  if(p.handKey===undefined){p.handKey=key;p.handId=cur?cur.id:null;p.equip=1;}
+  const tgt=key===p.handKey?1:0;p.equip+=clamp(tgt-p.equip,-dtFrame*8,dtFrame*8);if(p.equip<.1&&key!==p.handKey){p.handKey=key;p.handId=cur?cur.id:null;}
+  const f=1-p.equip,sp=p.swing>0?1-p.swing:0,sq=Math.sqrt(sp);
+  // rotateWithPlayerRotations: the arm lags behind fast turns (renderArmYaw/Pitch ease 0.5 per tick)
+  const k=1-Math.pow(.5,dtFrame*20);if(p.armYaw==null){p.armYaw=p.yaw;p.armPitch=p.pitch;}let dy=p.yaw-p.armYaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;
+  p.armYaw+=dy*k;p.armPitch+=(p.pitch-p.armPitch)*k;
+  const base=chain(pre||M4.id(),M4.rx(-(p.pitch-p.armPitch)*.1),M4.ry(-dy*.1));
+  const tfpi=(eq,s)=>{const a=Math.sin(s*s*Math.PI),b=Math.sin(Math.sqrt(s)*Math.PI);return chain(M4.tr(.56,-.52,-.72),M4.tr(0,eq*-.6,0),M4.ry(45*R),M4.ry(a*-20*R),M4.rz(b*-20*R),M4.rx(b*-80*R),M4.sc(.4,.4,.4));};
   useTex(proj,[0,0,0]);gl.uniform1f(PT.u.fogF,1e9);gl.uniform1f(PT.u.fogN,1e8);setEntLight(p.pos);
-  const S=skinTex(p.skin);const M=S.slim?MODELS.slim:MODELS.wide;
-  if(!it){ // vanilla-style empty hand: the right arm rises from the bottom-right corner, leaning in toward the crosshair
-    const walk=Math.min(1,Math.hypot(p.vel[0],p.vel[2])/4);const bx=Math.sin(p.walkT*2.2)*.03*walk,by=-Math.abs(Math.cos(p.walkT*2.2))*.03*walk;
-    const d=[-.2,.92,-.36];const L=Math.hypot(...d);for(let i=0;i<3;i++)d[i]/=L;
-    const Y=[-d[0],-d[1],-d[2]];let X=[Y[1]*1-Y[2]*0,Y[2]*0-Y[0]*1,0];const lx=Math.hypot(...X);X=X.map(v=>v/lx);const Z=[X[1]*Y[2]-X[2]*Y[1],X[2]*Y[0]-X[0]*Y[2],X[0]*Y[1]-X[1]*Y[0]];
-    const R=new Float32Array([X[0],X[1],X[2],0,Y[0],Y[1],Y[2],0,Z[0],Z[1],Z[2],0,0,0,0,1]);
-    const m=chain(M4.tr(.44-.3*r1*.6,-.34+.4*r3*.4-eq*.6,-.95-.4*r4*.4),M4.ry(r1*55*Math.PI/180),M4.rz(-r2*20*Math.PI/180),R,M4.ry(-.35),M4.sc(.92,.92,.92),M4.tr(0,10/16,0));
-    drawMesh(M.rarm,m,S.tex);drawMesh(M.rsleeve,m,S.tex);
-    if(p.armor[1]){const T=ARMOR_TEX[ITEMS[p.armor[1]].tier];drawMesh(MODELS.armor.rarm,m,T.l1);}return;}
-  const tool=it.type==='weapon';
-  if(it.type==='bow')drawMesh(getItemMesh(s.id),chain(base,M4.ry(-Math.PI/2+.3),M4.rz(-.2),M4.sc(.65,.65,.65)),itemTex);
-  else if(tool)drawMesh(getItemMesh(s.id),chain(base,M4.tr(.02,.16,-.08),M4.ry(-Math.PI/2+.75),M4.rz(.2),M4.sc(-.5,.5,.5)),itemTex);
-  else drawMesh(getItemMesh(s.id),chain(base,M4.tr(-.04,.05,0),M4.ry(-.4),M4.sc(.42,.42,.42)),itemTex);
+  const id=p.handId,it=id&&ITEMS[id];
+  if(!it){ // renderPlayerArm
+    const S=skinTex(p.skin);const M=S.slim?MODELS.slim:MODELS.wide;
+    const m=chain(base,M4.tr(-.3*Math.sin(sq*Math.PI),.4*Math.sin(sq*Math.PI*2),-.4*Math.sin(sp*Math.PI)),M4.tr(.64000005,-.6,-.72),M4.tr(0,f*-.6,0),M4.ry(45*R),
+      M4.ry(Math.sin(sq*Math.PI)*70*R),M4.rz(Math.sin(sp*sp*Math.PI)*-20*R),M4.tr(-1,3.6,3.5),M4.rz(120*R),M4.rx(200*R),M4.ry(-135*R),M4.tr(5.6,0,0),
+      M4.tr(-5/16,(S.slim?2.5:2)/16,0),M4.rz(.1),M4.sc(-1,-1,1));   // bipedRightArm at its rotation point, idle Z sway at age 0, back into vanilla model space
+    drawMesh(M.rarm,m,S.tex);drawMesh(M.rsleeve,m,S.tex);return;}
+  let m;
+  if(p.using==='eat'||p.using==='drink'){const maxD=32;const ff=Math.max(0,maxD-p.useT*20)+1;const f1=Math.min(1,ff/maxD);let f2=Math.abs(Math.cos(ff/4*Math.PI)*.1);if(f1>=.8)f2=0;const f3=1-Math.pow(f1,27);
+    m=chain(base,M4.tr(0,f2,0),M4.tr(f3*.6,f3*-.5,0),M4.ry(f3*90*R),M4.rx(f3*10*R),M4.rz(f3*30*R),tfpi(f,0));}
+  else if(p.using==='block')m=chain(base,tfpi(f,0),M4.tr(-.5,.2,0),M4.ry(30*R),M4.rx(-80*R),M4.ry(60*R));
+  else if(p.using==='bow'){const ft=p.useT*20;let f1=ft/20;f1=Math.min(1,(f1*f1+f1*2)/3);const shake=f1>.1?M4.tr(0,Math.sin((ft-.1)*1.3)*(f1-.1)*.01,0):M4.id();
+    m=chain(base,tfpi(f,0),M4.rz(-18*R),M4.ry(-12*R),M4.rx(-8*R),M4.tr(-.9,.2,0),shake,M4.tr(0,0,f1*.1),M4.sc(1,1,1+f1*.2));}
+  else m=chain(base,M4.tr(-.4*Math.sin(sq*Math.PI),.2*Math.sin(sq*Math.PI*2),-.2*Math.sin(sp*Math.PI)),tfpi(f,sp));
+  const hm=heldMesh(id);
+  // RenderItem: scale 2, then the model's firstperson display (items: [0,-135,25] / [0,4,2] / 1.7; blocks: none), then the 0.5 model scale
+  if(hm.block)m=chain(m,M4.sc(2,2,2),M4.sc(.5,.5,.5));
+  else m=chain(m,M4.sc(2,2,2),M4.tr(0,.25,.125),M4.ry(-135*R),M4.rz(25*R),M4.sc(1.7,1.7,1.7),M4.sc(.5,.5,.5));
+  drawMesh(hm.mesh,m,hm.tex);
 }
 
 // ================= HUD (console Battle layout) =================
@@ -2341,32 +2376,33 @@ function project(p){const q=xform(VP,p);if(q[3]<=0)return null;return [(q[0]/q[3
 function nameTag(e,col){const p=project([e.pos[0],e.pos[1]+(e.bat?.6:2.05),e.pos[2]]);if(!p)return;hc.font="18px "+HFONT;const tw=hc.measureText(e.name).width;
   hc.fillStyle='rgba(0,0,0,.45)';hc.fillRect(p[0]-tw/2-4,p[1]-15,tw+8,18);hc.textAlign='center';hc.fillStyle=col||'#fff';hc.fillText(e.name,p[0],p[1]-2);}
 function drawHUD(){
-  if(OPT.showFps&&MATCH.state!=='menu')drawFps();
   hc.setTransform(DPR,0,0,DPR,0,0);hc.clearRect(0,0,W,H);hc.imageSmoothingEnabled=false;
   if(MATCH.state==='menu'||!player)return;
+  if(hideGui)return;
+  if(showDebug)drawDebug();else if(OPT.showFps)drawFps();
   // name tags: lobby shows everyone; in Battle they are hidden until Showdown reveals the survivors
   for(const e of ents){if(e===player||!e.alive)continue;
-    if(MATCH.state==='lobby'){if(dist(camPos,e.pos)<30)nameTag(e,e.ready?'#7f7':'#fff');}
-    else if(MATCH.mode==='battle'&&MATCH.showdown)nameTag(e,PLAYER_COLORS[e.color%16]);
+    if(MATCH.state==='lobby'){if(dist(camPos,e.pos)<64)nameTagMC(e,e.ready?'#77ff77':'#ffffff');}
+    else if(MATCH.mode==='battle'&&MATCH.showdown)nameTagMC(e,PLAYER_COLORS[e.color%16]);
     else if(MATCH.mode==='battle'&&dist(camPos,e.pos)<6&&!e.effects.invis&&los(camPos,eye(e)))nameTag(e);}
   if(MATCH.state==='lobby')drawLobbyHud();
+  else if(showDebug){}
   else if(MATCH.mode==='br')drawBRHud();
   else drawBattleTop();
   // kill feed
   const fy=MATCH.mode==='br'?190:56;feed.forEach((f,i)=>{hc.globalAlpha=Math.min(1,f.t);txt(f.txt,W-14,fy+i*22,14,'#fff','right');});hc.globalAlpha=1;
   // chat (bottom left)
-  hc.font="20px "+HFONT;chat.forEach((c,i)=>{const y=H-130-(chat.length-1-i)*20;hc.globalAlpha=Math.min(1,c.t);hc.fillStyle='rgba(0,0,0,.45)';hc.fillRect(8,y-15,Math.min(W*.6,hc.measureText(c.txt).width+12),20);hc.textAlign='left';hc.fillStyle=c.col;hc.fillText(c.txt,14,y);});hc.globalAlpha=1;
+  {const cw=Math.min(W*.6,640),lh=18,by=H-(chatUI?40:120);chat.forEach((c,i)=>{const y=by-(chat.length-1-i)*lh;const a=chatUI?1:Math.min(1,c.t);if(a<=0)return;hc.globalAlpha=a;hc.fillStyle='rgba(0,0,0,.5)';hc.fillRect(4,y-lh+3,cw,lh);txt(c.txt,8,y,13,c.col&&c.col.length>=4?c.col:'#ffffff','left');});hc.globalAlpha=1;}
   if(msgs.length){const m=msgs[msgs.length-1];hc.globalAlpha=Math.min(1,m.t);txt(m.txt,W/2,H/2-80,44,'#ffd54a','center');if(m.sub)txt(m.sub,W/2,H/2-48,18,'#fff','center');hc.globalAlpha=1;}
   drawPrompts();
   if(MATCH.state==='play'&&MATCH.preT>0){const n=Math.ceil(MATCH.preT);txt(`Time to start: ${n} second${n===1?'':'s'}`,W/2,30,18,'#fff','center');}
   if(!player.alive){drawBatHud();return;}
-  if(player.hurtT>0){hc.fillStyle=`rgba(255,0,0,${player.hurtT*.45})`;hc.fillRect(0,0,W,H);}
   if(player.fire>0){const g=hc.createLinearGradient(0,H,0,H*.5);g.addColorStop(0,'rgba(255,120,0,.45)');g.addColorStop(1,'rgba(255,120,0,0)');hc.fillStyle=g;hc.fillRect(0,0,W,H);}
   if(fluidAt(camPos[0],camPos[1],camPos[2])==='water'){hc.fillStyle='rgba(30,60,200,.35)';hc.fillRect(0,0,W,H);}
   if(fluidAt(camPos[0],camPos[1],camPos[2])==='lava'){hc.fillStyle='rgba(255,90,0,.75)';hc.fillRect(0,0,W,H);}
   if(MATCH.state==='play'&&!inZone(player.pos,false)){const g=hc.createRadialGradient(W/2,H/2,H*.2,W/2,H/2,H*.8);g.addColorStop(0,'rgba(255,0,0,0)');g.addColorStop(1,'rgba(255,0,0,.45)');hc.fillStyle=g;hc.fillRect(0,0,W,H);}
   // crosshair
-  if(!spr('crosshair',W/2-9,H/2-9,18,18)){hc.fillStyle='rgba(255,255,255,.9)';hc.fillRect(W/2-9,H/2-1,18,2);hc.fillRect(W/2-1,H/2-9,2,18);}
+  // crosshair: DOM element #xhair (difference blend, like vanilla's inverted crosshair)
   if(MATCH.state==='play'&&locked&&!chestOpen&&lookChest())txt('[RMB] Open chest',W/2,H/2+34,14,'#fff','center');
   if(player.using&&player.using!=='block'){const pr=player.using==='bow'?bowCharge(player.useT):Math.min(1,player.useT/1.6);hc.fillStyle='rgba(0,0,0,.6)';hc.fillRect(W/2-30,H/2+14,60,6);hc.fillStyle=player.using==='bow'&&pr>=1?'#ffd54a':'#fff';hc.fillRect(W/2-30,H/2+14,60*pr,6);}
   drawHotbar();drawArmorDoll();drawEffects();
@@ -2456,7 +2492,7 @@ function lookDelta(dx,dy){const f=SENS*.6+.2,k=f*f*f*8*.15*Math.PI/180;player.ya
 function setNetStatus(s){const el=$('status');if(el)el.textContent=s;}
 document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===cv;
   if(locked){hide('clickResume');hide('pause');paused=false;}
-  else if((MATCH.state==='play'||MATCH.state==='lobby')&&!chestOpen&&$('lobbyPanel').classList.contains('hidden')&&$('results').classList.contains('hidden')){if(!online)paused=true;show('pause');}});
+  else if((MATCH.state==='play'||MATCH.state==='lobby')&&!chestOpen&&!chatUI&&$('lobbyPanel').classList.contains('hidden')&&$('results').classList.contains('hidden')){if(!online)paused=true;show('pause');}});
 cv.addEventListener('click',()=>{if((MATCH.state==='play'||MATCH.state==='lobby')&&!locked&&!chestOpen)lockPointer();});
 $('clickResume').addEventListener('click',()=>lockPointer());
 document.addEventListener('mousemove',e=>{if(!locked||!player)return;if(!player.alive&&spectate.mode==='follow')return;const dx=e.movementX,dy=e.movementY;if(Math.abs(dx)>350||Math.abs(dy)>350)return;lookDelta(dx,dy);});
@@ -2601,7 +2637,7 @@ function loadLogoURL(url,save){return new Promise(res=>{const im=new Image();im.
 (async()=>{const saved=store('bb_logo');if(saved&&await loadLogoURL(saved,false))return;if(location.protocol!=='file:')for(const n of ['logo.png','logo.webp','logo.jpg'])if(await loadLogoURL(n,false))return;})();
 $('logoFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>loadLogoURL(r.result,true).then(ok=>{$('packList').textContent=ok?'Title logo set.':'Could not read that image.';});r.readAsDataURL(f);});
 $('logoClear').addEventListener('click',()=>{store('bb_logo','');const c=$('logo');c.width=760;c.height=150;c.style.imageRendering='';drawLogo();$('edition').classList.remove('hidden');$('splash').classList.remove('onlogo');$('packList').textContent='Title logo reset.';});
-const SPLASHES=['Now with Photon!','Spam click!','Last one standing!','Bats can squeak!','100% procedural!','Grace period!','Showdown!','Not Herobrine!','Also try BR mode!','Sprint jump!'];
+const SPLASHES=['Now with our own servers!','Spam click!','Last one standing!','Bats can squeak!','100% procedural!','Grace period!','Showdown!','Not Herobrine!','Also try BR mode!','Sprint jump!'];
 
 $('optClose').addEventListener('click',()=>{readOptions();hide('optPanel');show(optReturn);sfx('click');});
 $('soloBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();online=false;if(net){net.leave();net=null;}MATCH.mapIdx=MATCH.mapIdx||0;hide('menu');showLoading('Loading level',()=>{player=null;ents=[];hostStartMatch();});});
@@ -2620,24 +2656,18 @@ function refreshSkinPicker(){const row=$('skinRow');const opts=availableSkins().
   for(const k of opts){const c=mkCanvas(16,16);const g=c.getContext('2d');g.imageSmoothingEnabled=false;const S=skinTex(k).img;g.drawImage(S,8,8,8,8,0,0,16,16);g.drawImage(S,40,8,8,8,0,0,16,16);c.title=k.replace(/^(pack|gen):/,'');if(k===mySkin)c.classList.add('on');
     c.addEventListener('click',()=>{mySkin=k;store('bb_skin',k);refreshSkinPicker();sfx('click');});row.appendChild(c);}}
 $('nameIn').addEventListener('change',()=>{if(mySkin.startsWith('gen:'))mySkin='gen:'+($('nameIn').value||'Player');refreshSkinPicker();});
-const DEFAULT_APPID='d4f1dd7f-3b87-4c28-ae83-c1ea4b649097',OLD_APPIDS=['d20d4904-60a7-49e7-8d96-7976eadfcaf6'];$('n_kind').value=store('bb_nkind2')||'relay';{const sv=store('bb_app');$('n_app').value=(!sv||OLD_APPIDS.includes(sv))?DEFAULT_APPID:sv;}$('n_region').value=store('bb_region')||'us';$('n_room').value=store('bb_room')||'battle';$('n_sdk').value=store('bb_sdk')||'';
-function showNetFields(){const ph=$('n_kind').value==='photon';document.querySelectorAll('#onlinePanel .ph').forEach(el=>el.classList.toggle('hidden',!ph));$('relayNote').classList.toggle('hidden',ph);}
-$('n_kind').addEventListener('change',showNetFields);showNetFields();
+$('n_server').value=store('bb_server')||'';$('n_kind').value=store('bb_nkind3')||'relay';$('n_room').value=store('bb_room')||'battle';
 $('connectBtn').addEventListener('click',async()=>{
-  const kind=$('n_kind').value,room=($('n_room').value||'battle').trim();store('bb_nkind2',kind);store('bb_app',$('n_app').value);store('bb_region',$('n_region').value);store('bb_room',room);store('bb_sdk',$('n_sdk').value);
+  const kind=$('n_kind').value,room=($('n_room').value||'battle').trim();store('bb_nkind3',kind);store('bb_server',$('n_server').value.trim());store('bb_room',room);
   if(net){net.leave();net=null;}readOptions();
   const ready=()=>{online=true;setNetStatus('Connected. '+(net.isHost()?'You are the host.':'Joining host...'));hide('onlinePanel');player=null;ents=[];
     if(net.isHost())enterLobby();else{enterLobby();netSend(N.HELLO,{},'host');}};
   const wire=()=>{net.onEvent=onNetEvent;net.onJoin=()=>{if(isHost()&&MATCH.state==='lobby')MATCH.phaseT=0;};net.onLeave=onMemberLeave;net.onHostChange=onHostChanged;};
   if(kind==='local'){setNetStatus('Joining room "'+room+'" in this browser...');net=new LocalNet(room,myName);wire();net.onReady=ready;return;}
-  if(kind==='relay'){setNetStatus('Connecting to the relay...');const n=new RelayNet(room,myName);net=n;wire();
-    n.onReady=()=>{if(net!==n)return;setNetStatus('Connected via '+(n.tr.url||'relay').replace(/^wss:\/\//,'').replace(/[:/].*$/,''));ready();};
+  if(kind==='relay'){setNetStatus('Connecting to the relay...');const n=new RelayNet(room,myName,$('n_server').value);net=n;wire();n.tr.trying=url=>{if(net===n&&!n.ready)setNetStatus('Connecting to '+url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,'')+'...');};
+    n.onReady=()=>{if(net!==n)return;setNetStatus('Connected to '+(n.tr.url||'relay').replace(/^wss?:\/\//,'').replace(/\/mqtt$/,''));ready();};
     n.onFail=msg=>{if(net!==n)return;const wasOnline=online;net=null;n.leave();if(wasOnline){toMenu();hide('menu');show('onlinePanel');}setNetStatus(msg);};return;}
-  if(!$('n_app').value.trim()){setNetStatus('Enter your Photon Realtime AppId first.');return;}
-  setNetStatus('Loading Photon SDK...');const ok=await loadPhotonSDK($('n_sdk').value.trim());
-  if(!ok){setNetStatus('Could not load the Photon JavaScript SDK. Download the Photon Realtime JavaScript SDK from photonengine.com and put lib/photon.min.js next to index.html (or paste its URL).');return;}
-  setNetStatus('Photon SDK: '+PHOTON_SDK_URL);
-  try{net=new PhotonNet($('n_app').value.trim(),$('n_region').value,room,myName,ready,msg=>setNetStatus(msg));wire();}catch(err){setNetStatus('Photon failed: '+err.message);net=null;}
+  setNetStatus('Pick a connection type.');
 });
 $('resumeBtn').addEventListener('click',()=>{paused=false;hide('pause');lockPointer();});
 $('leaveBtn').addEventListener('click',()=>toMenu());
@@ -2881,7 +2911,7 @@ function drawPreview(){
     g.setTransform(a,b,cc,d,e,f);const u0=Math.min(A[3],B[3]),v0=Math.min(A[4],D[4]);g.drawImage(T.l[li],u0,v0,Math.abs(du),Math.abs(dv),u0,v0,Math.abs(du),Math.abs(dv));g.restore();g.setTransform(1,0,0,1,0,0);}}
 // ---- per-frame hook ----
 let lceLastPad=null;
-function tickLCE(dt){tickTouch();if(lceLastPad!==padActive){lceLastPad=padActive;if(chestOpen)renderChest();}drawPreview();}
+function tickLCE(dt){tickTouch();tickCrosshair();tickRunParticles();if(lceLastPad!==padActive){lceLastPad=padActive;if(chestOpen)renderChest();}drawPreview();}
 // keyboard: Escape/Backspace go back, X opens the Dressing Room, arrows cycle skins in the Dressing Room
 document.addEventListener('keydown',e=>{const inInput=e.target&&e.target.tagName==='INPUT';
   if(!$('dressPanel').classList.contains('hidden')){if(e.code==='Escape'||(e.code==='Enter'&&inInput)){closeDress();e.preventDefault();}else if(!inInput&&(e.code==='ArrowLeft'||e.code==='ArrowRight')){cycleSkin(e.code==='ArrowLeft'?-1:1);e.preventDefault();}else if(!inInput&&e.code==='KeyX')$('skinFile').click();return;}
@@ -3002,6 +3032,88 @@ document.addEventListener('keydown',e=>{if($('jOpt').classList.contains('hidden'
 // FPS counter
 let fpsS=60;function drawFps(){fpsS+=(1/Math.max(1e-3,dtFrame)-fpsS)*.05;txt(Math.round(fpsS)+' fps',W-14,20,14,'#ffffff','right');}
 
+// ================= Java Edition touches: F5 camera, F1 hide GUI, F3 debug screen, T chat, inverted crosshair,
+// entity shadows, block selection box, sun and moon, distance-scaled name tags =================
+let camMode=0,hideGui=false,showDebug=false,chatUI=false;
+document.addEventListener('keydown',e=>{
+  if(e.target&&e.target.tagName==='INPUT')return;
+  if(e.code==='F5'){e.preventDefault();if(player&&MATCH.state!=='menu'){camMode=(camMode+1)%3;}return;}
+  if(e.code==='F1'){e.preventDefault();hideGui=!hideGui;return;}
+  if(e.code==='F3'){e.preventDefault();showDebug=!showDebug;return;}
+  if((e.code==='KeyT'||e.code==='Slash')&&player&&(MATCH.state==='play'||MATCH.state==='lobby'||MATCH.state==='over')&&!chestOpen&&!chatUI&&(locked||padActive||touchActive)){e.preventDefault();openChat(e.code==='Slash'?'/':'');}
+},true);
+// ---- chat (T) ----
+function openChat(prefix){chatUI=true;const el=$('chatIn');el.value=prefix||'';$('chatBar').classList.remove('hidden');for(const k in keys)keys[k]=false;
+  document.exitPointerLock&&document.exitPointerLock();setTimeout(()=>el.focus(),0);}
+function closeChat(relock){chatUI=false;$('chatBar').classList.add('hidden');$('chatIn').blur();if(relock&&player&&MATCH.state!=='menu')lockPointer();}
+$('chatIn').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'){e.preventDefault();closeChat(true);return;}
+  if(e.key==='Enter'){e.preventDefault();const m=$('chatIn').value.trim().slice(0,100);if(m){chat.push({t:10,txt:`<${myName}> ${m}`,col:'#ffffff'});if(chat.length>8)chat.shift();netSend(N.CHAT,{p:1,n:myName,m});}closeChat(true);}});
+// ---- crosshair (inverted like vanilla: drawn with a difference blend over the world) ----
+function tickCrosshair(){const el=$('xhair');const on=!!player&&!hideGui&&camMode===0&&(MATCH.state==='play'||MATCH.state==='lobby'||MATCH.state==='over')&&(player.alive||spectate.mode==='bat')&&
+  ['menu','chestUI','pause','results','lobbyPanel','jOpt','loading','dressPanel'].every(id=>{const x=$(id);return !x||x.classList.contains('hidden');});
+  el.classList.toggle('hidden',!on);}
+// ---- shadows, sun, moon textures ----
+let SHADOW_TEX=null,SUN_TEX=null,MOON_TEX=null,quadMesh=null;
+function procShadow(){const c=mkCanvas(32,32),g=c.getContext('2d');const gr=g.createRadialGradient(16,16,2,16,16,16);gr.addColorStop(0,'rgba(0,0,0,.85)');gr.addColorStop(.75,'rgba(0,0,0,.55)');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(0,0,32,32);return c;}
+function procSun(){const c=mkCanvas(32,32),g=c.getContext('2d');g.fillStyle='rgba(255,200,60,.35)';g.fillRect(4,4,24,24);g.fillStyle='rgba(255,230,120,.7)';g.fillRect(8,8,16,16);g.fillStyle='#fffbe6';g.fillRect(10,10,12,12);return c;}
+function procMoon(){const c=mkCanvas(128,64),g=c.getContext('2d');g.fillStyle='#d8dbe6';g.fillRect(8,8,16,16);g.fillStyle='#b9bdcc';for(const [x,y,s] of [[11,11,3],[18,13,2],[13,18,4],[20,19,2]])g.fillRect(x,y,s,s);return c;}
+function initSkyTextures(){for(const t of [SHADOW_TEX,SUN_TEX,MOON_TEX])if(t)gl.deleteTexture(t);
+  SHADOW_TEX=mkTex(PACK.shadow||procShadow());SUN_TEX=mkTex(PACK.sun||procSun());MOON_TEX=mkTex(PACK.moon||procMoon());
+  if(!quadMesh){const o=[];const v=[[-.5,0,-.5,0,0],[.5,0,-.5,1,0],[.5,0,.5,1,1],[-.5,0,.5,0,1]];for(const i of [0,1,2,0,2,3])o.push(v[i][0],0,v[i][2],0,1,0,v[i][3],v[i][4]);quadMesh=meshFrom(o);}}
+// sun and moon: fixed in the sky for each map (afternoon on day maps, full moon over Crucible), additive like vanilla
+function drawSunMoon(){if(!mapInfo||!SUN_TEX)return;const sun=mapInfo.skyLight&&!mapInfo.dark,moon=!!mapInfo.stars;if(!sun&&!moon)return;
+  const dir=sun?[-.55,.83,-.1]:[.5,.78,.38];const L=Math.hypot(...dir);const d=dir.map(v=>v/L);
+  // basis: quad faces the camera along -d, one edge along world z
+  const zA=[0,0,1];let xA=[zA[1]*d[2]-zA[2]*d[1],zA[2]*d[0]-zA[0]*d[2],zA[0]*d[1]-zA[1]*d[0]];const xl=Math.hypot(...xA)||1;xA=xA.map(v=>v/xl);const yA=d;const zB=[xA[1]*yA[2]-xA[2]*yA[1],xA[2]*yA[0]-xA[0]*yA[2],xA[0]*yA[1]-xA[1]*yA[0]];
+  const R=new Float32Array([xA[0],xA[1],xA[2],0,yA[0],yA[1],yA[2],0,zB[0],zB[1],zB[2],0,0,0,0,1]);const S=sun?60:40;
+  const m=chain(M4.tr(camPos[0]+d[0]*100,camPos[1]+d[1]*100,camPos[2]+d[2]*100),R,M4.sc(S,1,S));
+  gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+  useTex(VP,camPos);gl.uniform1f(PT.u.fogN,1e6);gl.uniform1f(PT.u.fogF,2e6);gl.uniform1f(PT.u.bright,1/1.06);
+  if(sun)drawMesh(quadMesh,m,SUN_TEX);else{// full-moon frame of moon_phases (top-left of a 4x2 sheet)
+    if(!quadMesh.moon){const o=[];const v=[[-.5,0,-.5,0,0],[.5,0,-.5,.25,0],[.5,0,.5,.25,.5],[-.5,0,.5,0,.5]];for(const i of [0,1,2,0,2,3])o.push(v[i][0],0,v[i][2],0,1,0,v[i][3],v[i][4]);quadMesh.moon=meshFrom(o);}
+    drawMesh(quadMesh.moon,m,MOON_TEX);}
+  gl.disable(gl.BLEND);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);}
+// round shadows under players, bots and dropped items (Render.renderShadow): fades out as the entity rises
+function drawShadows(){if(!SHADOW_TEX||!mapInfo)return;useTex(VP,camPos);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);gl.uniform1f(PT.u.bright,1);
+  const one=(pos,r)=>{if(dist(pos,camPos)>40)return;const x=Math.floor(pos[0]),z=Math.floor(pos[2]);let gy=-99;for(let y=Math.floor(pos[1]+.01);y>=Math.floor(pos[1])-2;y--){const b=getB(x,y,z);if(b&&BD[b].solid&&!BD[b].liquid){const bx=blockBoxes(x,y,z);gy=y+(bx?Math.max(...bx.map(q=>q[4])):1);break;}}
+    if(gy<-50)return;const h=pos[1]-gy;if(h>2||h<-.1)return;const a=(1-h/2)*.5;gl.uniform4f(PT.u.tint,1,1,1,a);drawMesh(quadMesh,chain(M4.tr(pos[0],gy+.015,pos[2]),M4.sc(r*2,1,r*2)),SHADOW_TEX);};
+  for(const e of ents){if(!e.alive||e.bat||e.effects.invis)continue;if(e===player&&camMode===0)continue;one(e.rpos||e.pos,.5);}
+  for(const d of drops)one(d.pos,.15);
+  gl.uniform4f(PT.u.tint,1,1,1,1);gl.depthMask(true);gl.disable(gl.BLEND);}
+// black selection box around the targeted block (only where blocks can be broken: Battle Royale)
+let edgeBuf=null;
+function drawSelection(x,y,z){if(!edgeBuf){const o=[];const c=[[0,0,0],[1,0,0],[1,0,1],[0,0,1],[0,1,0],[1,1,0],[1,1,1],[0,1,1]];
+    for(const [a,b] of [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])for(const i of [a,b])o.push(...c[i],0,1,0);
+    edgeBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,edgeBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(o),gl.STATIC_DRAW);}
+  const bx=blockBoxes(x,y,z)||FULLBOX;let x0=1,y0=1,z0=1,x1=0,y1=0,z1=0;for(const q of bx){x0=Math.min(x0,q[0]);y0=Math.min(y0,q[1]);z0=Math.min(z0,q[2]);x1=Math.max(x1,q[3]);y1=Math.max(y1,Math.min(1,q[4]));z1=Math.max(z1,q[5]);}
+  const g=.002;useBox(VP,camPos);gl.bindBuffer(gl.ARRAY_BUFFER,edgeBuf);gl.vertexAttribPointer(PB.a.p,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(PB.a.n,3,gl.FLOAT,false,24,12);
+  gl.uniform1f(PB.u.lit,0);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
+  gl.uniformMatrix4fv(PB.u.m,false,chain(M4.tr(x+x0-g,y+y0-g,z+z0-g),M4.sc(x1-x0+2*g,y1-y0+2*g,z1-z0+2*g)));gl.uniform4f(PB.u.col,0,0,0,.4);gl.drawArrays(gl.LINES,0,24);
+  gl.depthMask(true);gl.disable(gl.BLEND);useBox(VP,camPos);}
+// name tags (RenderLivingBase.renderLivingLabel): fixed size in the world, so they shrink with distance
+function nameTagMC(e,col){const top=e.bat?.7:(e.sneak?1.55:1.8)+.5;const rp=e.rpos||e.pos;const p=project([rp[0],rp[1]+top,rp[2]]);if(!p)return;
+  const d=Math.max(.5,dist(camPos,[rp[0],rp[1]+top,rp[2]]));const fov=OPT.fov*fovMod*Math.PI/180;const ppb=(H/2)/Math.tan(fov/2)/d;
+  const px=.02666667*ppb;if(px<.35)return;const sc=Math.max(1,Math.round(px));const t=e.name;
+  const w=FONT?bmpWidth(t,sc):t.length*6*sc;hc.globalAlpha=e.sneak?.5:1;hc.fillStyle='rgba(0,0,0,.25)';hc.fillRect(Math.round(p[0]-w/2-sc),Math.round(p[1]-9*sc),w+2*sc,9*sc);
+  if(FONT)bmpText(t,p[0],p[1]-1*sc,sc*9,col||'#ffffff','center');else{hc.font=`${8*sc}px ${HFONT}`;hc.textAlign='center';hc.fillStyle=col||'#fff';hc.fillText(t,p[0],p[1]-sc);}hc.globalAlpha=1;}
+// F3 debug screen
+function drawDebug(){if(!player)return;const p=player.rpos||player.pos;const f=n=>n.toFixed(3);const R=180/Math.PI;
+  let my=((180-player.yaw*R)%360+540)%360-180;const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);
+  const facing=Math.abs(fx)>Math.abs(fz)?(fx>0?'east (Towards positive X)':'west (Towards negative X)'):(fz>0?'south (Towards positive Z)':'north (Towards negative Z)');
+  const bx=Math.floor(p[0]),by=Math.floor(p[1]),bz=Math.floor(p[2]);const L=lightAt(bx,by,bz);
+  const left=[`Minecraft 1.8 (Battle Browser Edition)`,`${Math.round(fpsS)} fps`,'',`XYZ: ${f(p[0])} / ${f(p[1])} / ${f(p[2])}`,`Block: ${bx} ${by} ${bz}`,`Chunk: ${bx&15} ${by&15} ${bz&15} in ${bx>>4} ${by>>4} ${bz>>4}`,
+    `Facing: ${facing} (${my.toFixed(1)} / ${(-player.pitch*R).toFixed(1)})`,`Light: ${Math.max(L&15,(L>>4)&15)} (${(L>>4)&15} sky, ${L&15} block)`,`Map: ${(MAPS.find(m=>m.id===mapInfo.id)||{name:mapInfo.id}).name}`,
+    `Mode: ${MATCH.mode==='br'?'Battle Royale':'Battle'} (${MATCH.state})`,`E: ${ents.filter(e=>e.alive).length}/${ents.length}  Drops: ${drops.length}`,`Net: ${net?net.kind+(isHost()?' (host)':' (client)'):'offline'}`];
+  const gli=gl.getExtension('WEBGL_debug_renderer_info');const rend=gli?gl.getParameter(gli.UNMASKED_RENDERER_WEBGL):'WebGL';
+  const right=[`Browser: ${(navigator.userAgent.match(/(Firefox|Edg|Chrome|Safari)\/[\d.]+/)||['Web'])[0]}`,`Display: ${W}x${H} (${String(rend).slice(0,40)})`,performance.memory?`Mem: ${Math.round(performance.memory.usedJSHeapSize/1048576)}MB`:'',`Settings: ${['Tiny','Short','Normal','Far'][OPT.rd]} ${OPT.fancy?'fancy':'fast'}`];
+  const line=(t,x,y,al)=>{if(!t)return;const w=FONT?bmpWidth(t,2):t.length*12;const xx=al==='right'?x-w:x;hc.fillStyle='rgba(80,80,80,.56)';hc.fillRect(xx-2,y-15,w+3,18);txt(t,al==='right'?x:x,y,13,'#e0e0e0',al);};
+  left.forEach((t,i)=>line(t,4,18+i*18,'left'));right.forEach((t,i)=>line(t,W-4,18+i*18,'right'));}
+
+// running particles (Entity.createRunningParticles): chips of the block under a sprinting player's feet
+function tickRunParticles(){if(MATCH.state!=='play'&&MATCH.state!=='lobby')return;for(const e of ents){if(!e.alive||!e.sprint||e.inWater||Math.random()>dtFrame*20*.6)continue;if(e.onGround===false)continue;
+  const sp=Math.hypot(e.vel[0],e.vel[2]);if(sp<3)continue;const x=Math.floor(e.pos[0]),y=Math.floor(e.pos[1]-.2),z=Math.floor(e.pos[2]);const b=getB(x,y,z);if(!b||!BD[b].solid||BD[b].liquid)continue;
+  if(dist(e.pos,camPos)>24)continue;particles.push({p:[e.pos[0]+(Math.random()-.5)*.6,e.pos[1]+.1,e.pos[2]+(Math.random()-.5)*.6],v:[-e.vel[0]*.2,1.5,-e.vel[2]*.2],t:.5,t0:.5,kind:b,sz:.1,q:Math.random()*4|0,g:16});}}
+
 // ================= main loop =================
 function update(dt){
   pollPad(dt);tickAmbience(dt);tickLCE(dt);
@@ -3036,7 +3148,7 @@ requestAnimationFrame(frame);
   if(n){applyPack();refreshPackList();}
   // default packs beside the page: textures first (applied straight away), then sounds
   if(location.protocol!=='file:')for(const name of ['pack.zip','resourcepack.zip','sounds.zip']){try{const r=await fetch(name);if(r.ok){const buf=await r.arrayBuffer();if(await loadPackBuffer(buf,name)){applyPack();refreshPackList();}}}catch(e){}}})();
-window.__bb={get state(){return MATCH.state;},get MATCH(){return MATCH;},get ents(){return ents;},get player(){return player;},get chests(){return chests;},get br(){return br;},get net(){return net;},SET,update,hostStartMatch,generateMap,loadPackBuffer,applyPack,PACK,get drops(){return drops;},getB,fluidAt,BD,topSolid,physics,mcTick,setB,B,enterLobby,hurt,doAttack,fireBow,bowCharge,get projs(){return projs;},update,sfx,packEvent,packGroup,get actx(){return actx;},initAudio,sndCache,get atlas(){return atlasCanvas;},get cam(){return [camPos,camYaw,camPitch];}};
+window.__bb={spawnParticles,blockParticles,applyBlock,doAttack:typeof doAttack==='function'?doAttack:null,get particles(){return particles;},setCam(m){camMode=m;},get state(){return MATCH.state;},get MATCH(){return MATCH;},get ents(){return ents;},get player(){return player;},get chests(){return chests;},get br(){return br;},get net(){return net;},SET,update,hostStartMatch,generateMap,loadPackBuffer,applyPack,PACK,get drops(){return drops;},getB,fluidAt,BD,topSolid,physics,mcTick,setB,B,enterLobby,hurt,doAttack,fireBow,bowCharge,get projs(){return projs;},update,sfx,packEvent,packGroup,get actx(){return actx;},initAudio,sndCache,get atlas(){return atlasCanvas;},get cam(){return [camPos,camYaw,camPitch];}};
 
 }
 </script>

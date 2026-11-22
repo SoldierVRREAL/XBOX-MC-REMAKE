@@ -1,0 +1,12 @@
+{
+  "name": "xbox-minecraft-battle-mode-browser-edition",
+  "version": "1.0.0",
+  "description": "Fan-made browser tribute to the Legacy Console Battle mini game, with its own multiplayer server.",
+  "private": true,
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
