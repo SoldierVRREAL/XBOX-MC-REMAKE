@@ -62,6 +62,7 @@ function ringSpawns(r,n){const out=[];for(let i=0;i<n;i++){const a=i/n*Math.PI*2
 function barrierWalls(){for(let y=0;y<WY;y++)for(let i=0;i<WX;i++){setB(i,y,0,B.BARRIER);setB(i,y,WZ-1,B.BARRIER);}for(let y=0;y<WY;y++)for(let i=0;i<WZ;i++){setB(0,y,i,B.BARRIER);setB(WX-1,y,i,B.BARRIER);}}
 
 const MAPS=[
+  {id:'temple',name:'Temple',desc:'A ruined temple deep in a jungle cave, ringed by a lily-pad moat with stepping stones, bridges and hanging vines.'},
   {id:'cavern',name:'Cavern',desc:'Underground arena under the bones of a giant beast. Lava, sand dunes, ledges.'},
   {id:'cove',name:'Cove',desc:'A pirate cove inside a cliff bowl: beach, lagoon, shipwreck, waterfalls and boardwalk huts.'},
   {id:'crucible',name:'Crucible',desc:'A lava colosseum at night under the bones of a giant beast, with a sandstone pyramid at its heart.'},
@@ -257,7 +258,7 @@ function genBR(seed,extra){
   return {sky:[.47,.65,1],fog:[.74,.84,1],fogDist:110,skyLight:true,voidY:-12,central:sp,spawns:sp,center:null};
 }
 function generateMap(id,seed,extra){
-  let info;if(id==='hub')info=genHub();else if(id==='cavern')info=genCavern();else if(id==='cove')info=genCove();else if(id==='crucible')info=genCrucible();else if(id==='br')info=genBR(seed,extra);else info=genSkyhold();
+  let info;if(id==='hub')info=genHub();else if(id==='cavern')info=genCavern();else if(id==='cove')info=genCove();else if(id==='crucible')info=genCrucible();else if(id==='temple')info=genTemple();else if(id==='br')info=genBR(seed,extra);else info=genSkyhold();
   if(id!=='cavern'){rs=(seed|0)+77||77;for(let z=1;z<WZ-1;z++)for(let x=1;x<WX-1;x++){const t=topSolid(x,z);if(t<0||getB(x,t,z)!==B.GRASS||getB(x,t+1,z))continue;
     if([...chests.values()].some(c=>Math.abs(c.x-x)<2&&Math.abs(c.z-z)<2))continue;const r=srand();if(r<.16)setB(x,t+1,z,B.TGRASS);else if(r<.175)setB(x,t+1,z,B.POPPY);else if(r<.19)setB(x,t+1,z,B.DANDELION);}}
   info.id=id;mapInfo=info;computeLight();return info;

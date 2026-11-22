@@ -39,11 +39,11 @@ function buildChunk(ci,cj){
   const out=[],wat=[];const x0=ci*16,z0=cj*16,x1=Math.min(WX,x0+16),z1=Math.min(WZ,z0+16);const AS=ACOLS*TILE;const skyMul=mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1;
   for(let y=0;y<WY;y++)for(let z=z0;z<z1;z++)for(let x=x0;x<x1;x++){
     const b=world[idx(x,y,z)];if(!b)continue;const D=BD[b];if(!D.render)continue;
-    if(D.cross){const tx=(D.side%ACOLS)*TILE,ty=Math.floor(D.side/ACOLS)*TILE;const L=lightAt(x,y,z);const lv=Math.max(LB[(L>>4)&15]*skyMul,LB[L&15],.12)*.9;const j=(hash2(x,z,5)-.5)*.3;
+    if(D.cross){const tx=(D.side%ACOLS)*TILE,ty=Math.floor(D.side/ACOLS)*TILE;const L=lightAt(x,y,z);const lv=Math.max(LB[(L>>4)&15]*skyMul,LB[L&15],mapInfo&&mapInfo.ambient||.12)*.9;const j=(hash2(x,z,5)-.5)*.3;
       const u0=(tx+.02)/AS,u1=(tx+TILE-.02)/AS,v0=(ty+.02)/AS,v1=(ty+TILE-.02)/AS;
       for(const [ax,az,bx,bz] of [[.15,.15,.85,.85],[.15,.85,.85,.15]]){const q=[[x+ax+j,y+1,z+az,u0,v0],[x+bx+j,y+1,z+bz,u1,v0],[x+bx+j,y,z+bz,u1,v1],[x+ax+j,y,z+az,u0,v1]];
         for(const i of [0,1,2,0,2,3])out.push(q[i][0],q[i][1],q[i][2],q[i][3],q[i][4],lv);}continue;}
-    if(D.shape){const Lo=lightAt(x,y,z),Lu=lightAt(x,y+1,z);const lvB=Math.max(LB[Math.max(Lo>>4,Lu>>4)&15]*skyMul,LB[Math.max(Lo&15,Lu&15)],mapInfo&&mapInfo.dark?.07:.12);
+    if(D.shape){const Lo=lightAt(x,y,z),Lu=lightAt(x,y+1,z);const lvB=Math.max(LB[Math.max(Lo>>4,Lu>>4)&15]*skyMul,LB[Math.max(Lo&15,Lu&15)],mapInfo&&mapInfo.dark?(mapInfo.ambient||.07):.12);
       for(const bx of (D.fence?fenceBoxes(x,y,z,false):D.shape))for(let f=0;f<6;f++){const d=f>>1,s=(f&1)?-1:1;const u=(d+1)%3,v=(d+2)%3;const lo=[bx[0],bx[1],bx[2]],hi=[bx[3],bx[4],bx[5]];
         const plane=s>0?hi[d]:lo[d];
         if((s>0&&plane>=1)||(s<0&&plane<=0)){const nx=x+(d==0?s:0),ny=y+(d==1?s:0),nz=z+(d==2?s:0);const nb=getB(nx,ny,nz);if(nb&&BD[nb].opaque&&!BD[nb].shape)continue;}
@@ -62,7 +62,7 @@ function buildChunk(ci,cj){
       const tile=d==1?(s>0?D.top:D.bottom):(f==4?D.front:D.side);
       const tx=(tile%ACOLS)*TILE,ty=Math.floor(tile/ACOLS)*TILE;
       const u=(d+1)%3,v=(d+2)%3;const F=[nx,ny,nz];
-      const L=lightAt(nx,ny,nz);const lv=D.light?1:Math.max(LB[(L>>4)&15]*skyMul,LB[L&15]*1.05,mapInfo&&mapInfo.dark?.07:.12);
+      const L=lightAt(nx,ny,nz);const lv=D.light?1:Math.max(LB[(L>>4)&15]*skyMul,LB[L&15]*1.05,mapInfo&&mapInfo.dark?(mapInfo.ambient||.07):.12);
       const vs=[];const aos=[];
       for(const [cu,cv2] of [[0,0],[1,0],[1,1],[0,1]]){
         const l=[0,0,0];l[d]=s>0?1:0;l[u]=cu;l[v]=cv2;

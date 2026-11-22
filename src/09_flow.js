@@ -1,10 +1,11 @@
 // ================= match flow: settings, start/end, lobby hub, phases, chests, MCBR timeline, net handlers =================
 const SET={mode:'battle',roundLen:600,hunger:1,refill:120,grace:30,showdown:true,takeAll:true,central:true,bots:5,difficulty:1,
-  maps:{cavern:true,cove:true,crucible:true,skyhold:true},brLen:.2,brExtra:true,enchants:true,lobbyWait:45};
+  maps:{temple:true,cavern:true,cove:true,crucible:true,skyhold:true},brLen:.2,brExtra:true,enchants:true,lobbyWait:45};
 const MATCH={state:'menu',mode:'battle',map:null,seed:0,gameT:0,showdown:false,refillAt:0,mapIdx:0,lobbyCD:-1,winner:null,phaseT:0,graceAnn:false,edits:[],nextMap:null};
 let suddenDeath=false,br=null,myName='Player',mySkin='gen:Player',online=false;
 const inGrace=()=>MATCH.mode==='battle'&&SET.grace>0&&MATCH.gameT<SET.grace;
-function enabledMaps(){const m=MAPS.filter(x=>SET.maps[x.id]);return m.length?m:[MAPS[0]];}
+function enabledMaps(){const m=MAPS.filter(x=>SET.maps[x.id]!==false);   // a map added in an update starts switched on
+return m.length?m:[MAPS[0]];}
 function nextMapId(){if(SET.mode==='br')return 'br';const m=enabledMaps();return m[MATCH.mapIdx%m.length].id;}
 function announce(t,sub,dur=3,bcast=true){msgs.push({t:dur,txt:t,sub:sub||''});if(bcast&&isHost())netSend(N.ANN,{t,s:sub,d:dur});}
 function chatMsg(t,col='#fff',bcast=true){chat.push({t:10,txt:t,col});if(chat.length>8)chat.shift();if(bcast&&isHost())netSend(N.CHAT,{t,c:col});}

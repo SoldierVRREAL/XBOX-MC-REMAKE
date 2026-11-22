@@ -79,7 +79,7 @@ const BLOCK_TIPS={1:'A block of dirt with grass growing on top.',2:'Common soil 
   51:'A section of a spruce tree trunk.',52:'Wooden boards cut from spruce logs.',53:'A barrier you can see over but cannot jump.',56:'Metal bars that block the way but let you see through.',
   57:'Smooth white quartz.',58:'Leaves from a jungle tree.',59:'Coal packed into a solid block.',60:'Stone bricks that have cracked with age.',61:'Sandstone carved with a pattern.',
   62:'Sandstone polished smooth.',63:'A block that gives off a constant redstone signal.',64:'A section of a jungle tree trunk.',65:'Half a block of sandstone.',66:'Half a block of stone bricks.',
-  67:'Stone brick steps.',71:'Soft white wool.',72:'Spruce wood steps.'};
+  67:'Stone brick steps.',71:'Soft white wool.',72:'Spruce wood steps.',76:'Leafy vines hanging from the cave roof. You can walk straight through them.',77:'Floats on the water. Light enough to step across, if you are careful.'};
 const HINT_SEEN=new Set();let hintCur=null,hintLook=null,hintLookT=0;
 function wrapText(s,maxW,size){const meas=t=>{if(FONT)return bmpWidth(t,Math.max(1,Math.round(size*1.15/9)));hc.font=`${Math.round(size*1.3)}px ${HFONT}`;return hc.measureText(t).width;};
   const out=[];let cur='';for(const w of String(s).split(' ')){const t=cur?cur+' '+w:w;if(meas(t)>maxW&&cur){out.push(cur);cur=w;}else cur=t;}if(cur)out.push(cur);return out;}

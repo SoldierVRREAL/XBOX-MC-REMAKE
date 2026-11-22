@@ -200,3 +200,94 @@ function genCrucible(){
   const central=squareSpawns(CX,CZ,5,F+3,16);
   return {sky:[.012,.012,.035],fog:[.02,.018,.04],fogDist:100,skyLight:true,skyMul:.45,dark:true,stars:true,noBeam:true,voidY:-12,central,spawns:spawnRing(CX,CZ,15,16,F+4),center:[CX,F+6,CZ]};
 }
+
+// ---------------- Temple: a ruined temple deep in a jungle cave (after the Battle key art) ----------------
+// stepped stone-brick temple with a redstone block over the door, a lily-pad moat crossed by bridges and glowstone
+// stepping stones, a jungle floor with trees and ruins, a gallery round the cave wall, wooden beams and hanging vines
+function genTemple(){
+  setDims(96,52,96);const s=7171;rs=s;const F=12,R=44,T0=F+1;
+  const brick=(x,y,z)=>{const h=hash2(x*3+y,z,s);return h<.15?B.MSBRICK:h<.23?B.CRACKED:B.SBRICK;};
+  const rock=(x,y,z)=>{const h=hash2(x,y*3+z,s+1);return h<.12?B.MOSSY:h<.3?B.COBBLE:h<.33?B.GRAVEL:B.STONE;};
+  const ceil=(x,z)=>{const r=Math.hypot(x-CX,z-CZ)/R;return Math.min(WY-3,F+34-Math.floor(r*r*14+fbm(x*.08,z*.08,s+2)*5));};
+  const m=(x,z)=>Math.max(Math.abs(x-CX),Math.abs(z-CZ));
+  // the cave: solid rock hollowed into a dome
+  for(let z=0;z<WZ;z++)for(let x=0;x<WX;x++){const r=Math.hypot(x-CX,z-CZ);const wall=r+(fbm(x*.06,z*.06,s+3)-.5)*4;const top=ceil(x,z);
+    for(let y=1;y<WY-1;y++)setB(x,y,z,rock(x,y,z));if(wall>=41.5)continue;
+    for(let y=F+1;y<top;y++)setB(x,y,z,0);
+    const n=fbm(x*.1,z*.1,s+4);
+    if(r<11){setB(x,F,z,n<.32?B.MSBRICK:hash2(x,z,s+5)<.1?B.CRACKED:B.SBRICK);}                                  // temple island paving
+    else if(r<19.5){setB(x,F,z,B.WATER);setB(x,F-1,z,B.WATER);setB(x,F-2,z,hash2(x,z,s+6)<.5?B.SAND:B.GRAVEL);}  // moat
+    else if(r<21){setB(x,F,z,brick(x,F,z));}                                                                      // kerb
+    else if(r<36){setB(x,F,z,n>.64?B.MOSSY:n>.52?B.DIRT:B.GRASS);setB(x,F-1,z,B.DIRT);
+      if(n>.7&&r>23&&r<33){setB(x,F,z,B.DIRT);setB(x,F+1,z,B.GRASS);}}                                           // jungle floor, a few low mounds
+    else{for(let y=F;y<=F+6;y++)setB(x,y,z,brick(x,y,z));}                                                        // gallery round the wall
+  }
+  // bridges over the moat (north/south/east/west) with slab kerbs
+  for(const [dx,dz] of [[1,0],[0,1],[-1,0],[0,-1]]){const px=-dz,pz=dx;for(let r=10;r<=21;r++)for(let w=-1;w<=1;w++){const x=CX+dx*r+px*w,z=CZ+dz*r+pz*w;setB(x,F,z,brick(x,F,z));setB(x,F-1,z,B.STONE);setB(x,F+1,z,0);}
+    for(let r=12;r<=19;r+=2)for(const w of [-2,2]){const x=CX+dx*r+px*w,z=CZ+dz*r+pz*w;if(r===14||r===18){setB(x,F,z,B.SBRICK);setB(x,F-1,z,B.STONE);setB(x,F+1,z,B.CHISELED);setB(x,F+2,z,B.TORCH);}else setB(x,F+1,z,B.SBR_SLAB);}}
+  // big stepping stones on the diagonals: chiseled ring round a glowstone heart, flush with the water
+  for(const [sx,sz] of [[1,1],[-1,1],[1,-1],[-1,-1]]){const cx=CX+Math.round(sx*10.6),cz=CZ+Math.round(sz*10.6);
+    for(let dx=-2;dx<=2;dx++)for(let dz=-2;dz<=2;dz++){const x=cx+dx,z=cz+dz,e=Math.max(Math.abs(dx),Math.abs(dz));if(Math.hypot(x-CX,z-CZ)<11)continue;
+      setB(x,F,z,e===0?B.GLOW:e===1?(hash2(x,z,s+8)<.4?B.MSBRICK:B.SBRICK):B.CHISELED);setB(x,F-1,z,B.STONE);setB(x,F+1,z,0);}}
+  // small mossy stepping stones dotted round the moat, and lily pads on the open water
+  for(let i=0;i<40;i++){const a=srand()*Math.PI*2,r=12.5+srand()*6;const x=Math.round(CX+Math.cos(a)*r),z=Math.round(CZ+Math.sin(a)*r);if(getB(x,F,z)===B.WATER&&getB(x,F+1,z)===0){setB(x,F,z,srand()<.6?B.MSBRICK:B.MOSSY);setB(x,F-1,z,B.STONE);}}
+  for(let z=0;z<WZ;z++)for(let x=0;x<WX;x++){if(getB(x,F,z)===B.WATER&&getB(x,F+1,z)===0&&hash2(x,z,s+7)<.09)setB(x,F+1,z,B.LILY);if(getB(x,F-1,z)===B.WATER&&(x*7+z*3)%9===0)setB(x,F-2,z,B.GLOW);}
+  // ---- the temple ----
+  for(let dx=-7;dx<=7;dx++)for(let dz=-7;dz<=7;dz++){const x=CX+dx,z=CZ+dz,e=Math.max(Math.abs(dx),Math.abs(dz));
+    setB(x,T0,z,e===7?B.SBR_SLAB:brick(x,T0,z));if(e<=6)setB(x,T0+1,z,e===6?B.SBR_SLAB:brick(x,T0+1,z));}   // two half-block steps up to the floor
+  for(let dx=-5;dx<=5;dx++)for(let dz=-5;dz<=5;dz++){const x=CX+dx,z=CZ+dz,e=Math.max(Math.abs(dx),Math.abs(dz));
+    for(let y=T0+2;y<=T0+10;y++)setB(x,y,z,e===5?((Math.abs(dx)===5&&Math.abs(dz)===5)?B.CHISELED:brick(x,y,z)):0);
+    setB(x,T0+11,z,e===5?B.CHISELED:brick(x,T0+11,z));}
+  for(const [dx,dz] of [[0,1],[1,0],[0,-1],[-1,0]]){const px=-dz,pz=dx;   // doorways with chiseled frames
+    for(let w=-1;w<=1;w++)for(let y=T0+2;y<=T0+5;y++)setB(CX+dx*5+px*w,y,CZ+dz*5+pz*w,0);
+    for(let y=T0+2;y<=T0+6;y++)for(const w of [-2,2])setB(CX+dx*5+px*w,y,CZ+dz*5+pz*w,B.CHISELED);for(let w=-2;w<=2;w++)setB(CX+dx*5+px*w,T0+6,CZ+dz*5+pz*w,B.CHISELED);
+    for(let w=-1;w<=1;w++)for(let y=T0+7;y<=T0+9;y++)setB(CX+dx*5+px*w,y,CZ+dz*5+pz*w,w===0&&y===T0+8?B.REDSTONE:B.CHISELED);
+    for(const w of [-4,4])for(const y of [T0+3,T0+8])setB(CX+dx*5+px*w,y,CZ+dz*5+pz*w,B.GLOW);for(const w of [-2,2])setB(CX+dx*3+px*w,T0+16,CZ+dz*3+pz*w,B.GLOW);}   // the red block over each door
+  setB(CX,T0+1,CZ,B.GLOW);for(const [dx,dz] of [[0,1],[1,0],[0,-1],[-1,0]])placeChest(CX+dx,T0+2,CZ+dz,true,false,Math.atan2(-dx,-dz)+Math.PI);   // centre chests
+  for(const [dx,dz] of [[3,3],[-3,3],[3,-3],[-3,-3]])setB(CX+dx,T0+2,CZ+dz,B.TORCH);
+  for(let y=T0+2;y<=T0+10;y++)setB(CX+2,y,CZ-4,B.LADDER+ladderK(0,1));setB(CX+2,T0+11,CZ-4,0);   // ladder up to the roof
+  for(let dx=-5;dx<=5;dx++)for(let dz=-5;dz<=5;dz++){const e=Math.max(Math.abs(dx),Math.abs(dz));if(e===5&&(dx+dz)%2===0)setB(CX+dx,T0+12,CZ+dz,brick(CX+dx,T0+12,CZ+dz));}   // battlements
+  for(const [dx,dz] of [[5,5],[-5,5],[5,-5],[-5,-5]]){setB(CX+dx,T0+12,CZ+dz,B.NETHERRACK);setB(CX+dx,T0+13,CZ+dz,B.TORCH);}   // braziers on the corners
+  for(let dx=-3;dx<=3;dx++)for(let dz=-3;dz<=3;dz++){const x=CX+dx,z=CZ+dz,e=Math.max(Math.abs(dx),Math.abs(dz)),corner=Math.abs(dx)===3&&Math.abs(dz)===3;   // upper shrine
+    for(let y=T0+12;y<=T0+18;y++)setB(x,y,z,e===3?(corner?B.CHISELED:brick(x,y,z)):0);setB(x,T0+19,z,brick(x,T0+19,z));if(e<=2)setB(x,T0+20,z,e===2?B.CHISELED:brick(x,T0+20,z));if(e<=1)setB(x,T0+21,z,e===0?B.GLOW:B.SBRICK);}
+  for(const [dx,dz] of [[0,1],[1,0],[0,-1],[-1,0]])for(let y=T0+12;y<=T0+14;y++)setB(CX+dx*3,y,CZ+dz*3,0);
+  placeChest(CX,T0+12,CZ,true,false,0);for(const [dx,dz] of [[3,3],[-3,3],[3,-3],[-3,-3]])setB(CX+dx,T0+20,CZ+dz,B.TORCH);
+  for(let i=0;i<70;i++){const dx=Math.round((srand()*2-1)*6),dz=Math.round((srand()*2-1)*6);const e=Math.max(Math.abs(dx),Math.abs(dz));if(e!==6&&e!==4)continue;if(Math.min(Math.abs(dx),Math.abs(dz))<=1)continue;   // keep the doors and red blocks clear   // vines down the walls
+    const top=e===6?T0+10:T0+18,len=2+(srand()*5|0);for(let k=0;k<len;k++){const y=top-k;if(getB(CX+dx,y,CZ+dz)!==0||y<=T0+2)break;setB(CX+dx,y,CZ+dz,B.VINE);}}
+  reserved.push([CX,CZ,12]);
+  // ---- jungle floor: trees, ruined walls, lamp posts, chests ----
+  const nearRoute=(x,z)=>Math.min(Math.abs(x-CX),Math.abs(z-CZ))<4;
+  let trees=0;for(let t=0;t<400&&trees<11;t++){const a=srand()*Math.PI*2,r=24+srand()*9;const x=Math.round(CX+Math.cos(a)*r),z=Math.round(CZ+Math.sin(a)*r);if(nearRoute(x,z)||reserved.some(([rx,rz,rr])=>Math.hypot(rx-x,rz-z)<rr+3))continue;
+    const g=floorAt(x,z,F+3),h=6+(srand()*3|0);for(let y=g+1;y<=g+h;y++)setB(x,y,z,B.JLOG);
+    for(let dy=-2;dy<=1;dy++){const rad=dy===1?1:2.6;for(let dx=-3;dx<=3;dx++)for(let dz=-3;dz<=3;dz++){if(Math.hypot(dx,dz)>rad||!(getB(x+dx,g+h+dy,z+dz)===0))continue;setB(x+dx,g+h+dy,z+dz,B.JLEAVES);
+      if(dy===-2&&srand()<.3)for(let k=1;k<=1+(srand()*4|0);k++){if(getB(x+dx,g+h+dy-k,z+dz)!==0)break;setB(x+dx,g+h+dy-k,z+dz,B.VINE);}}}
+    reserved.push([x,z,3]);trees++;}
+  for(let i=0;i<8;i++){const a=i/8*Math.PI*2+Math.PI/8;const x=Math.round(CX+Math.cos(a)*27),z=Math.round(CZ+Math.sin(a)*27);   // ruins with a chest each
+    const tx=Math.abs(Math.cos(a))>Math.abs(Math.sin(a))?0:1;for(let k=-3;k<=3;k++){const wx=x+(tx?k:0)-(tx?0:2*Math.sign(Math.cos(a))),wz=z+(tx?0:k)-(tx?2*Math.sign(Math.sin(a)):0);const g=floorAt(wx,wz,F+3);const hh=1+(hash2(wx,wz,s+9)*3|0);
+      for(let y=g+1;y<=g+hh;y++)setB(wx,y,wz,brick(wx,y,wz));if(srand()<.35&&getB(wx,g+hh+1,wz)===0)setB(wx,g+hh+1,wz,B.SBR_SLAB);}
+    const g=floorAt(x,z,F+3);for(let y=g+1;y<=g+3;y++)setB(x,y,z,0);chestAt(x,g+1,z,false,Math.atan2(-(CX-x),-(CZ-z))+Math.PI);reserved.push([x,z,3]);}
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2+Math.PI/12;const x=Math.round(CX+Math.cos(a)*21.6),z=Math.round(CZ+Math.sin(a)*21.6);if(nearRoute(x,z))continue;   // lamp posts round the moat
+    const g=floorAt(x,z,F+3);setB(x,g+1,z,B.FENCE);setB(x,g+2,z,B.FENCE);setB(x,g+3,z,B.TORCH);}
+  for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4;const x=Math.round(CX+Math.cos(a)*9.6),z=Math.round(CZ+Math.sin(a)*9.6);setB(x,F,z,B.GLOW);}   // glowing paving at the island corners
+  // ---- gallery round the cave wall: stairs up, railings, alcove chests below, chests and torches on top ----
+  const stair=(x0,z0,dx,dz,y0,n,wide)=>{const px=-dz,pz=dx;for(let j=1;j<=n;j++)for(let w=0;w<wide;w++){const x=x0+dx*j+px*w,z=z0+dz*j+pz*w;
+    for(let y=y0;y<y0+j-1;y++)setB(x,y+1,z,B.SBRICK);setB(x,y0+j,z,B.SBR_STAIRS+stairK(dx,dz));for(let y=y0+j+1;y<=y0+j+3;y++)setB(x,y,z,0);}};
+  stair(CX+29,CZ-1,1,0,F,6,3);stair(CX-29,CZ+1,-1,0,F,6,3);stair(CX+1,CZ+29,0,1,F,6,3);stair(CX-1,CZ-29,0,-1,F,6,3);
+  for(let z=0;z<WZ;z++)for(let x=0;x<WX;x++){const r=Math.hypot(x-CX,z-CZ);if(r>=36&&r<36.9&&getB(x,F+7,z)===0&&!nearRoute(x,z)&&getB(x,F+6,z)&&BD[getB(x,F+6,z)].solid)setB(x,F+7,z,B.FENCE);}
+  for(let i=0;i<8;i++){const a=i/8*Math.PI*2+Math.PI/8;const ax=Math.round(CX+Math.cos(a)*36.5),az=Math.round(CZ+Math.sin(a)*36.5);   // alcoves in the gallery face
+    for(let k=-1;k<=1;k++)for(const d of [0,1])for(let y=F+1;y<=F+3;y++){const t=Math.abs(Math.cos(a))>Math.abs(Math.sin(a));const x=ax+(t?Math.sign(Math.cos(a))*d:k),z=az+(t?k:Math.sign(Math.sin(a))*d);setB(x,y,z,0);}
+    const bx=ax+Math.round(Math.cos(a)),bz=az+Math.round(Math.sin(a));chestAt(bx,F+1,bz,false,Math.atan2(-(CX-bx),-(CZ-bz))+Math.PI);setB(ax,F+3,az,B.TORCH);setB(ax,F+1,az,0);
+    const ux=Math.round(CX+Math.cos(a+Math.PI/8)*39.5),uz=Math.round(CZ+Math.sin(a+Math.PI/8)*39.5);if(i%2===0)chestAt(ux,F+7,uz,false,Math.atan2(-(CX-ux),-(CZ-uz))+Math.PI);
+    const tx=Math.round(CX+Math.cos(a)*40),tz=Math.round(CZ+Math.sin(a)*40);if(getB(tx,F+7,tz)===0)setB(tx,F+7,tz,B.TORCH);}
+  // ---- overhead: dark wooden beams across the cave, glowstone in the rock, vines hanging everywhere ----
+  for(const o of [-15,14])for(let t=-41;t<=41;t++)for(let a=0;a<=1;a++)for(let b=0;b<=1;b++){for(const [x,z] of [[CX+t,CZ+o+a],[CX+o+a,CZ+t]]){const y=F+19+b;if(getB(x,y,z)===0)setB(x,y,z,B.SPRUCE_LOG);}}
+  for(let z=0;z<WZ;z++)for(let x=0;x<WX;x++){const r=Math.hypot(x-CX,z-CZ);if(r>41)continue;let y=WY-2;while(y>F&&getB(x,y,z)!==0)y--;if(y<=F+8)continue;   // y = top air cell under the roof
+    const above=getB(x,y+1,z);if(hash2(x,z,s+11)<.04&&above&&above!==B.SPRUCE_LOG)setB(x,y+1,z,B.GLOW);
+    if(hash2(x,z,s+12)<.07){const len=2+(hash2(x,z,s+13)*7|0);for(let k=0;k<len;k++){if(getB(x,y-k,z)!==0||y-k<=F+8)break;setB(x,y-k,z,B.VINE);}}}
+  for(const o of [-16,16])for(let t=-38;t<=38;t+=3)for(const [x,z] of [[CX+t,CZ+o],[CX+o,CZ+t]])if(hash2(x,z,s+14)<.45){const len=1+(hash2(x,z,s+15)*5|0);for(let k=0;k<len;k++){const y=F+18-k;if(getB(x,y,z)!==0)break;setB(x,y,z,B.VINE);}}
+  for(const o of [-15,14])for(let t=-36;t<=36;t+=9)for(const [x,z] of [[CX+t,CZ+o],[CX+o,CZ+t]])if(getB(x,F+18,z)===0&&Math.abs(t)>8){setB(x,F+18,z,B.FENCE);setB(x,F+17,z,B.GLOW);}   // hanging lamps
+  for(let i=0;i<16;i++){const a=i/16*Math.PI*2;const x=Math.round(CX+Math.cos(a)*40),z=Math.round(CZ+Math.sin(a)*40);if(getB(x,F+7,z)===0)setB(x,F+7,z,B.TORCH);}   // gallery torches
+  barrierWalls();finishSurface();
+  const central=spawnRing(CX,CZ,10,16,F+3),spawns=spawnRing(CX,CZ,28,16,F+4);
+  return {sky:[.035,.045,.035],fog:[.05,.065,.05],fogDist:88,skyLight:false,dark:true,ambient:.2,noBeam:true,voidY:-12,central,spawns,center:[CX,T0+2,CZ]};
+}

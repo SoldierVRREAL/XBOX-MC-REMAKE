@@ -1,7 +1,7 @@
 // ================= blocks =================
 const B={ICE:33,SLIME:34,SOUL:35,WEB:36,LADDER:37,SLAB:41,STAIRS:42,TGRASS:30,POPPY:31,DANDELION:32,AIR:0,GRASS:1,DIRT:2,STONE:3,LOG:4,LEAVES:5,PLANKS:6,SAND:7,CHEST:8,COBBLE:9,BRICK:10,GLASS:11,WOOL:12,GRAVEL:13,MOSSY:14,
   WATER:15,LAVA:16,GLOW:17,BONE:18,SANDSTONE:19,SBRICK:20,MSBRICK:21,CHISELED:22,GOLDB:23,DIAMONDB:24,EMERALDB:25,OBSIDIAN:26,NETHERRACK:27,BARRIER:28,BEACON:29,
-  OAK_STAIRS:46,OAK_SLAB:50,SPRUCE_LOG:51,SPRUCE_PLANKS:52,FENCE:53,TORCH:54,CARPET:55,IRON_BARS:56,QUARTZ:57,JLEAVES:58,COAL:59,CRACKED:60,CSANDSTONE:61,SSANDSTONE:62,REDSTONE:63,JLOG:64,SST_SLAB:65,SBR_SLAB:66,SBR_STAIRS:67,WOOL_W:71,SPRUCE_STAIRS:72};
+  OAK_STAIRS:46,OAK_SLAB:50,SPRUCE_LOG:51,SPRUCE_PLANKS:52,FENCE:53,TORCH:54,CARPET:55,IRON_BARS:56,QUARTZ:57,JLEAVES:58,COAL:59,CRACKED:60,CSANDSTONE:61,SSANDSTONE:62,REDSTONE:63,JLOG:64,SST_SLAB:65,SBR_SLAB:66,SBR_STAIRS:67,WOOL_W:71,SPRUCE_STAIRS:72,VINE:76,LILY:77};
 const BD=[];
 function def(id,top,side,bottom,o={}){BD[id]=Object.assign({top,side,bottom,front:side,solid:true,opaque:true,liquid:false,light:0,render:true},o);}
 def(1,0,1,2);def(2,2,2,2);def(3,3,3,3);def(4,5,4,5);def(5,6,6,6,{opaque:false});def(6,7,7,7);def(7,8,8,8);
@@ -30,6 +30,8 @@ def(57,51,50,51);def(58,52,52,52,{opaque:false});def(59,53,53,53);def(60,54,54,5
 def(65,24,23,24,{opaque:false,shape:[[0,0,0,1,.5,1]],col:[[0,0,0,1,.5,1]]});def(66,25,25,25,{opaque:false,shape:[[0,0,0,1,.5,1]],col:[[0,0,0,1,.5,1]]});
 for(let k=0;k<4;k++)def(67+k,25,25,25,{opaque:false,shape:[[0,0,0,1,.5,1],stairTop(k)],col:[[0,0,0,1,.5,1],stairTop(k)]});
 def(71,59,59,59);
+def(76,60,60,60,{solid:false,opaque:false,cross:true});   // vines: hanging strands you walk through
+def(77,61,61,61,{opaque:false,shape:[[0,0,0,1,1/64,1]],col:[[0,0,0,1,1/64,1]]});   // lily pad: floats on water and holds you up
 for(let k=0;k<4;k++)def(72+k,47,47,47,{opaque:false,shape:[[0,0,0,1,.5,1],stairTop(k)],col:[[0,0,0,1,.5,1],stairTop(k)]});
 def(8,10,9,10,{front:11,opaque:false,render:false,tileEnt:true,shape:[[1/16,0,1/16,15/16,14/16,15/16]],col:[[1/16,0,1/16,15/16,14/16,15/16]]});
 // fences join to neighbouring fences and full blocks
@@ -38,14 +40,14 @@ function fenceBoxes(x,y,z,col){const top=col?1.5:1;const out=[[6/16,0,6/16,10/16
   const add=(x0,z0,x1,z1)=>{if(col)out.push([x0,0,z0,x1,1.5,z1]);else{out.push([x0,12/16,z0,x1,15/16,z1]);out.push([x0,6/16,z0,x1,9/16,z1]);}};
   if(fenceJoin(x+1,y,z))add(10/16,7/16,1,9/16);if(fenceJoin(x-1,y,z))add(0,7/16,6/16,9/16);if(fenceJoin(x,y,z+1))add(7/16,10/16,9/16,1);if(fenceJoin(x,y,z-1))add(7/16,0,9/16,6/16);return out;}
 const BLOCK_NAMES={1:'Grass Block',2:'Dirt',3:'Stone',4:'Oak Log',5:'Oak Leaves',6:'Oak Planks',7:'Sand',9:'Cobblestone',10:'Bricks',11:'Glass',12:'Red Wool',13:'Gravel',14:'Mossy Cobblestone',
-  17:'Glowstone',18:'Bone Block',19:'Sandstone',20:'Stone Bricks',21:'Mossy Stone Bricks',22:'Chiseled Stone Bricks',23:'Block of Gold',24:'Block of Diamond',25:'Block of Emerald',26:'Obsidian',27:'Netherrack',46:'Oak Stairs',50:'Oak Slab',51:'Spruce Wood',52:'Spruce Planks',53:'Oak Fence',54:'Torch',55:'Red Carpet',56:'Iron Bars',57:'Block of Quartz',58:'Jungle Leaves',59:'Block of Coal',60:'Cracked Stone Bricks',61:'Chiseled Sandstone',62:'Smooth Sandstone',63:'Block of Redstone',64:'Jungle Wood',65:'Sandstone Slab',66:'Stone Brick Slab',67:'Stone Brick Stairs',71:'White Wool',72:'Spruce Stairs'};
-const BLOCK_COL={1:'#5f9f35',2:'#866043',3:'#7f7f7f',4:'#665032',5:'#3a8228',6:'#a2824e',7:'#dbcfa3',8:'#9c6c2c',9:'#7a7a7a',10:'#964a3a',11:'#d8f0f5',12:'#cc3430',13:'#8c8682',14:'#62784a',
+  17:'Glowstone',18:'Bone Block',19:'Sandstone',20:'Stone Bricks',21:'Mossy Stone Bricks',22:'Chiseled Stone Bricks',23:'Block of Gold',24:'Block of Diamond',25:'Block of Emerald',26:'Obsidian',27:'Netherrack',46:'Oak Stairs',50:'Oak Slab',51:'Spruce Wood',52:'Spruce Planks',53:'Oak Fence',54:'Torch',55:'Red Carpet',56:'Iron Bars',57:'Block of Quartz',58:'Jungle Leaves',59:'Block of Coal',60:'Cracked Stone Bricks',61:'Chiseled Sandstone',62:'Smooth Sandstone',63:'Block of Redstone',64:'Jungle Wood',76:'Vines',77:'Lily Pad',65:'Sandstone Slab',66:'Stone Brick Slab',67:'Stone Brick Stairs',71:'White Wool',72:'Spruce Stairs'};
+const BLOCK_COL={76:'#3c8020',77:'#2f7a2a',1:'#5f9f35',2:'#866043',3:'#7f7f7f',4:'#665032',5:'#3a8228',6:'#a2824e',7:'#dbcfa3',8:'#9c6c2c',9:'#7a7a7a',10:'#964a3a',11:'#d8f0f5',12:'#cc3430',13:'#8c8682',14:'#62784a',
   15:'#3f6fe0',16:'#e8701a',17:'#f2d07a',18:'#e6e0cc',19:'#d8cb94',20:'#7c7c7c',21:'#6c7a5a',22:'#7a7a7a',23:'#f5d43a',24:'#5fe3d6',25:'#3fd46a',26:'#1c1426',27:'#7a2e2e',29:'#7fe9e0',46:'#a2824e',47:'#a2824e',48:'#a2824e',49:'#a2824e',50:'#a2824e',51:'#3d2c18',52:'#69492c',53:'#a2824e',54:'#ffd060',55:'#cc3430',56:'#8a8a8a',57:'#ebe6dc',58:'#3c8020',59:'#1a1a1a',60:'#6a6a6a',61:'#d8cb94',62:'#d8cb94',63:'#b01a0e',64:'#5a481c',65:'#d8cb94',66:'#7c7c7c',67:'#7c7c7c',68:'#7c7c7c',69:'#7c7c7c',70:'#7c7c7c',71:'#ebebeb',72:'#69492c',73:'#69492c',74:'#69492c',75:'#69492c'};
 // pack texture names for each atlas tile
 const TILE_PACK=['grass_block_top','grass_block_side','dirt','stone','oak_log','oak_log_top','oak_leaves','oak_planks','sand','~chest_side','~chest_top','~chest_front','cobblestone','bricks','glass','red_wool',
   'gravel','mossy_cobblestone','water_still','lava_still','glowstone','bone_block_side','bone_block_top','sandstone','sandstone_top','stone_bricks','mossy_stone_bricks','chiseled_stone_bricks','gold_block','diamond_block','emerald_block','obsidian',
   'netherrack','sandstone_bottom','beacon','short_grass','poppy','dandelion','ice','slime_block','soul_sand','cobweb','ladder','smooth_stone_slab_side','smooth_stone',
-  'spruce_log','spruce_log_top','spruce_planks','torch','iron_bars','quartz_block_side','quartz_block_top','jungle_leaves','coal_block','cracked_stone_bricks','chiseled_sandstone','cut_sandstone','redstone_block','jungle_log','white_wool'];
+  'spruce_log','spruce_log_top','spruce_planks','torch','iron_bars','quartz_block_side','quartz_block_top','jungle_leaves','coal_block','cracked_stone_bricks','chiseled_sandstone','cut_sandstone','redstone_block','jungle_log','white_wool','vine','lily_pad'];
 let TILE=16;const ACOLS=8;
 let atlasCanvas=null;
 // vanilla-style 16x16 tiles: small palettes + clustered noise, drawn from scratch
@@ -126,6 +128,10 @@ function procTile(t,x,y){
   case 57:return pk(P.rs,(x==0||y==0||x==15||y==15)?.1:.35+cl(x,y,73,2)*.65);
   case 58:{const col=Math.floor(x+h(Math.floor(y/5),x>>2,74)*2);return pk(P.jbark,(x%4==1?.1:.5)+h(col,Math.floor(y/4),75)*.5);}
   case 59:{const v=.82+h(x,y,76)*.12+cl(x,y,77,1.5)*.06;return [235*v|0,235*v|0,235*v|0];}
+  case 60:{for(const sx of [2,6,10,13]){const xx=sx+Math.round(Math.sin(y*.7+sx)*1.2);if(x===xx)return pk(P.jleaf,.15+h(x,y,80)*.3);
+      if(Math.abs(x-xx)<=2&&h(x>>1,y>>1,81+sx)<.33)return pk(P.jleaf,.4+h(x,y,82)*.55);}return [0,0,0,0];}
+  case 61:{const dx=x-7.5,dy=y-7.5,r=Math.hypot(dx,dy);if(r>7.4)return [0,0,0,0];const a=Math.atan2(dy,dx);if(Math.abs(a-.6)<.24&&r>.8)return [0,0,0,0];
+      const vein=(Math.abs(Math.sin(a*4))<.13&&r>1.5)||r>6.5;return pk(P.leaf,vein?.12:.45+h(x,y,83)*.45);}
   }
   return [255,0,255];
 }

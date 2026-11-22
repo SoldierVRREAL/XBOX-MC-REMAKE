@@ -177,7 +177,7 @@ function drawMiniPlayer(){
     drawHumanoid(p);}
   finally{p.rpos=sv.rpos;p.yaw=sv.yaw;p.pitch=sv.pitch;p.bodyYaw=sv.by;camPos=sv.cam;VP=sv.vp;gl.disable(gl.SCISSOR_TEST);gl.viewport(0,0,cv.width,cv.height);}
 }
-function setEntLight(p){const x=Math.floor(p[0]),z=Math.floor(p[2]),y=Math.floor(p[1]+.5);const a=lightAt(x,y,z),b=lightAt(x,y+1,z);const L=Math.max(a>>4,b>>4)<<4|Math.max(a&15,b&15);const v=Math.max(LB[(L>>4)&15]*(mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1),LB[L&15],mapInfo&&mapInfo.dark?.12:.2);gl.uniform1f(PT.u.bright,v);}
+function setEntLight(p){const x=Math.floor(p[0]),z=Math.floor(p[2]),y=Math.floor(p[1]+.5);const a=lightAt(x,y,z),b=lightAt(x,y+1,z);const L=Math.max(a>>4,b>>4)<<4|Math.max(a&15,b&15);const v=Math.max(LB[(L>>4)&15]*(mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1),LB[L&15],mapInfo&&mapInfo.dark?Math.max(.12,(mapInfo.ambient||0)*1.3):.2);gl.uniform1f(PT.u.bright,v);}
 // ModelBiped / ModelPlayer.setRotationAngles (1.8). Our parts are the vanilla model flipped by scale(-1,-1,1), so X and Y rotations change sign.
 function limbTick(e){if(e._lt===perfT)return;e._lt=perfT;   // once per frame, even when the model is drawn twice (world + animated character)
   const dts=dtFrame*20;const v=Math.hypot(e.vel[0],e.vel[2])/20;const tgt=Math.min(1,v*4);

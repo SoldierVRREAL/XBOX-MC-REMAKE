@@ -56,7 +56,7 @@ function availableSkins(){return CUSTOM_SKINS.concat(PACK.skins.length?PACK.skin
 
 // -------- loading --------
 // 1.8-era file names for the same tiles (blocks/ folder)
-const TILE_ALT={grass_block_top:'grass_top',grass_block_side:'grass_side',oak_log:'log_oak',oak_log_top:'log_oak_top',oak_leaves:'leaves_oak',oak_planks:'planks_oak',bricks:'brick',red_wool:'wool_colored_red',
+const TILE_ALT={vine:'vine',lily_pad:'waterlily',grass_block_top:'grass_top',grass_block_side:'grass_side',oak_log:'log_oak',oak_log_top:'log_oak_top',oak_leaves:'leaves_oak',oak_planks:'planks_oak',bricks:'brick',red_wool:'wool_colored_red',
   mossy_cobblestone:'cobblestone_mossy',sandstone:'sandstone_normal',stone_bricks:'stonebrick',mossy_stone_bricks:'stonebrick_mossy',chiseled_stone_bricks:'stonebrick_carved',short_grass:'tallgrass',poppy:'flower_rose',dandelion:'flower_dandelion',slime_block:'slime',cobweb:'web',smooth_stone:'stone_slab_top',smooth_stone_slab_side:'stone_slab_side',
   spruce_log:'log_spruce',spruce_log_top:'log_spruce_top',spruce_planks:'planks_spruce',torch:'torch_on',quartz_block_side:'quartz_block_side',quartz_block_top:'quartz_block_top',jungle_leaves:'leaves_jungle',
   cracked_stone_bricks:'stonebrick_cracked',chiseled_sandstone:'sandstone_carved',cut_sandstone:'sandstone_smooth',jungle_log:'log_jungle',white_wool:'wool_colored_white',bone_block_side:'quartz_block_side',bone_block_top:'quartz_block_top'};
@@ -85,7 +85,7 @@ async function loadPackBuffer(buf,label){
     const nc=mkCanvas(ACOLS*maxRes,ACOLS*maxRes),g=nc.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(atlasCanvas,0,0,nc.width,nc.height);
     for(const t in tiles){const img=tiles[t];const tx=(t%ACOLS)*maxRes,ty=Math.floor(t/ACOLS)*maxRes;g.clearRect(tx,ty,maxRes,maxRes);
       const cell=imgToCanvas(img,maxRes,maxRes,0,0,img.width,img.width);const n=TILE_PACK[t];
-      const gray=isGray(img);if(gray&&(n==='grass_block_top'||n==='short_grass'))tintCanvas(cell,'#79c05a');if(gray&&n==='oak_leaves')tintCanvas(cell,'#59ae30');if(gray&&n==='jungle_leaves')tintCanvas(cell,'#30bb0b');if(gray&&n==='water_still')tintCanvas(cell,'#3f76e4');
+      const gray=isGray(img);if(gray&&(n==='grass_block_top'||n==='short_grass'))tintCanvas(cell,'#79c05a');if(gray&&n==='oak_leaves')tintCanvas(cell,'#59ae30');if(gray&&n==='jungle_leaves')tintCanvas(cell,'#30bb0b');if(gray&&n==='vine')tintCanvas(cell,'#48b518');if(gray&&n==='lily_pad')tintCanvas(cell,'#208030');if(gray&&n==='water_still')tintCanvas(cell,'#3f76e4');
       if(n==='grass_block_side'&&grassOv&&isGray(grassOv)){const ov=tintCanvas(imgToCanvas(grassOv,maxRes,maxRes),'#79c05a');cell.getContext('2d').drawImage(ov,0,0);}
       if(n==='water_still'){const cg=cell.getContext('2d');const d=cg.getImageData(0,0,maxRes,maxRes);for(let i=3;i<d.data.length;i+=4)d.data[i]=Math.min(d.data[i],180);cg.putImageData(d,0,0);}
       g.drawImage(cell,tx,ty);}
