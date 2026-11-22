@@ -37,7 +37,11 @@ Open `index.html` in a browser, or host it with GitHub Pages (below).
 2. In the repo: **Settings > Pages > Build and deployment**, set **Source** to *Deploy from a branch*, branch `main`, folder `/ (root)`.
 3. After a minute the game is live at `https://<your-username>.github.io/<repo-name>/`.
 
-### Online multiplayer (Photon)
+### Online multiplayer
+
+**Built-in relay (default, no setup):** Mini Games → Play Online → "Internet (built-in relay)", everyone types the same room code and presses Connect. The game has its own small multiplayer system: it sends game messages through free public MQTT-over-WebSocket servers (EMQX, HiveMQ, Mosquitto test broker; it tries them in that order). No account, AppId or SDK file needed. Anyone who knows the room code can join, so use an unusual one. To use your own MQTT broker instead, open the page with `?relay=wss://your-broker:port/mqtt`.
+
+### Online multiplayer (Photon, optional)
 
 1. Create a free **Photon Realtime** app at dashboard.photonengine.com and copy its AppId.
 2. Download the **Realtime JavaScript SDK** from photonengine.com (SDKs page, sign in) and copy `lib/photon.min.js` from it next to `index.html` (or paste its URL in Play Online). Use this official, current file: older copies of the SDK connect to the master server and then get dropped by the game server with error 2003.
