@@ -166,7 +166,7 @@ function onNetEvent(code,d,from){
   case N.SKIN:onSkinNet(d);break;
   case N.STATE:{if(!d||!d.id)return;let e=entById(d.id);
     if(!e){if(MATCH.state==='menu')return;e=new Ent(d.id,d.n,'player');e.skin=d.sk||'gen:'+d.n;e.color=ents.length;ents.push(e);e.pos=d.p.slice();if(MATCH.state==='play'&&!d.al){e.alive=false;e.bat=true;e.spectator=!!d.sp;}}
-    if(e.isLocal)return;e.net={p:d.p,v:d.v,t:performance.now()};e.yaw=d.y;e.pitch=d.pi;e.name=String(d.n||e.name).slice(0,16);if(d.sk)e.skin=d.sk;
+    if(e.isLocal)return;pushSnap(e,d.p,d.v,d.y,d.pi,d.ts,d.g);e.name=String(d.n||e.name).slice(0,16);if(d.sk)e.skin=d.sk;
     e.inv=new Array(9).fill(null);e.sel=0;if(d.h)e.inv[0]={id:d.h,count:1};e.armor=d.a||[null,null,null,null];e.health=d.hp;e.food=d.f;if(d.sw)e.swing=Math.max(e.swing,d.sw);e.using=d.u||null;e.useT=d.ut||0;
     e.fire=d.fi||0;if(d.hp<e.health-.4)sfx('hurt',{pos:e.pos});e.effects=d.ef?Object.fromEntries(d.ef.map(n=>[n,{t:9,amp:0,tick:0}])):{};e.sprint=!!d.sr;e.sneak=!!d.sn;e.openChest=d.oc||null;e.ready=!!d.r;e.bat=!!d.b;
     if(MATCH.state==='lobby'){e.alive=true;e.bat=false;}
@@ -183,7 +183,7 @@ function onNetEvent(code,d,from){
   case N.DROPREQ:if(isHost())hostSpawnDrop(d.p,d.id,d.c,d.v);break;
   case N.PICK:{if(!isHost())return;const x=drops.find(x=>x.did===d.did&&!x.dead);if(!x)return;x.dead=true;netSend(N.DROPDEL,{did:x.did});netSend(N.GIVE,{to:'p'+from,items:[{id:x.id,count:x.count}]},from);break;}
   case N.PROJ:{const o=entById(d.o);spawnProj(d.k,d.p,d.v,o,d.d,d.pot,false);break;}
-  case N.BOTS:for(const b of d){const e=entById(b[0]);if(!e)continue;e.net={p:[b[1],b[2],b[3]],v:[b[4],b[5],b[6]],t:performance.now()};e.yaw=b[7];e.pitch=b[8];e.health=b[9];
+  case N.BOTS:for(const b of d){const e=entById(b[0]);if(!e)continue;pushSnap(e,[b[1],b[2],b[3]],[b[4],b[5],b[6]],b[7],b[8],b[17]);e.health=b[9];
       e.inv=new Array(9).fill(null);e.sel=0;if(b[10])e.inv[0]={id:b[10],count:1};e.armor=b[11];e.using=b[12];e.useT=b[13];if(b[14])e.swing=Math.max(e.swing,b[14]);e.fire=b[15];e.effects=b[16]?{invis:{t:9,amp:0}}:{};}break;
   case N.PHASE:if(!fromHost)return;if(d.pre!=null&&Math.abs((MATCH.preT||0)-d.pre)>.5)MATCH.preT=d.pre;if(Math.abs(MATCH.gameT-d.t)>.5)MATCH.gameT=d.t;MATCH.showdown=d.sd;MATCH.refillAt=d.r;suddenDeath=d.bs;break;
   case N.BR:if(!br)return;br.T=d.T;br.ev=d.ev;br.border=d.border;br.lastCx=d.lastCx;br.lastCz=d.lastCz;break;
@@ -216,14 +216,38 @@ function onHostChanged(){
 // state broadcast for my player
 let stateT=0;
 function sendMyState(dt){
-  if(!net||!player)return;stateT-=dt;if(stateT>0)return;stateT=.1;const p=player;const h=p.inv[p.sel];
-  netSend(N.STATE,{id:p.id,n:myName,sk:mySkin,p:p.pos.map(v=>Math.round(v*100)/100),v:p.vel.map(v=>Math.round(v*100)/100),y:+p.yaw.toFixed(3),pi:+p.pitch.toFixed(3),h:h?h.id:null,a:p.armor,hp:Math.round(p.health*10)/10,f:p.food,
+  if(!net||!player)return;stateT-=dt;if(stateT>0)return;stateT=.05;const p=player;const h=p.inv[p.sel];
+  netSend(N.STATE,{ts:Math.round(performance.now()),g:p.onGround?1:0,id:p.id,n:myName,sk:mySkin,p:p.pos.map(v=>Math.round(v*100)/100),v:p.vel.map(v=>Math.round(v*100)/100),y:+p.yaw.toFixed(3),pi:+p.pitch.toFixed(3),h:h?h.id:null,a:p.armor,hp:Math.round(p.health*10)/10,f:p.food,
     sw:p.swing>.5?p.swing:0,u:p.using,ut:p.useT,fi:p.fire>0?1:0,ef:Object.keys(p.effects).filter(k=>k==='invis'),sr:p.sprint?1:0,sn:p.sneak?1:0,r:p.ready?1:0,b:p.bat?1:0,al:p.alive?1:0,sp:p.spectator?1:0,oc:chestOpen&&!chestOpen.inv?key(chestOpen.x,chestOpen.y,chestOpen.z):0});
 }
 let botsT=0;
 function sendBots(dt){if(!net||!isHost())return;botsT-=dt;if(botsT>0)return;botsT=.12;const arr=ents.filter(e=>e.kind==='bot'&&e.alive).map(e=>{const h=e.inv[e.sel];
-  return [e.id,+e.pos[0].toFixed(2),+e.pos[1].toFixed(2),+e.pos[2].toFixed(2),+e.vel[0].toFixed(2),+e.vel[1].toFixed(2),+e.vel[2].toFixed(2),+e.yaw.toFixed(3),+e.pitch.toFixed(3),Math.round(e.health*10)/10,h?h.id:null,e.armor,e.using,e.useT,e.swing>.5?e.swing:0,e.fire>0?1:0,e.effects.invis?1:0];});
+  return [e.id,+e.pos[0].toFixed(2),+e.pos[1].toFixed(2),+e.pos[2].toFixed(2),+e.vel[0].toFixed(2),+e.vel[1].toFixed(2),+e.vel[2].toFixed(2),+e.yaw.toFixed(3),+e.pitch.toFixed(3),Math.round(e.health*10)/10,h?h.id:null,e.armor,e.using,e.useT,e.swing>.5?e.swing:0,e.fire>0?1:0,e.effects.invis?1:0,Math.round(performance.now())];});
   if(arr.length)netSend(N.BOTS,arr);}
-function interpRemote(e,dt){if(!e.net)return;const age=Math.min(.25,(performance.now()-e.net.t)/1000);const tp=[e.net.p[0]+e.net.v[0]*age,e.net.p[1]+e.net.v[1]*age,e.net.p[2]+e.net.v[2]*age];
-  const k=Math.min(1,dt*14);if(dist(tp,e.pos)>6)e.pos=tp.slice();else for(let i=0;i<3;i++)e.pos[i]+=(tp[i]-e.pos[i])*k;e.vel=e.net.v.slice();if(e.onGround!==false)e.walkT+=dt*Math.hypot(e.vel[0],e.vel[2]);
-  e.onGround=Math.abs(e.vel[1])<.5;e.rpos=e.pos;}
+// ---- remote player / bot smoothing ----
+// Snapshots are stamped with the sender's clock and kept in a short buffer. We draw everyone slightly in the past
+// (about 2 packets) and interpolate between two real snapshots, so late or uneven packets no longer make people stutter.
+function lerpAng(a,b,f){let d=b-a;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return a+d*f;}
+function pushSnap(e,p,v,yaw,pitch,ts,g){
+  const now=performance.now();let n=e.net;if(!n||!n.buf)n=e.net={buf:[],off:null,iv:100};
+  let t=now;
+  if(typeof ts==='number'){const s=now-ts;if(n.off==null||s<n.off)n.off=s;else n.off+=(s-n.off)*.02;t=ts+n.off;}   // sender clock -> our clock (tracks the fastest packets)
+  const b=n.buf,last=b[b.length-1];
+  if(last){if(t<=last.t){if(typeof ts==='number')return;t=last.t+1;}const gap=t-last.t;if(gap<400)n.iv+=(gap-n.iv)*.1;
+    if(Math.hypot(p[0]-last.p[0],p[1]-last.p[1],p[2]-last.p[2])>6){b.length=0;n.snap=true;}}   // teleport / respawn: don't glide across the map
+  b.push({t,p:p.slice(),v:v.slice(),y:yaw,pi:pitch,g});if(b.length>12)b.shift();
+}
+function interpRemote(e,dt){
+  const n=e.net;if(!n||!n.buf||!n.buf.length)return;const b=n.buf,first=b[0],last=b[b.length-1];
+  const rt=performance.now()-Math.max(90,n.iv+60);
+  let p,v,yaw,pitch,g;
+  if(b.length===1||rt<=first.t){p=first.p;v=first.v;yaw=first.y;pitch=first.pi;g=first.g;}
+  else if(rt>=last.t){   // ran out of snapshots: coast briefly. Grounded players report a small downward speed from gravity, so only coast vertically while airborne
+    const ex=Math.min(.15,(rt-last.t)/1000);const air=last.g===0||(last.g===undefined&&Math.abs(last.v[1])>2);
+    p=[last.p[0]+last.v[0]*ex,last.p[1]+(air?last.v[1]*ex:0),last.p[2]+last.v[2]*ex];v=last.v;yaw=last.y;pitch=last.pi;g=last.g;}
+  else{let i=b.length-2;while(i>0&&b[i].t>rt)i--;const a=b[i],c=b[i+1],f=Math.max(0,Math.min(1,(rt-a.t)/(c.t-a.t)));
+    p=[a.p[0]+(c.p[0]-a.p[0])*f,a.p[1]+(c.p[1]-a.p[1])*f,a.p[2]+(c.p[2]-a.p[2])*f];v=[a.v[0]+(c.v[0]-a.v[0])*f,a.v[1]+(c.v[1]-a.v[1])*f,a.v[2]+(c.v[2]-a.v[2])*f];
+    yaw=lerpAng(a.y,c.y,f);pitch=a.pi+(c.pi-a.pi)*f;g=c.g;}
+  if(n.snap||dist(p,e.pos)>6){n.snap=false;e.pos=p.slice();}else{const k=Math.min(1,dt*30);for(let i=0;i<3;i++)e.pos[i]+=(p[i]-e.pos[i])*k;}
+  e.vel=v.slice();e.yaw=yaw;e.pitch=pitch;if(e.onGround!==false)e.walkT+=dt*Math.hypot(e.vel[0],e.vel[2]);
+  e.onGround=g!==undefined?!!g:Math.abs(v[1])<2;e.rpos=e.pos;}

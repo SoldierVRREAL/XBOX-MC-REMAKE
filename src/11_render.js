@@ -190,10 +190,12 @@ function drawHumanoid(e){
     rarm:chain(base,...P(5*Math.cos(bodyY),22-(S.slim?.5:0),5*Math.sin(bodyY),rX,rY,rZ)),larm:chain(base,...P(-5*Math.cos(bodyY),22-(S.slim?.5:0),-5*Math.sin(bodyY),lX,lY,lZ)),
     rleg:chain(base,...P(1.9,12+(sk?3:0),sk?4:.1,rlX,0,0)),lleg:chain(base,...P(-1.9,12+(sk?3:0),sk?4:.1,llX,0,0))};
   setEntLight(e.pos);gl.uniform1f(PT.u.hurt,e.hurtT>0?1:0);
-  if(!invis){for(const [m,ov] of [['head','hat'],['body','jacket'],['rarm','rsleeve'],['larm','lsleeve'],['rleg','rpants'],['lleg','lpants']]){drawMesh(M[m],parts[m],S.tex);drawMesh(M[ov],parts[m],S.tex);}}
+  // camera inside this head (F5 view squeezed against a wall, spectating up close, standing in someone): faces aren't culled, so you'd see the inside of the skull. Skip the head then.
+  const inHead=Math.hypot(camPos[0]-rp[0],camPos[1]-(rp[1]+(e.sneak?1.5:1.64)),camPos[2]-rp[2])<.6;
+  if(!invis){for(const [m,ov] of [['head','hat'],['body','jacket'],['rarm','rsleeve'],['larm','lsleeve'],['rleg','rpants'],['lleg','lpants']]){if(inHead&&m==='head')continue;drawMesh(M[m],parts[m],S.tex);drawMesh(M[ov],parts[m],S.tex);}}
   // armor layers
   const A=MODELS.armor;e.armor.forEach((a,i)=>{if(!a||!ITEMS[a])return;const it=ITEMS[a];const T=ARMOR_TEX[it.tier];if(!T)return;if(T.tint)gl.uniform4f(PT.u.tint,...T.tint,1);
-    if(i===0)drawMesh(A.head,parts.head,T.l1);
+    if(i===0&&!inHead)drawMesh(A.head,parts.head,T.l1);
     if(i===1){drawMesh(A.body,parts.body,T.l1);drawMesh(A.rarm,parts.rarm,T.l1);drawMesh(A.larm,parts.larm,T.l1);}
     if(i===2){drawMesh(A.body2,parts.body,T.l2);drawMesh(A.rleg2,parts.rleg,T.l2);drawMesh(A.lleg2,parts.lleg,T.l2);}
     if(i===3){drawMesh(A.rleg,parts.rleg,T.l1);drawMesh(A.lleg,parts.lleg,T.l1);}
