@@ -199,6 +199,7 @@ body.touch #clickResume{display:none!important}
     <label for="o_diff">Bot difficulty</label><select id="o_diff"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option><option value="3">Sweaty</option></select>
     <label for="o_brlen">Battle Royale length</label><select id="o_brlen"><option value="0.2">Quick (~7 min)</option><option value="0.4">Medium (~15 min)</option><option value="1">Original datapack (~37 min)</option></select>
     <label for="o_brx">BR extra loot chests</label><input id="o_brx" type="checkbox" checked>
+    <label for="o_ench">Enchanted loot</label><input id="o_ench" type="checkbox" checked>
   </div>
   <h3>Select Maps</h3><div class="maps" id="mapChecks"></div>
   <div class="row"><button class="btn small" id="optClose">Done</button></div>
@@ -471,6 +472,24 @@ SPLASH.forEach(([k,N,c,fx])=>item('splash_'+k,{name:'Splash Potion of '+N,type:'
 const EFFECT_NAMES={regen:'Regeneration',speed:'Speed',strength:'Strength',fireres:'Fire Resistance',invis:'Invisibility',absorption:'Absorption',poison:'Poison',slowness:'Slowness',weakness:'Weakness'};
 const EFFECT_COL={regen:'#cd5cab',speed:'#7cafc6',strength:'#932423',fireres:'#e49a3a',invis:'#7f8392',absorption:'#2552a5',poison:'#4e9331',slowness:'#5a6c81',weakness:'#484d48'};
 for(const id in BLOCK_NAMES)item('b'+id,{name:BLOCK_NAMES[id],type:'block',block:+id,stack:64,color:BLOCK_COL[id]});
+
+// ---------- enchanted items ----------
+// Every enchanted version is its own item id (base id + '_e_' + enchants, e.g. iron_sword_e_sharpness2). That way chests, drops, armour slots,
+// death loot and online sync all carry it with no extra data. ITEMS[id].ench = {enchantment: level}, ITEMS[id].base = the plain item.
+const ENCH_NAMES={sharpness:'Sharpness',knockback:'Knockback',fire_aspect:'Fire Aspect',protection:'Protection',power:'Power',punch:'Punch',flame:'Flame',infinity:'Infinity'};
+const ROMAN=['','I','II','III','IV'];
+const ENCH_PRESETS={
+  melee:[[['sharpness',1]],[['sharpness',2]],[['sharpness',3]],[['knockback',1]],[['knockback',2]],[['fire_aspect',1]],[['sharpness',3],['fire_aspect',1]]],
+  bow:[[['power',1]],[['power',2]],[['power',3]],[['punch',1]],[['punch',2]],[['flame',1]],[['infinity',1]],[['power',3],['flame',1]]],
+  armor:[[['protection',1]],[['protection',2]],[['protection',3]]]};
+const enchKey=p=>p.map(([k,l])=>k+l).join('_');
+const enchId=(base,key)=>base+'_e_'+key;
+for(const k of Object.keys(ITEMS)){const it=ITEMS[k];
+  const set=it.type==='weapon'&&(it.tool==='sword'||it.tool==='axe')?ENCH_PRESETS.melee:it.type==='bow'?ENCH_PRESETS.bow:it.type==='armor'?ENCH_PRESETS.armor:null;
+  if(set)for(const p of set)ITEMS[enchId(k,enchKey(p))]=Object.assign({},it,{base:k,ench:Object.fromEntries(p)});}
+const enchLvl=(id,k)=>{const it=id&&ITEMS[id];return(it&&it.ench&&it.ench[k])||0;};
+const enchScore=id=>{const it=id&&ITEMS[id];return it&&it.ench?Object.values(it.ench).reduce((a,b)=>a+b,0):0;};
+const itemTipLines=id=>Object.entries((ITEMS[id]&&ITEMS[id].ench)||{}).map(([k,l])=>ENCH_NAMES[k]+(k==='flame'||k==='infinity'?'':' '+ROMAN[l]));
 const MINE_T={1:.6,2:.5,3:2.2,4:1.4,5:.25,6:1.4,7:.5,9:2.6,10:2.6,11:.4,12:.9,13:.6,14:2.6,17:.6,18:2,19:1.2,20:2.4,21:2.4,22:2.4};
 const MINE_DROP={1:'b2',2:'b2',3:'b9',4:'b4',5:null,6:'b6',7:'b7',9:'b9',10:'b10',11:null,12:'b12',13:'b13',14:'b14',17:'b17',18:'b18',19:'b19',20:'b20',21:'b21',22:'b22'};
 
@@ -507,8 +526,12 @@ function procIcon(id){
     else{R(4,14,8,12,c2);R(4,22,11,6,c2);R(19,14,8,12,c2);R(19,22,11,6,c2);R(5,15,6,10,c1);R(20,15,6,10,c1);}}
   return c;
 }
-const ICONS={};
-function rebuildIcons(){for(const k in ITEMS)ICONS[k]=(PACK.icons&&PACK.icons[k])||procIcon(k);}
+const ICONS={},ICON_RAW={};
+// enchanted icons get a purple sheen baked in (ICON_RAW keeps the plain art for the 3D item models, which get an animated glint in the shader instead)
+function glintIcon(raw){const w=raw.width||32,h=raw.height||32,c=mkCanvas(w,h),g=c.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(raw,0,0,w,h);
+  g.globalCompositeOperation='source-atop';g.fillStyle='rgba(110,50,210,.22)';g.fillRect(0,0,w,h);g.strokeStyle='rgba(185,120,255,.55)';g.lineWidth=Math.max(2,w*.1);
+  for(let i=-h;i<w+h;i+=Math.max(5,w*.4)){g.beginPath();g.moveTo(i,h);g.lineTo(i+h,0);g.stroke();}return c;}
+function rebuildIcons(){for(const k in ITEMS){const it=ITEMS[k],b=it.base||k;const raw=(PACK.icons&&(PACK.icons[k]||PACK.icons[b]))||procIcon(b);ICON_RAW[k]=raw;ICONS[k]=it.ench?glintIcon(raw):raw;}}
 
 // ---------- loot ----------
 const LOOT_EDGE=[['wood_sword',7],['stone_sword',5],['iron_sword',1.4],['golden_sword',2],['wood_axe',5],['stone_axe',4],['iron_axe',1.5],['stone_pickaxe',3],['iron_pickaxe',1.2],
@@ -519,9 +542,18 @@ const LOOT_EDGE=[['wood_sword',7],['stone_sword',5],['iron_sword',1.4],['golden_
 const LOOT_CENTER=[['stone_sword',5],['iron_sword',5],['diamond_sword',1.5],['iron_axe',4],['diamond_axe',1.5],['bow',5],['arrow',8,6,16],['golden_apple',2.5],['cooked_beef',5,2,4],['bread',4,2,4],
  ['chainmail_chestplate',3],['chainmail_leggings',3],['iron_helmet',3],['iron_chestplate',2],['iron_leggings',2],['iron_boots',3],['diamond_helmet',.8],['diamond_chestplate',.5],['diamond_leggings',.6],['diamond_boots',.8],
  ['potion_healing',2],['potion_strength',1.5],['potion_regeneration',1.5],['potion_invisibility',.8],['splash_harming',1.5],['splash_poison',1.2]];
+// enchanted finds: rare at the edges, common enough in the centre chests to be worth the run (turn off with the Enchanted Loot rule)
+const E_=(b,k)=>enchId(b,k);
+const ENCH_LOOT_EDGE=[[E_('wood_sword','sharpness1'),1.2],[E_('stone_sword','sharpness1'),1],[E_('stone_sword','knockback1'),.6],[E_('iron_sword','sharpness1'),.5],[E_('golden_sword','sharpness2'),.5],
+  [E_('bow','power1'),.8],[E_('bow','punch1'),.5],[E_('bow','flame1'),.15],[E_('leather_chestplate','protection1'),.6],[E_('leather_boots','protection2'),.5],[E_('chainmail_chestplate','protection1'),.4],
+  [E_('iron_helmet','protection1'),.3],[E_('iron_boots','protection1'),.3]].filter(e=>ITEMS[e[0]]);
+const ENCH_LOOT_CENTER=[[E_('iron_sword','sharpness2'),1.5],[E_('iron_sword','knockback1'),1],[E_('iron_sword','fire_aspect1'),.8],[E_('diamond_sword','sharpness1'),.8],[E_('diamond_sword','sharpness2'),.4],[E_('iron_axe','sharpness2'),.8],
+  [E_('bow','power2'),1.2],[E_('bow','power3'),.5],[E_('bow','flame1'),.6],[E_('bow','infinity1'),.3],[E_('bow','punch2'),.5],[E_('iron_chestplate','protection2'),.7],[E_('iron_helmet','protection2'),.8],
+  [E_('iron_leggings','protection2'),.7],[E_('iron_boots','protection2'),.8],[E_('diamond_chestplate','protection1'),.3],[E_('diamond_helmet','protection1'),.3],[E_('diamond_leggings','protection1'),.3],
+  [E_('diamond_boots','protection2'),.3],[E_('chainmail_chestplate','protection2'),.6]].filter(e=>ITEMS[e[0]]);
 const CHEST_SLOTS=27;
 function rollLoot(center){
-  const T=center?LOOT_CENTER:LOOT_EDGE,tot=T.reduce((s,e)=>s+e[1],0);const items=new Array(CHEST_SLOTS).fill(null);
+  const T=(center?LOOT_CENTER:LOOT_EDGE).concat(SET.enchants===false?[]:center?ENCH_LOOT_CENTER:ENCH_LOOT_EDGE),tot=T.reduce((s,e)=>s+e[1],0);const items=new Array(CHEST_SLOTS).fill(null);
   const n=(center?4:3)+(Math.random()*3|0);
   for(let i=0;i<n;i++){let r=Math.random()*tot,e=T[0];for(const t of T){r-=t[1];if(r<=0){e=t;break;}}
     const cnt=e[2]?e[2]+(Math.random()*(e[3]-e[2]+1)|0):1;let s;do{s=Math.random()*CHEST_SLOTS|0;}while(items[s]);items[s]={id:e[0],count:cnt};}
@@ -529,7 +561,7 @@ function rollLoot(center){
 }
 function rollEaster(){ // MCBR easter.json
   const items=new Array(CHEST_SLOTS).fill(null);const put=it=>{let s;do{s=Math.random()*CHEST_SLOTS|0;}while(items[s]);items[s]=it;};
-  const r=Math.random()*6;put({id:r<3?'iron_sword':r<5?'golden_sword':'diamond_sword',count:1});
+  const r=Math.random()*6;let sid=r<3?'iron_sword':r<5?'golden_sword':'diamond_sword';if(SET.enchants!==false&&Math.random()<.5)sid=enchId(sid,Math.random()<.5?'sharpness2':'knockback1');put({id:sid,count:1});
   put({id:'arrow',count:4+(Math.random()*13|0)});if(Math.random()<.4)put({id:'bow',count:1});return items;
 }
 
@@ -1037,8 +1069,8 @@ void main(){float f=clamp((vd-fogN)/(fogF-fogN),0.,1.);vec3 c=col.rgb*mix(1.,l,l
 // textured meshes: skins, armor, bats, extruded items
 const PT=prog(`attribute vec3 p;attribute vec3 n;attribute vec2 t;uniform mat4 vp;uniform mat4 m;uniform vec3 cam;varying vec2 vt;varying float l;varying float vd;
 void main(){vec4 w=m*vec4(p,1.);gl_Position=vp*w;vec3 nn=normalize((m*vec4(n,0.)).xyz);l=.55+.45*max(dot(nn,normalize(vec3(.4,1.,.3))),0.)+.1*nn.y;vd=length(w.xyz-cam);vt=t;}`,
-`precision mediump float;uniform sampler2D tex;uniform vec4 tint;uniform float hurt;uniform float bright;${FOG_GLSL}varying vec2 vt;varying float l;varying float vd;
-void main(){vec4 c=texture2D(tex,vt);if(c.a<.1)discard;c*=tint;vec3 rgb=mix(c.rgb*l*bright,vec3(1.,.15,.1),hurt*.55);float f=clamp((vd-fogN)/(fogF-fogN),0.,1.);gl_FragColor=vec4(mix(rgb,fogC,f),c.a);}`);
+`precision mediump float;uniform sampler2D tex;uniform vec4 tint;uniform float hurt;uniform float bright;uniform float glint;uniform float gph;uniform vec2 gs;${FOG_GLSL}varying vec2 vt;varying float l;varying float vd;
+void main(){vec4 c=texture2D(tex,vt);if(c.a<.1)discard;c*=tint;if(glint>0.){float k=(vt.x*gs.x+vt.y*gs.y)*1.5+gph;float s=.5+.5*sin(k*6.2831);s=s*s*s;c.rgb+=vec3(.45,.22,.9)*glint*(.18+.85*s);}vec3 rgb=mix(c.rgb*l*bright,vec3(1.,.15,.1),hurt*.55);float f=clamp((vd-fogN)/(fogF-fogN),0.,1.);gl_FragColor=vec4(mix(rgb,fogC,f),c.a);}`);
 const PS=prog(`attribute vec3 p;uniform mat4 vp;varying vec3 d;void main(){d=p;vec4 q=vp*vec4(p,1.);gl_Position=q.xyww;}`,
 `precision mediump float;uniform sampler2D tex;varying vec3 d;uniform float face;void main(){gl_FragColor=texture2D(tex,vec2(0.,0.));}`);
 function mkTex(src,repeat){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
@@ -1158,10 +1190,10 @@ function makeChestModel(){const P={};const A=(name,fn)=>{const o=[];fn(o);P[name
 const MODELS={wide:makePlayerModel(false),slim:makePlayerModel(true),armor:makeArmorModel(),bat:makeBatModel(),chest:makeChestModel()};
 
 // ---- extruded item meshes (like held items in Minecraft) built from 32x32 icons, stored in an item atlas ----
-const ITEM_CELL=32,ITEM_COLS=16;let itemAtlas=mkCanvas(ITEM_CELL*ITEM_COLS,ITEM_CELL*ITEM_COLS),itemTex=null,itemMesh={},itemSlot={};
+const ITEM_CELL=32,ITEM_COLS=16,ITEM_ROWS=32;let itemAtlas=mkCanvas(ITEM_CELL*ITEM_COLS,ITEM_CELL*ITEM_ROWS),itemTex=null,itemMesh={},itemSlot={};
 function rebuildItemAtlas(){
   const g=itemAtlas.getContext('2d');g.clearRect(0,0,itemAtlas.width,itemAtlas.height);g.imageSmoothingEnabled=false;let i=0;itemSlot={};
-  for(const k in ITEMS){const cx=(i%ITEM_COLS)*ITEM_CELL,cy=Math.floor(i/ITEM_COLS)*ITEM_CELL;g.drawImage(ICONS[k],cx,cy,ITEM_CELL,ITEM_CELL);itemSlot[k]=[cx,cy];i++;}
+  for(const k in ITEMS){const cx=(i%ITEM_COLS)*ITEM_CELL,cy=Math.floor(i/ITEM_COLS)*ITEM_CELL;g.drawImage(ICON_RAW[k]||ICONS[k],cx,cy,ITEM_CELL,ITEM_CELL);itemSlot[k]=[cx,cy];i++;}
   if(itemTex)gl.deleteTexture(itemTex);itemTex=mkTex(itemAtlas);for(const k in itemMesh)gl.deleteBuffer(itemMesh[k].buf);itemMesh={};
 }
 // block items render as little 3D blocks (their real shape), everything else as extruded sprites
@@ -1200,7 +1232,11 @@ function useBox(vp,cam){gl.useProgram(PB.p);gl.bindBuffer(gl.ARRAY_BUFFER,cubeBu
   gl.uniformMatrix4fv(PB.u.vp,false,vp);gl.uniform3fv(PB.u.cam,cam);gl.uniform3fv(PB.u.fogC,curFog.c);gl.uniform1f(PB.u.fogN,curFog.n);gl.uniform1f(PB.u.fogF,curFog.f);gl.uniform1f(PB.u.lit,1);}
 function box(m,col,a=1){gl.uniformMatrix4fv(PB.u.m,false,m);gl.uniform4f(PB.u.col,col[0],col[1],col[2],a);gl.drawArrays(gl.TRIANGLES,0,36);}
 function useTex(vp,cam){gl.useProgram(PT.p);gl.uniformMatrix4fv(PT.u.vp,false,vp);gl.uniform3fv(PT.u.cam,cam);gl.uniform3fv(PT.u.fogC,curFog.c);gl.uniform1f(PT.u.fogN,curFog.n);gl.uniform1f(PT.u.fogF,curFog.f);
-  gl.uniform4f(PT.u.tint,1,1,1,1);gl.uniform1f(PT.u.hurt,0);gl.uniform1f(PT.u.bright,1);gl.activeTexture(gl.TEXTURE0);gl.uniform1i(PT.u.tex,0);}
+  gl.uniform4f(PT.u.tint,1,1,1,1);gl.uniform1f(PT.u.hurt,0);gl.uniform1f(PT.u.bright,1);gl.uniform1f(PT.u.glint,0);gl.activeTexture(gl.TEXTURE0);gl.uniform1i(PT.u.tex,0);}
+// enchantment glint: a drifting purple shimmer added in the entity shader (gs = how many texture 'cells' span the UV range, so the bands suit the item/armour size)
+const ITEM_GS=[ITEM_COLS,ITEM_ROWS],ARMOR_GS=[4,4];
+function glintOn(gs){gl.uniform1f(PT.u.glint,1);gl.uniform2f(PT.u.gs,gs[0],gs[1]);gl.uniform1f(PT.u.gph,(perfT*.7)%1);}
+function glintOff(){gl.uniform1f(PT.u.glint,0);}
 function drawMesh(mesh,m,tex){gl.bindTexture(gl.TEXTURE_2D,tex);gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buf);
   gl.enableVertexAttribArray(PT.a.p);gl.vertexAttribPointer(PT.a.p,3,gl.FLOAT,false,32,0);gl.enableVertexAttribArray(PT.a.n);gl.vertexAttribPointer(PT.a.n,3,gl.FLOAT,false,32,12);
   gl.enableVertexAttribArray(PT.a.t);gl.vertexAttribPointer(PT.a.t,2,gl.FLOAT,false,32,24);gl.uniformMatrix4fv(PT.u.m,false,m);gl.drawArrays(gl.TRIANGLES,0,mesh.count);}
@@ -1394,21 +1430,23 @@ const entBox=(e,p=.1)=>[[e.pos[0]-HW-p,e.pos[1]-p,e.pos[2]-HW-p],[e.pos[0]+HW+p,
 
 // ---------- inventory ----------
 const armorPts=e=>e.armor.reduce((s,a)=>s+(a?ITEMS[a].pts:0),0);
+const enchProt=e=>e.armor.reduce((s,a)=>s+enchLvl(a,'protection'),0);
 function addItem(e,id,count){
   const it=ITEMS[id];if(!it)return 0;
-  if(it.type==='armor'){const cur=e.armor[it.slot];if(!cur||ITEMS[cur].pts<it.pts){e.armor[it.slot]=id;if(cur)addItem(e,cur,1);return 0;}} // auto-equip from chests
+  if(it.type==='armor'){const cur=e.armor[it.slot];if(!cur||ITEMS[cur].pts<it.pts||(ITEMS[cur].pts===it.pts&&enchScore(id)>enchScore(cur))){e.armor[it.slot]=id;if(cur)addItem(e,cur,1);return 0;}} // auto-equip from chests
   if(it.stack>1)for(const s of e.inv){if(s&&s.id===id&&s.count<it.stack){const m=Math.min(count,it.stack-s.count);s.count+=m;count-=m;if(!count)return 0;}}
   for(let i=0;i<9;i++)if(!e.inv[i]){const m=Math.min(count,it.stack);e.inv[i]={id,count:m};count-=m;if(!count)return 0;}
   return count;
 }
 const hasItem=(e,id)=>e.inv.findIndex(s=>s&&s.id===id);
 function consume(e,i){const s=e.inv[i];if(!s)return;s.count--;if(s.count<=0)e.inv[i]=null;}
-function weaponDmg(e){const s=e.inv[e.sel];let d=s&&ITEMS[s.id].type==='weapon'?ITEMS[s.id].dmg:1;const st=e.effects.strength,wk=e.effects.weakness;if(wk)d-=.5*(wk.amp+1);if(st)d*=1+1.3*(st.amp+1);return Math.max(0,d);}
+function weaponDmg(e){const s=e.inv[e.sel];let d=s&&ITEMS[s.id].type==='weapon'?ITEMS[s.id].dmg:1;const st=e.effects.strength,wk=e.effects.weakness;if(wk)d-=.5*(wk.amp+1);if(st)d*=1+1.3*(st.amp+1);if(s&&ITEMS[s.id].type==='weapon')d+=1.25*enchLvl(s.id,'sharpness');return Math.max(0,d);}
 
 // ---------- effects ----------
 function giveEffect(e,name,dur,amp){
   if(name==='heal'){e.health=Math.min(maxHP(e),e.health+(4<<amp));return;}
   if(name==='harm'){hurt(e,6<<amp,null,'magic',null,true,true);return;}
+  if(name==='ignite'){if(!e.effects.fireres&&!e.inWater)e.fire=Math.max(e.fire||0,dur);return;}   // Fire Aspect / Flame
   const cur=e.effects[name];if(cur&&cur.amp>amp&&cur.t>dur)return;e.effects[name]={t:dur,amp,tick:0};
   if(name==='absorption')e.absorb=Math.max(e.absorb,4*(amp+1));if(name==='fireres')e.fire=0;
 }
@@ -1440,7 +1478,7 @@ function hurt(e,amt,src,cause,kb,raw,ignoreInvuln){
   if(e.invuln>0&&!ignoreInvuln){if(amt<=(e.lastDmg||0))return false;const d=amt-(e.lastDmg||0);e.lastDmg=amt;amt=d;fresh=false;} // EntityLivingBase.attackEntityFrom
   else{e.lastDmg=amt;e.invuln=.5;e.hurtT=.5;}
   if(!raw&&e.using==='block'&&src)amt=(1+amt)*.5;                       // sword blocking
-  if(!raw)amt*=1-Math.min(20,armorPts(e))*.04;                            // armour: 4% per point
+  if(!raw){amt*=1-Math.min(20,armorPts(e))*.04;const ep=enchProt(e);if(ep)amt*=1-Math.min(20,ep)*.04;}                            // armour: 4% per point
   if(e.absorb>0){const a2=Math.min(e.absorb,amt);e.absorb-=a2;amt-=a2;}
   e.health-=amt;e.lastHurt=0;exhaust(e,.3);
   if(src&&src!==e){e.lastAttacker=src;e.lastAttackT=0;creditDamage(src,amt);}
@@ -1498,17 +1536,17 @@ function doAttack(e,target){
   if(e.atkCD>0)return;e.atkCD=e.isLocal?0:.12;e.swing=1;
   const t=target!==undefined?target:meleeTarget(e,3);if(!t)return;exhaust(e,.3);
   let dmg=weaponDmg(e);const crit=(e.fallDist||0)>0&&!e.onGround&&!onLadder(e)&&!e.inWater;if(crit){dmg*=1.5;spawnParticles(t.pos[0],t.pos[1]+1.2,t.pos[2],14,[1,1,1],4,'crit');}
-  const extra=e.sprint?1:0;if(e.sprint){e.sprint=false;if(e.mot){e.mot[0]*=.6;e.mot[2]*=.6;}}
+  const held=e.inv[e.sel],hid=held&&held.id;const extra=(e.sprint?1:0)+enchLvl(hid,'knockback'),fa=enchLvl(hid,'fire_aspect');if(e.sprint){e.sprint=false;if(e.mot){e.mot[0]*=.6;e.mot[2]*=.6;}}
   if(e.effects.invis)delete e.effects.invis;
-  damage(t,dmg,e,'melee',[t.pos[0]-e.pos[0],t.pos[2]-e.pos[2],extra,-Math.sin(e.yaw),-Math.cos(e.yaw)]);
+  damage(t,dmg,e,'melee',[t.pos[0]-e.pos[0],t.pos[2]-e.pos[2],extra,-Math.sin(e.yaw),-Math.cos(e.yaw)],false,fa?[['ignite',4*fa,0]]:undefined);
 }
 
 // ---------- projectiles (arrows, splash potions) ----------
 function spawnProj(kind,pos,vel,owner,dmg,pot,net=true){projs.push({kind,pos,vel,owner,dmg,pot,age:0,stuck:false});if(net&&owner&&owned(owner))netSend(N.PROJ,{k:kind,p:pos,v:vel,o:owner.id,d:dmg,pot});}
 const bowCharge=sec=>{const t=sec;return Math.min(1,(t*t+2*t)/3);};
-function fireBow(e,f){if(f<.1)return;const ai=hasItem(e,'arrow');if(ai<0)return;consume(e,ai);const d=fwd(e),o=eye(e);const g=()=>(Math.random()+Math.random()+Math.random()-1.5)*.0075*1.2;
+function fireBow(e,f){if(f<.1)return;const ai=hasItem(e,'arrow');if(ai<0)return;const bs=e.inv[e.sel],inf=enchLvl(bs&&bs.id,'infinity');if(!inf)consume(e,ai);const d=fwd(e),o=eye(e);const g=()=>(Math.random()+Math.random()+Math.random()-1.5)*.0075*1.2;
   const v=[d[0]+g(),d[1]+g(),d[2]+g()];const L=Math.hypot(...v);const sp=f*3;
-  spawnProj('arrow',[o[0]-Math.cos(e.yaw)*.16,o[1]-.1,o[2]+Math.sin(e.yaw)*.16],[v[0]/L*sp,v[1]/L*sp,v[2]/L*sp],e,f>=1?1:0);sfx('bow',{pos:e.pos});}
+  spawnProj('arrow',[o[0]-Math.cos(e.yaw)*.16,o[1]-.1,o[2]+Math.sin(e.yaw)*.16],[v[0]/L*sp,v[1]/L*sp,v[2]/L*sp],e,f>=1?1:0);{const pr=projs[projs.length-1],bi=bs&&ITEMS[bs.id];if(bi&&bi.ench)pr.en=bi.ench;if(inf)pr.noPick=true;}sfx('bow',{pos:e.pos});}
 function throwSplash(e,id){const p=e.pitch+20*Math.PI/180;const d=[-Math.sin(e.yaw)*Math.cos(p),Math.sin(p),-Math.cos(e.yaw)*Math.cos(p)],o=eye(e),sp=.5;spawnProj('splash',[o[0],o[1]-.1,o[2]],[d[0]*sp,d[1]*sp,d[2]*sp],e,0,id);sfx('bow',{pos:e.pos});}
 function splashImpact(p){
   const it=ITEMS[p.pot];spawnParticles(p.pos[0],p.pos[1],p.pos[2],30,hexRGB(it.color),4);sfx('glass',{pos:p.pos});
@@ -1520,8 +1558,8 @@ function splashImpact(p){
 }
 function updateProjs(dt){
   for(const a of projs){a.age+=dt;
-    if(a.stuck){if(a.kind==='arrow'&&a.age>.5)for(const e of ents){if(!e.alive||!owned(e))continue;if(dist([e.pos[0],e.pos[1]+.9,e.pos[2]],a.pos)<1.4&&invRoom(e,'arrow')){addItem(e,'arrow',1);a.dead=true;if(e===player)sfx('pick');break;}}continue;}
-    a.tacc=(a.tacc||0)+dt;
+    if(a.stuck){if(a.kind==='arrow'&&a.age>.5&&!a.noPick)for(const e of ents){if(!e.alive||!owned(e))continue;if(dist([e.pos[0],e.pos[1]+.9,e.pos[2]],a.pos)<1.4&&invRoom(e,'arrow')){addItem(e,'arrow',1);a.dead=true;if(e===player)sfx('pick');break;}}continue;}
+    a.tacc=(a.tacc||0)+dt;if(a.en&&a.en.flame&&a.kind==='arrow'&&Math.random()<.6)spawnParticles(a.pos[0],a.pos[1],a.pos[2],1,[1,.5,.1],.5);
     while(a.tacc>=TICK&&!a.dead&&!a.stuck){a.tacc-=TICK;
       const sp=Math.hypot(...a.vel);const n=Math.max(1,Math.ceil(sp/.25));
       for(let i=0;i<n&&!a.dead;i++){
@@ -1531,8 +1569,8 @@ function updateProjs(dt){
         for(const e of ents){if(!e.alive||(e===a.owner&&a.age<.25))continue;const bb=entBox(e,.15);
           if(a.pos[0]>bb[0][0]&&a.pos[0]<bb[1][0]&&a.pos[1]>bb[0][1]&&a.pos[1]<bb[1][1]&&a.pos[2]>bb[0][2]&&a.pos[2]<bb[1][2]){
             if(a.kind==='splash')splashImpact(a);
-            else if(owned(a.owner)){let dmg=Math.ceil(sp*2);if(a.dmg)dmg+=Math.floor(Math.random()*(dmg/2+2));
-              const src=a.owner;damage(e,dmg,src,'shot',[a.vel[0],a.vel[2],0,0,0]);sfx('arrowhit',{pos:a.pos});}
+            else if(owned(a.owner)){let dmg=Math.ceil(sp*2);if(a.dmg)dmg+=Math.floor(Math.random()*(dmg/2+2));const en=a.en||{};if(en.power)dmg+=en.power*.5+.5;
+              const src=a.owner;damage(e,dmg,src,'shot',[a.vel[0],a.vel[2],en.punch||0,0,0],false,en.flame?[['ignite',5,0]]:undefined);sfx('arrowhit',{pos:a.pos});}
             a.dead=true;break;}}
       }
       if(a.dead||a.stuck)break;
@@ -1754,7 +1792,7 @@ class RelayNet extends MeshNet{constructor(room,name,typed){const tr=mqttTranspo
 
 // ================= match flow: settings, start/end, lobby hub, phases, chests, MCBR timeline, net handlers =================
 const SET={mode:'battle',roundLen:600,hunger:1,refill:120,grace:15,showdown:true,takeAll:true,central:true,bots:5,difficulty:1,
-  maps:{cavern:true,cove:true,crucible:true,skyhold:true},brLen:.2,brExtra:true,lobbyWait:45};
+  maps:{cavern:true,cove:true,crucible:true,skyhold:true},brLen:.2,brExtra:true,enchants:true,lobbyWait:45};
 const MATCH={state:'menu',mode:'battle',map:null,seed:0,gameT:0,showdown:false,refillAt:0,mapIdx:0,lobbyCD:-1,winner:null,phaseT:0,graceAnn:false,edits:[],nextMap:null};
 let suddenDeath=false,br=null,myName='Player',mySkin='gen:Player',online=false;
 const inGrace=()=>MATCH.mode==='battle'&&SET.grace>0&&MATCH.gameT<SET.grace;
@@ -1920,9 +1958,9 @@ function onNetEvent(code,d,from){
   case N.SKIN:onSkinNet(d);break;
   case N.STATE:{if(!d||!d.id)return;let e=entById(d.id);
     if(!e){if(MATCH.state==='menu')return;e=new Ent(d.id,d.n,'player');e.skin=d.sk||'gen:'+d.n;e.color=ents.length;ents.push(e);e.pos=d.p.slice();if(MATCH.state==='play'&&!d.al){e.alive=false;e.bat=true;e.spectator=!!d.sp;}}
-    if(e.isLocal)return;pushSnap(e,d.p,d.v,d.y,d.pi,d.ts,d.g);e.name=String(d.n||e.name).slice(0,16);if(d.sk)e.skin=d.sk;
+    if(e.isLocal)return;const hp0=e.health;pushSnap(e,d.p,d.v,d.y,d.pi,d.ts,d.g);e.name=String(d.n||e.name).slice(0,16);if(d.sk)e.skin=d.sk;
     e.inv=new Array(9).fill(null);e.sel=0;if(d.h)e.inv[0]={id:d.h,count:1};e.armor=d.a||[null,null,null,null];e.health=d.hp;e.food=d.f;if(d.sw)e.swing=Math.max(e.swing,d.sw);e.using=d.u||null;e.useT=d.ut||0;
-    e.fire=d.fi||0;if(d.hp<e.health-.4)sfx('hurt',{pos:e.pos});e.effects=d.ef?Object.fromEntries(d.ef.map(n=>[n,{t:9,amp:0,tick:0}])):{};e.sprint=!!d.sr;e.sneak=!!d.sn;e.openChest=d.oc||null;e.ready=!!d.r;e.bat=!!d.b;
+    e.fire=d.fi||0;if(d.hp<hp0-.4){e.hurtT=.5;sfx('hurt',{pos:e.pos});}e.effects=d.ef?Object.fromEntries(d.ef.map(n=>[n,{t:9,amp:0,tick:0}])):{};e.sprint=!!d.sr;e.sneak=!!d.sn;e.openChest=d.oc||null;e.ready=!!d.r;e.bat=!!d.b;
     if(MATCH.state==='lobby'){e.alive=true;e.bat=false;}
     break;}
   case N.HIT:{const t=entById(d.t);if(!t||!owned(t))return;const a=d.a?entById(d.a):null;const ok=hurt(t,d.d,a,d.c,d.kb,!!d.r);if(d.fx&&(ok||d.d===0))for(const f of d.fx)giveEffect(t,...f);break;}
@@ -1937,7 +1975,7 @@ function onNetEvent(code,d,from){
   case N.DROPREQ:if(isHost())hostSpawnDrop(d.p,d.id,d.c,d.v);break;
   case N.PICK:{if(!isHost())return;const x=drops.find(x=>x.did===d.did&&!x.dead);if(!x)return;x.dead=true;netSend(N.DROPDEL,{did:x.did});netSend(N.GIVE,{to:'p'+from,items:[{id:x.id,count:x.count}]},from);break;}
   case N.PROJ:{const o=entById(d.o);spawnProj(d.k,d.p,d.v,o,d.d,d.pot,false);break;}
-  case N.BOTS:for(const b of d){const e=entById(b[0]);if(!e)continue;pushSnap(e,[b[1],b[2],b[3]],[b[4],b[5],b[6]],b[7],b[8],b[17]);e.health=b[9];
+  case N.BOTS:for(const b of d){const e=entById(b[0]);if(!e)continue;pushSnap(e,[b[1],b[2],b[3]],[b[4],b[5],b[6]],b[7],b[8],b[17]);if(b[9]<e.health-.4){e.hurtT=.5;sfx('hurt',{pos:e.pos});}e.health=b[9];
       e.inv=new Array(9).fill(null);e.sel=0;if(b[10])e.inv[0]={id:b[10],count:1};e.armor=b[11];e.using=b[12];e.useT=b[13];if(b[14])e.swing=Math.max(e.swing,b[14]);e.fire=b[15];e.effects=b[16]?{invis:{t:9,amp:0}}:{};}break;
   case N.PHASE:if(!fromHost)return;if(d.pre!=null&&Math.abs((MATCH.preT||0)-d.pre)>.5)MATCH.preT=d.pre;if(Math.abs(MATCH.gameT-d.t)>.5)MATCH.gameT=d.t;MATCH.showdown=d.sd;MATCH.refillAt=d.r;suddenDeath=d.bs;break;
   case N.BR:if(!br)return;br.T=d.T;br.ev=d.ev;br.border=d.border;br.lastCx=d.lastCx;br.lastCz=d.lastCz;break;
@@ -1985,7 +2023,7 @@ function lerpAng(a,b,f){let d=b-a;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)
 function pushSnap(e,p,v,yaw,pitch,ts,g){
   const now=performance.now();let n=e.net;if(!n||!n.buf)n=e.net={buf:[],off:null,iv:100};
   let t=now;
-  if(typeof ts==='number'){const s=now-ts;if(n.off==null||s<n.off)n.off=s;else n.off+=(s-n.off)*.02;t=ts+n.off;}   // sender clock -> our clock (tracks the fastest packets)
+  if(typeof ts==='number'){const s=now-ts;if(n.off==null||s<n.off)n.off=s;else n.off+=(s-n.off)*.02;t=ts+n.off;n.pk=Math.max(s-n.off,(n.pk||0)*.99);}   // sender clock -> our clock (tracks the fastest packets)
   const b=n.buf,last=b[b.length-1];
   if(last){if(t<=last.t){if(typeof ts==='number')return;t=last.t+1;}const gap=t-last.t;if(gap<400)n.iv+=(gap-n.iv)*.1;
     if(Math.hypot(p[0]-last.p[0],p[1]-last.p[1],p[2]-last.p[2])>6){b.length=0;n.snap=true;}}   // teleport / respawn: don't glide across the map
@@ -1993,16 +2031,17 @@ function pushSnap(e,p,v,yaw,pitch,ts,g){
 }
 function interpRemote(e,dt){
   const n=e.net;if(!n||!n.buf||!n.buf.length)return;const b=n.buf,first=b[0],last=b[b.length-1];
-  const rt=performance.now()-Math.max(90,n.iv+60);
+  const rt=performance.now()-Math.min(300,Math.max(90,n.iv+(n.pk||0)+20));
   let p,v,yaw,pitch,g;
   if(b.length===1||rt<=first.t){p=first.p;v=first.v;yaw=first.y;pitch=first.pi;g=first.g;}
   else if(rt>=last.t){   // ran out of snapshots: coast briefly. Grounded players report a small downward speed from gravity, so only coast vertically while airborne
     const ex=Math.min(.15,(rt-last.t)/1000);const air=last.g===0||(last.g===undefined&&Math.abs(last.v[1])>2);
-    p=[last.p[0]+last.v[0]*ex,last.p[1]+(air?last.v[1]*ex:0),last.p[2]+last.v[2]*ex];v=last.v;yaw=last.y;pitch=last.pi;g=last.g;}
+    p=[last.p[0]+last.v[0]*ex,last.p[1]+(air&&last.v[1]>0?last.v[1]*Math.min(ex,.05):0),last.p[2]+last.v[2]*ex];v=last.v;yaw=last.y;pitch=last.pi;g=last.g;}
   else{let i=b.length-2;while(i>0&&b[i].t>rt)i--;const a=b[i],c=b[i+1],f=Math.max(0,Math.min(1,(rt-a.t)/(c.t-a.t)));
     p=[a.p[0]+(c.p[0]-a.p[0])*f,a.p[1]+(c.p[1]-a.p[1])*f,a.p[2]+(c.p[2]-a.p[2])*f];v=[a.v[0]+(c.v[0]-a.v[0])*f,a.v[1]+(c.v[1]-a.v[1])*f,a.v[2]+(c.v[2]-a.v[2])*f];
     yaw=lerpAng(a.y,c.y,f);pitch=a.pi+(c.pi-a.pi)*f;g=c.g;}
   if(n.snap||dist(p,e.pos)>6){n.snap=false;e.pos=p.slice();}else{const k=Math.min(1,dt*30);for(let i=0;i<3;i++)e.pos[i]+=(p[i]-e.pos[i])*k;}
+  if(e.alive!==false){const fb=[e.pos[0]-HW+.05,e.pos[1]+.03,e.pos[2]-HW+.05,e.pos[0]+HW-.05,e.pos[1]+.35,e.pos[2]+HW-.05];let top=-1e9;for(const c of collisionBoxes(fb))if(c[4]-e.pos[1]<=.6)top=Math.max(top,c[4]);if(top>e.pos[1])e.pos[1]=top;}
   e.vel=v.slice();e.yaw=yaw;e.pitch=pitch;if(e.onGround!==false)e.walkT+=dt*Math.hypot(e.vel[0],e.vel[2]);
   e.onGround=g!==undefined?!!g:Math.abs(v[1])<2;e.rpos=e.pos;}
 
@@ -2221,7 +2260,7 @@ function render(){
     drawMesh(M.base,base,CHEST_TEX);const lm=chain(base,M4.tr(0,9/16,7/16),M4.rx(f*Math.PI/2));drawMesh(M.lid,lm,CHEST_TEX);drawMesh(M.knob,lm,CHEST_TEX);}
   drawShadows();useTex(VP,camPos);
   // dropped items and projectiles
-  for(const d of drops){const hm=heldMesh(d.id);const sc=hm.block?.25:.5;const m=chain(M4.tr(d.pos[0],d.pos[1]+Math.sin(d.spin*1.5)*.1+.1+sc/2,d.pos[2]),M4.ry(d.spin),M4.sc(sc,sc,sc));setEntLight(d.pos);drawMesh(hm.mesh,m,hm.tex);}
+  for(const d of drops){const hm=heldMesh(d.id);const sc=hm.block?.25:.5;const m=chain(M4.tr(d.pos[0],d.pos[1]+Math.sin(d.spin*1.5)*.1+.1+sc/2,d.pos[2]),M4.ry(d.spin),M4.sc(sc,sc,sc));setEntLight(d.pos);const dg=ITEMS[d.id]&&ITEMS[d.id].ench&&!hm.block;if(dg)glintOn(ITEM_GS);drawMesh(hm.mesh,m,hm.tex);if(dg)glintOff();}
   for(const a of projs){if(a.kind==='splash'){setEntLight(a.pos);drawMesh(getItemMesh(a.pot),chain(M4.tr(...a.pos),M4.ry(perfT*8),M4.sc(.4,.4,.4)),itemTex);continue;}
     const l=Math.hypot(...a.vel)||1;const yw=Math.atan2(-a.vel[0],-a.vel[2]),pt=Math.asin(clamp(a.vel[1]/l,-1,1));setEntLight(a.pos);
     drawMesh(getItemMesh('arrow'),chain(M4.tr(...a.pos),M4.ry(yw),M4.rx(pt),M4.ry(Math.PI/2),M4.rz(-Math.PI/4),M4.sc(.7,.7,.7)),itemTex);}
@@ -2277,12 +2316,12 @@ function drawHumanoid(e){
   const inHead=Math.hypot(camPos[0]-rp[0],camPos[1]-(rp[1]+(e.sneak?1.5:1.64)),camPos[2]-rp[2])<.6;
   if(!invis){for(const [m,ov] of [['head','hat'],['body','jacket'],['rarm','rsleeve'],['larm','lsleeve'],['rleg','rpants'],['lleg','lpants']]){if(inHead&&m==='head')continue;drawMesh(M[m],parts[m],S.tex);drawMesh(M[ov],parts[m],S.tex);}}
   // armor layers
-  const A=MODELS.armor;e.armor.forEach((a,i)=>{if(!a||!ITEMS[a])return;const it=ITEMS[a];const T=ARMOR_TEX[it.tier];if(!T)return;if(T.tint)gl.uniform4f(PT.u.tint,...T.tint,1);
+  const A=MODELS.armor;e.armor.forEach((a,i)=>{if(!a||!ITEMS[a])return;const it=ITEMS[a];const T=ARMOR_TEX[it.tier];if(!T)return;if(T.tint)gl.uniform4f(PT.u.tint,...T.tint,1);if(it.ench)glintOn(ARMOR_GS);
     if(i===0&&!inHead)drawMesh(A.head,parts.head,T.l1);
     if(i===1){drawMesh(A.body,parts.body,T.l1);drawMesh(A.rarm,parts.rarm,T.l1);drawMesh(A.larm,parts.larm,T.l1);}
     if(i===2){drawMesh(A.body2,parts.body,T.l2);drawMesh(A.rleg2,parts.rleg,T.l2);drawMesh(A.lleg2,parts.lleg,T.l2);}
     if(i===3){drawMesh(A.rleg,parts.rleg,T.l1);drawMesh(A.lleg,parts.lleg,T.l1);}
-    gl.uniform4f(PT.u.tint,1,1,1,1);});
+    gl.uniform4f(PT.u.tint,1,1,1,1);if(it.ench)glintOff();});
   // held item (LayerHeldItem 1.8: translate to the hand, then the model's third-person display transform)
   if(held&&ITEMS[held.id]){const hm=heldMesh(held.id),it=ITEMS[held.id],R=Math.PI/180;
     // back into vanilla model space (y down), then LayerHeldItem + the item model's "thirdperson" display, verbatim
@@ -2292,7 +2331,7 @@ function drawHumanoid(e){
       :it.type==='bow'?chain(hand,...disp([.75,0,.25],[5,80,-45],1))
       :it.type==='weapon'?chain(hand,...disp([0,1.25,-3.5],[0,90,-35],.85))
       :chain(hand,...disp([0,1,-3],[-90,0,0],.55));
-    drawMesh(hm.mesh,chain(m,M4.sc(.5,.5,.5)),hm.tex);}
+    const hg=it.ench&&!hm.block;if(hg)glintOn(ITEM_GS);drawMesh(hm.mesh,chain(m,M4.sc(.5,.5,.5)),hm.tex);if(hg)glintOff();}
   gl.uniform1f(PT.u.hurt,0);
   if(e.fire>0){useBox(VP,camPos);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.uniform1f(PB.u.lit,0);for(let i=0;i<3;i++)box(chain(M4.tr(e.pos[0],e.pos[1]+.9+Math.sin(perfT*9+i)*.2,e.pos[2]),M4.ry(perfT*2+i*2),M4.sc(.7,1.6,.7)),[1,.5+.2*i,.1],.18);gl.disable(gl.BLEND);useTex(VP,camPos);}
 }
@@ -2366,7 +2405,7 @@ function drawHand(proj,pre){
   // RenderItem: scale 2, then the model's firstperson display (items: [0,-135,25] / [0,4,2] / 1.7; blocks: none), then the 0.5 model scale
   if(hm.block)m=chain(m,M4.sc(2,2,2),M4.sc(.5,.5,.5));
   else m=chain(m,M4.sc(2,2,2),M4.tr(0,.25,.125),M4.ry(-135*R),M4.rz(25*R),M4.sc(1.7,1.7,1.7),M4.sc(.5,.5,.5));
-  drawMesh(hm.mesh,m,hm.tex);
+  const hg=it.ench&&!hm.block;if(hg)glintOn(ITEM_GS);drawMesh(hm.mesh,m,hm.tex);if(hg)glintOff();
 }
 
 // ================= HUD (console Battle layout) =================
@@ -2458,7 +2497,7 @@ function drawHotbar(){
   if(p.air!=null&&p.air<300){const nb=Math.ceil((p.air-2)*10/300),part=Math.ceil(p.air*10/300)-nb;for(let i=0;i<10;i++){const x=right-(i+1)*step+1,y=hy2-9*s-4;if(i<nb){hc.fillStyle='#000';hc.beginPath();hc.arc(x+4.5*s,y+4.5*s,4*s,0,7);hc.fill();hc.fillStyle='#4a8ae8';hc.beginPath();hc.arc(x+4.5*s,y+4.5*s,3*s,0,7);hc.fill();hc.fillStyle='#fff';hc.fillRect(x+3*s,y+2.5*s,s,s);}else if(i<nb+part){hc.strokeStyle='#fff';hc.lineWidth=s;hc.beginPath();hc.arc(x+4.5*s,y+4.5*s,3*s,0,7);hc.stroke();}}}
   // armor bar above hearts
   const ap=armorPts(p);if(ap>0){const y=hy2-9*s-4-(p.absorb>0?9*s+2:0);for(let i=0;i<10;i++){const v=clamp(ap-i*2,0,2)/2,x=left+i*step;if(PACK.gui.armor_full){spr(v>=1?'armor_full':v>0?'armor_half':'armor_empty',x,y,9*s,9*s);}else icon9(ICON9.armor,x,y,s,v,ARMOR_PAL);}}
-  if(selShow>0){const it=p.inv[p.sel];if(it){hc.globalAlpha=Math.min(1,selShow);txt(ITEMS[it.id].name,W/2,hy2-(ap?20*s:10*s)-10,16,'#fff','center');hc.globalAlpha=1;}}
+  if(selShow>0){const it=p.inv[p.sel];if(it){hc.globalAlpha=Math.min(1,selShow);txt(ITEMS[it.id].name,W/2,hy2-(ap?20*s:10*s)-10,16,ITEMS[it.id].ench?'#55ffff':'#fff','center');hc.globalAlpha=1;}}
 }
 function drawArmorDoll(){ // small figure on the left showing equipped armour, like the console HUD
   const p=player;if(!p.armor.some(Boolean))return;const x=18,y=H/2-60,s=4;const col=i=>p.armor[i]?ITEMS[p.armor[i]].color:'rgba(255,255,255,.15)';
@@ -2599,7 +2638,7 @@ function tryOpenChest(){if(!player.alive||MATCH.state!=='play')return false;cons
 function chestClose(relock){if(!chestOpen)return;if(!chestOpen.inv)sfx('chestclose');else sfx('click');chestOpen.selfClose=true;chestOpen=null;hide('chestUI');if(relock&&player&&player.alive)lockPointer();}
 const INV_SCREEN={inv:true,items:[]};let invHover=null;
 function openInv(){if(!player||!player.alive||MATCH.state!=='play'||chestOpen)return false;chestOpen=INV_SCREEN;chestCursor=CHEST_SLOTS+player.sel;sfx('click');document.exitPointerLock&&document.exitPointerLock();show('chestUI');renderChest();return true;}
-function slotHTML(s,i,kind,sel){const id=s?(typeof s==='string'?s:s.id):null;return `<div class="slot${sel?' sel':''}" data-k="${kind}" data-i="${i}" data-n="${id&&ITEMS[id]?ITEMS[id].name:''}" title="${id&&ITEMS[id]?ITEMS[id].name:''}"></div>`;}
+function slotHTML(s,i,kind,sel){const id=s?(typeof s==='string'?s:s.id):null;return `<div class="slot${sel?' sel':''}" data-k="${kind}" data-i="${i}" data-n="${id&&ITEMS[id]?ITEMS[id].name:''}" data-e="${id&&ITEMS[id]&&ITEMS[id].ench?itemTipLines(id).join('|'):''}" title="${id&&ITEMS[id]?ITEMS[id].name:''}"></div>`;}
 function slotCanvas(id,count){const S=GS,px=18*S,c=mkCanvas(px,px),g=c.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(ICONS[id],S,S,16*S,16*S);
   if(count>1){const t=pxCanvas(String(count),S,'#ffffff');g.drawImage(t,px-t.width,px-t.height+S);}return c;}
 function fillIcons(el,list){[...el.children].forEach((d,i)=>{const s=list[i];if(!s)return;const id=typeof s==='string'?s:s.id;if(!ICONS[id])return;d.prepend(slotCanvas(id,typeof s==='string'?1:s.count));});}
@@ -2617,15 +2656,15 @@ $('chestUI').addEventListener('click',e=>{const d=e.target.closest('.slot');if(!
   else if(k==='p'){const s=player.inv[i];if(!s)return;player.inv[i]=null;chestOp('put',0,s);}
   else if(k==='a'){const a=player.armor[i];if(!a)return;player.armor[i]=null;chestOp('put',0,{id:a,count:1});}
   renderChest();});
-$('chestUI').addEventListener('mousemove',e=>{const d=e.target.closest('.slot');const n=d&&d.dataset.n||null;const tip=$('invTip');if(n!==invHover){invHover=n;if(n)pxSet(tip,n,'#ffffff');}tip.classList.toggle('hidden',!n);if(n){tip.style.left=(e.clientX+12*GS/2+6)+'px';tip.style.top=(e.clientY-12*GS)+'px';}});
+$('chestUI').addEventListener('mousemove',e=>{const d=e.target.closest('.slot');const n=d&&d.dataset.n||null,en=d&&d.dataset.e||'';const tk=n?n+'|'+en:null;const tip=$('invTip');if(tk!==invHover){invHover=tk;if(n){pxSet(tip,n,en?'#55ffff':'#ffffff');if(en)for(const l of en.split('|'))tip.appendChild(pxCanvas(l,GS,'#aaaaaa'));}}tip.classList.toggle('hidden',!n);if(n){tip.style.left=(e.clientX+12*GS/2+6)+'px';tip.style.top=(e.clientY-12*GS)+'px';}});
 $('takeAll').addEventListener('click',()=>chestOp('all'));$('closeChest').addEventListener('click',()=>chestClose(true));
 
 // ---------- menus ----------
 function readOptions(){SENS=clamp(+$('o_sens').value/200,0,1);INVY=$('o_invy').checked;store('bb_sens',SENS);store('bb_invy',INVY?'1':'0');SET.mode=$('o_mode').value;SET.roundLen=+$('o_round').value;SET.hunger=+$('o_hunger').value;SET.refill=+$('o_refill').value;SET.grace=+$('o_grace').value;
-  SET.showdown=$('o_show').checked;SET.takeAll=$('o_take').checked;SET.central=$('o_central').checked;SET.bots=clamp(+$('o_bots').value|0,0,15);SET.difficulty=+$('o_diff').value;SET.brLen=+$('o_brlen').value;SET.brExtra=$('o_brx').checked;
+  SET.showdown=$('o_show').checked;SET.takeAll=$('o_take').checked;SET.central=$('o_central').checked;SET.bots=clamp(+$('o_bots').value|0,0,15);SET.difficulty=+$('o_diff').value;SET.brLen=+$('o_brlen').value;SET.brExtra=$('o_brx').checked;SET.enchants=$('o_ench').checked;
   for(const m of MAPS)SET.maps[m.id]=$('map_'+m.id).checked;store('bb_set',JSON.stringify(SET));}
 function writeOptions(){$('o_sens').value=Math.round(SENS*200);$('o_invy').checked=INVY;$('o_mode').value=SET.mode;$('o_round').value=SET.roundLen;$('o_hunger').value=SET.hunger;$('o_refill').value=SET.refill;$('o_grace').value=SET.grace;$('o_show').checked=SET.showdown;$('o_take').checked=SET.takeAll;
-  $('o_central').checked=SET.central;$('o_bots').value=SET.bots;$('o_diff').value=SET.difficulty;$('o_brlen').value=SET.brLen;$('o_brx').checked=SET.brExtra;for(const m of MAPS)$('map_'+m.id).checked=!!SET.maps[m.id];}
+  $('o_central').checked=SET.central;$('o_bots').value=SET.bots;$('o_diff').value=SET.difficulty;$('o_brlen').value=SET.brLen;$('o_brx').checked=SET.brExtra;$('o_ench').checked=SET.enchants!==false;for(const m of MAPS)$('map_'+m.id).checked=!!SET.maps[m.id];}
 $('mapChecks').innerHTML=MAPS.map(m=>`<label title="${m.desc}"><input type="checkbox" id="map_${m.id}" checked> ${m.name}</label>`).join('');
 try{const s=JSON.parse(store('bb_set')||'null');if(s)Object.assign(SET,s,{maps:Object.assign({},SET.maps,s.maps||{})});}catch(e){}
 writeOptions();
@@ -3044,7 +3083,7 @@ JPAGES.controls=()=>{const keys=[['Attack','Left Click'],['Use Item','Right Clic
   jSlider(()=>SENS<=0?'Sensitivity: *yawn*':SENS>=1?'Sensitivity: HYPERSPEED!!!':'Sensitivity: '+Math.round(SENS*200)+'%',()=>SENS,v=>{SENS=v;store('bb_sens',SENS);if($('o_sens'))$('o_sens').value=Math.round(SENS*200);},40),
   jBtn(()=>'Invert Mouse: '+onOff(INVY),()=>{INVY=!INVY;store('bb_invy',INVY?'1':'0');if($('o_invy'))$('o_invy').checked=INVY;})].concat(keys.map(([a,k])=>jBtn(`${a}: ${k}`,null,'off')))};};
 JPAGES.rules=()=>({title:'Game Rules',items:[ruleBtn('o_mode','Mode'),ruleBtn('o_round','Round Length'),ruleBtn('o_hunger','Hunger Rate'),ruleBtn('o_refill','Item Respawn'),ruleBtn('o_grace','Grace Period'),
-  ruleBtn('o_show','Showdown'),ruleBtn('o_take','Take Everything'),ruleBtn('o_central','Central Spawn'),ruleBtn('o_bots','Bots'),ruleBtn('o_diff','Bot Difficulty'),ruleBtn('o_brlen','Battle Royale Length'),ruleBtn('o_brx','BR Extra Loot')]});
+  ruleBtn('o_show','Showdown'),ruleBtn('o_take','Take Everything'),ruleBtn('o_central','Central Spawn'),ruleBtn('o_bots','Bots'),ruleBtn('o_diff','Bot Difficulty'),ruleBtn('o_brlen','Battle Royale Length'),ruleBtn('o_brx','BR Extra Loot'),ruleBtn('o_ench','Enchanted Loot')]});
 JPAGES.maps=()=>({title:'Maps',items:MAPS.map(m=>jBtn(()=>`${m.name}: ${onOff($('map_'+m.id).checked)}`,()=>{const el=$('map_'+m.id);el.checked=!el.checked;if(!MAPS.some(q=>$('map_'+q.id).checked))el.checked=true;readOptions();}))});
 function jRender(){const P=JPAGES[jPage]();pxSet($('jTitle'),P.title,'#ffffff');const g=$('jGrid');g.textContent='';for(const it of P.items)g.appendChild(it);
   if(P.items.length%2)P.items[P.items.length-1].classList.add('full');
