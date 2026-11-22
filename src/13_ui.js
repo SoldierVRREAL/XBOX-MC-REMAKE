@@ -173,14 +173,19 @@ function refreshSkinPicker(){const row=$('skinRow');const opts=availableSkins().
   for(const k of opts){const c=mkCanvas(16,16);const g=c.getContext('2d');g.imageSmoothingEnabled=false;const S=skinTex(k).img;g.drawImage(S,8,8,8,8,0,0,16,16);g.drawImage(S,40,8,8,8,0,0,16,16);c.title=k.replace(/^(pack|gen):/,'');if(k===mySkin)c.classList.add('on');
     c.addEventListener('click',()=>{mySkin=k;store('bb_skin',k);refreshSkinPicker();sfx('click');});row.appendChild(c);}}
 $('nameIn').addEventListener('change',()=>{if(mySkin.startsWith('gen:'))mySkin='gen:'+($('nameIn').value||'Player');refreshSkinPicker();});
-const DEFAULT_APPID='d4f1dd7f-3b87-4c28-ae83-c1ea4b649097',OLD_APPIDS=['d20d4904-60a7-49e7-8d96-7976eadfcaf6'];$('n_kind').value=store('bb_nkind')||'photon';{const sv=store('bb_app');$('n_app').value=(!sv||OLD_APPIDS.includes(sv))?DEFAULT_APPID:sv;}$('n_region').value=store('bb_region')||'us';$('n_room').value=store('bb_room')||'battle';$('n_sdk').value=store('bb_sdk')||'';
+const DEFAULT_APPID='d4f1dd7f-3b87-4c28-ae83-c1ea4b649097',OLD_APPIDS=['d20d4904-60a7-49e7-8d96-7976eadfcaf6'];$('n_kind').value=store('bb_nkind2')||'relay';{const sv=store('bb_app');$('n_app').value=(!sv||OLD_APPIDS.includes(sv))?DEFAULT_APPID:sv;}$('n_region').value=store('bb_region')||'us';$('n_room').value=store('bb_room')||'battle';$('n_sdk').value=store('bb_sdk')||'';
+function showNetFields(){const ph=$('n_kind').value==='photon';document.querySelectorAll('#onlinePanel .ph').forEach(el=>el.classList.toggle('hidden',!ph));$('relayNote').classList.toggle('hidden',ph);}
+$('n_kind').addEventListener('change',showNetFields);showNetFields();
 $('connectBtn').addEventListener('click',async()=>{
-  const kind=$('n_kind').value,room=($('n_room').value||'battle').trim();store('bb_nkind',kind);store('bb_app',$('n_app').value);store('bb_region',$('n_region').value);store('bb_room',room);store('bb_sdk',$('n_sdk').value);
+  const kind=$('n_kind').value,room=($('n_room').value||'battle').trim();store('bb_nkind2',kind);store('bb_app',$('n_app').value);store('bb_region',$('n_region').value);store('bb_room',room);store('bb_sdk',$('n_sdk').value);
   if(net){net.leave();net=null;}readOptions();
   const ready=()=>{online=true;setNetStatus('Connected. '+(net.isHost()?'You are the host.':'Joining host...'));hide('onlinePanel');player=null;ents=[];
     if(net.isHost())enterLobby();else{enterLobby();netSend(N.HELLO,{},'host');}};
   const wire=()=>{net.onEvent=onNetEvent;net.onJoin=()=>{if(isHost()&&MATCH.state==='lobby')MATCH.phaseT=0;};net.onLeave=onMemberLeave;net.onHostChange=onHostChanged;};
   if(kind==='local'){setNetStatus('Joining room "'+room+'" in this browser...');net=new LocalNet(room,myName);wire();net.onReady=ready;return;}
+  if(kind==='relay'){setNetStatus('Connecting to the relay...');const n=new RelayNet(room,myName);net=n;wire();
+    n.onReady=()=>{if(net!==n)return;setNetStatus('Connected via '+(n.tr.url||'relay').replace(/^wss:\/\//,'').replace(/[:/].*$/,''));ready();};
+    n.onFail=msg=>{if(net!==n)return;const wasOnline=online;net=null;n.leave();if(wasOnline){toMenu();hide('menu');show('onlinePanel');}setNetStatus(msg);};return;}
   if(!$('n_app').value.trim()){setNetStatus('Enter your Photon Realtime AppId first.');return;}
   setNetStatus('Loading Photon SDK...');const ok=await loadPhotonSDK($('n_sdk').value.trim());
   if(!ok){setNetStatus('Could not load the Photon JavaScript SDK. Download the Photon Realtime JavaScript SDK from photonengine.com and put lib/photon.min.js next to index.html (or paste its URL).');return;}

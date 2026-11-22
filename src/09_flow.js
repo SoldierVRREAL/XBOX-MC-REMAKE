@@ -166,7 +166,7 @@ function onNetEvent(code,d,from){
   case N.SKIN:onSkinNet(d);break;
   case N.STATE:{if(!d||!d.id)return;let e=entById(d.id);
     if(!e){if(MATCH.state==='menu')return;e=new Ent(d.id,d.n,'player');e.skin=d.sk||'gen:'+d.n;e.color=ents.length;ents.push(e);e.pos=d.p.slice();if(MATCH.state==='play'&&!d.al){e.alive=false;e.bat=true;e.spectator=!!d.sp;}}
-    if(e.isLocal)return;e.net={p:d.p,v:d.v,t:performance.now()};e.yaw=d.y;e.pitch=d.pi;e.name=d.n||e.name;if(d.sk)e.skin=d.sk;
+    if(e.isLocal)return;e.net={p:d.p,v:d.v,t:performance.now()};e.yaw=d.y;e.pitch=d.pi;e.name=String(d.n||e.name).slice(0,16);if(d.sk)e.skin=d.sk;
     e.inv=new Array(9).fill(null);e.sel=0;if(d.h)e.inv[0]={id:d.h,count:1};e.armor=d.a||[null,null,null,null];e.health=d.hp;e.food=d.f;if(d.sw)e.swing=Math.max(e.swing,d.sw);e.using=d.u||null;e.useT=d.ut||0;
     e.fire=d.fi||0;if(d.hp<e.health-.4)sfx('hurt',{pos:e.pos});e.effects=d.ef?Object.fromEntries(d.ef.map(n=>[n,{t:9,amp:0,tick:0}])):{};e.sprint=!!d.sr;e.sneak=!!d.sn;e.openChest=d.oc||null;e.ready=!!d.r;e.bat=!!d.b;
     if(MATCH.state==='lobby'){e.alive=true;e.bat=false;}
@@ -189,7 +189,7 @@ function onNetEvent(code,d,from){
   case N.BR:if(!br)return;br.T=d.T;br.ev=d.ev;br.border=d.border;br.lastCx=d.lastCx;br.lastCz=d.lastCz;break;
   case N.START:if(!fromHost)return;applyStart(d,d.join||null);showLoading(d.join?'Joining game':'Loading level',null);break;
   case N.ANN:msgs.push({t:d.d,txt:d.t,sub:d.s||''});break;
-  case N.CHAT:chat.push({t:10,txt:d.t,col:d.c});if(chat.length>8)chat.shift();break;
+  case N.CHAT:chat.push({t:10,txt:String(d.t||'').slice(0,120),col:/^#[0-9a-f]{3,6}$/i.test(d.c)?d.c:'#fff'});if(chat.length>8)chat.shift();break;
   case N.BLOCK:applyBlock(d[0],d[1],d[2],d[3]);break;
   case N.SQUEAK:{const e=entById(d.id);if(e){spawnParticles(e.pos[0],e.pos[1],e.pos[2],4,[.3,.2,.15],1.5);if(player&&dist(e.pos,player.pos)<24)sfx('squeak');}break;}
   case N.LOBBY:if(!fromHost)return;if(MATCH.state!=='lobby')enterLobby();MATCH.lobbyCD=d.cd;MATCH.nextMap=d.next;Object.assign(SET,d.set);for(const e of ents)e.ready=d.ready.includes(e.id);break;

@@ -204,13 +204,14 @@ body.touch #clickResume{display:none!important}
 <div id="onlinePanel" class="screen hidden"><div class="panel">
   <h3>Play Online</h3>
   <div class="form">
-    <label for="n_kind">Connection</label><select id="n_kind"><option value="photon">Photon Realtime (internet)</option><option value="local">Same browser, other tabs (LAN test)</option></select>
-    <label for="n_app">Photon AppId</label><input id="n_app" type="password" placeholder="Realtime AppId from dashboard.photonengine.com">
-    <label for="n_region">Region</label><select id="n_region"><option>us</option><option>usw</option><option>eu</option><option>asia</option><option>jp</option><option>au</option><option>sa</option><option>kr</option><option>in</option></select>
+    <label for="n_kind">Connection</label><select id="n_kind"><option value="relay">Internet (built-in relay, no setup)</option><option value="photon">Photon Realtime (your AppId)</option><option value="local">Same browser, other tabs (test)</option></select>
+    <label for="n_app" class="ph">Photon AppId</label><input class="ph" id="n_app" type="password" placeholder="Realtime AppId from dashboard.photonengine.com">
+    <label for="n_region" class="ph">Region</label><select class="ph" id="n_region"><option>us</option><option>usw</option><option>eu</option><option>asia</option><option>jp</option><option>au</option><option>sa</option><option>kr</option><option>in</option></select>
     <label for="n_room">Room code</label><input id="n_room" type="text" maxlength="24" value="battle">
-    <label for="n_sdk">Photon SDK URL (optional)</label><input id="n_sdk" type="text" placeholder="photon.min.js next to this page">
+    <label for="n_sdk" class="ph">Photon SDK URL (optional)</label><input class="ph" id="n_sdk" type="text" placeholder="photon.min.js next to this page">
   </div>
-  <div class="note">Photon needs your own free Realtime AppId and the Photon JavaScript SDK (put <code>photon.min.js</code> beside this page, or give its URL). Hosted pages work; this preview blocks outside connections, so use "Same browser, other tabs" here. The first player in a room hosts: it runs the bots, chests and round timer.</div>
+  <div class="note" id="relayNote">Everyone types the same room code and presses Connect. The built-in relay needs no account: it uses free public servers, so pick an unusual room code to keep strangers out. The first player in a room hosts: it runs the bots, chests and round timer.</div>
+  <div class="note ph">Photon needs your own free Realtime AppId and the Photon JavaScript SDK (put <code>photon.min.js</code> beside this page, or give its URL). Hosted pages work; this preview blocks outside connections, so use "Same browser, other tabs" here. The first player in a room hosts: it runs the bots, chests and round timer.</div>
   <div id="status"></div>
   <div class="row"><button class="btn small" id="connectBtn">Connect</button><button class="btn small" id="onlineClose">Back</button></div>
 </div></div>
