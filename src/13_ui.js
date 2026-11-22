@@ -16,10 +16,25 @@ document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockEl
   else if((MATCH.state==='play'||MATCH.state==='lobby')&&!chestOpen&&!chatUI&&$('lobbyPanel').classList.contains('hidden')&&$('results').classList.contains('hidden')){if(!online)paused=true;show('pause');}});
 cv.addEventListener('click',()=>{if((MATCH.state==='play'||MATCH.state==='lobby')&&!locked&&!chestOpen)lockPointer();});
 $('clickResume').addEventListener('click',()=>lockPointer());
-// mouse look; some browsers deliver the same drag movement twice while a button is held, so an exact repeat (same time, same deltas) is skipped
-let lastMove={t:-1,dx:0,dy:0};
+// ---- mouse look, with a fix for Mac browsers that over-report movement while a mouse button is held ----
+// Depending on the browser this shows up as duplicated drag events or as bigger deltas. Repeats while held are dropped, and the
+// held/free speed ratio is learned from how fast the mouse moves just before and just after each press and release (a hand does not
+// suddenly double its speed at the instant it clicks); held movement is divided by that ratio. Starts at 2x on Macs, remembers what it learns.
+const CLK={scale:+(store('bb_clickscale')||0)||(IS_MAC?2:1),samples:[],hist:[],last:null,prevHeld:false,pend:[]};
+const clickFix=()=>OPT.clickFix==='on'||(OPT.clickFix!=='off'&&IS_MAC);
+function clkSpeed(a,b){let s=0,n=0;for(const h of CLK.hist)if(h.t>=a&&h.t<b){s+=h.mag;n++;}return n>=3?s/(b-a):-1;}
+function mouseLookFilter(dx,dy,held,t){
+  if(held&&clickFix()&&CLK.last&&CLK.last.held&&t-CLK.last.t<4&&dx===CLK.last.dx&&dy===CLK.last.dy){CLK.last.t=t;return null;}   // the same drag movement again
+  CLK.last={t,dx,dy,held};CLK.hist.push({t,mag:Math.abs(dx)+Math.abs(dy),held});while(CLK.hist.length&&t-CLK.hist[0].t>700)CLK.hist.shift();
+  if(held!==CLK.prevHeld){CLK.pend.push({t,toHeld:held});CLK.prevHeld=held;}
+  while(CLK.pend.length&&t>CLK.pend[0].t+130){const p=CLK.pend.shift();const pre=clkSpeed(p.t-130,p.t),post=clkSpeed(p.t,p.t+130);   // judge a press/release once 130 ms have passed
+    if(pre>.08&&post>.08){CLK.samples.push(p.toHeld?post/pre:pre/post);if(CLK.samples.length>9)CLK.samples.shift();
+      if(CLK.samples.length>=3){const sorted=CLK.samples.slice().sort((a,b)=>a-b),med=sorted[sorted.length>>1];const agree=CLK.samples.filter(v=>Math.abs(v-med)<=med*.4).length/CLK.samples.length;
+        if(agree>=.6){CLK.scale=med>=1.45?Math.min(4,med):1;try{store('bb_clickscale',String(Math.round(CLK.scale*100)/100));}catch(e){}}}}}
+  if(held&&clickFix()&&CLK.scale>1)return [dx/CLK.scale,dy/CLK.scale];
+  return [dx,dy];}
 document.addEventListener('mousemove',e=>{if(!locked||!player)return;if(!player.alive&&spectate.mode==='follow')return;const dx=e.movementX,dy=e.movementY;if(!dx&&!dy)return;
-  if(e.timeStamp===lastMove.t&&dx===lastMove.dx&&dy===lastMove.dy)return;lastMove={t:e.timeStamp,dx,dy};if(Math.abs(dx)>350||Math.abs(dy)>350)return;lookDelta(dx,dy);});
+  if(Math.abs(dx)>350||Math.abs(dy)>350)return;const r=mouseLookFilter(dx,dy,e.buttons!==0,performance.now());if(r)lookDelta(r[0],r[1]);});
 document.addEventListener('mousedown',e=>{if(!locked)return;if(e.button===0){lmb=true;lmbEdge=true;}if(e.button===2){rmb=true;rmbEdge=true;}});
 document.addEventListener('mouseup',e=>{if(e.button===0)lmb=false;if(e.button===2)rmb=false;});
 document.addEventListener('contextmenu',e=>e.preventDefault());
@@ -199,7 +214,7 @@ $('menuBtn').addEventListener('click',()=>toMenu());
 $('nextBtn').addEventListener('click',()=>{hide('results');if(!online){showLoading('Loading level',()=>{player=null;ents=[];hostStartMatch();});}});
 function toMenu(){if(net){net.leave();net=null;}online=false;MATCH.state='menu';player=null;ents=[];document.exitPointerLock&&document.exitPointerLock();hideOverlays();show('menu');setMSel(0);generateMap('skyhold',1,false);buildMesh();refreshSkinPicker();}
 function openLobbyPanel(){document.exitPointerLock&&document.exitPointerLock();show('lobbyPanel');const host=isHost();
-  $('lobbyInfo').innerHTML=`<div class="note">Room: <b>${($('n_room').value||'').replace(/</g,'&lt;')}</b> · ${net?net.kind:''} · ${host?'You are the host':'Host decides the options'}<br>Mode: ${SET.mode==='br'?'Battle Royale':'Battle'} · Round ${SET.roundLen?SET.roundLen/60+' min':'unlimited'} · Grace ${SET.grace||'off'} · Hunger ${({0.5:'slow',1:'normal',2:'fast'})[SET.hunger]} · Bots ${SET.bots}<br>Players: ${ents.filter(e=>e.kind==='player').map(e=>(e.ready?'✓ ':'')+e.name.replace(/</g,'&lt;')).join(', ')}</div>`;
+  $('lobbyInfo').innerHTML=`<div class="note">Room: <b>${($('n_room').value||'').replace(/</g,'&lt;')}</b> · ${net?net.kind:''}${net&&net.tr&&net.tr.url?' via '+net.tr.url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,'').replace(/</g,'&lt;'):''}${net&&net.ping!=null?' · ping '+Math.round(net.ping)+' ms':''} · ${host?'You are the host':'Host decides the options'}<br>Mode: ${SET.mode==='br'?'Battle Royale':'Battle'} · Round ${SET.roundLen?SET.roundLen/60+' min':'unlimited'} · Grace ${SET.grace||'off'} · Hunger ${({0.5:'slow',1:'normal',2:'fast'})[SET.hunger]} · Bots ${SET.bots}<br>Players: ${ents.filter(e=>e.kind==='player').map(e=>(e.ready?'✓ ':'')+e.name.replace(/</g,'&lt;')+(e===player?(net&&net.ping!=null?' ('+Math.round(net.ping)+' ms)':''):(e.ping!=null?' ('+e.ping+' ms)':''))).join(', ')}</div>`;
   $('lobbyStart').classList.toggle('hidden',!host);$('lobbyOpts').classList.toggle('hidden',!host);}
 $('lobbyReady').addEventListener('click',()=>{toggleReady();openLobbyPanel();});
 $('lobbyStart').addEventListener('click',()=>{if(isHost()){hide('lobbyPanel');hostStartMatch();}});

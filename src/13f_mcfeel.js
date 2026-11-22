@@ -67,7 +67,7 @@ function drawDebug(){if(!player)return;const p=player.rpos||player.pos;const f=n
   let my=((180-player.yaw*R)%360+540)%360-180;const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);
   const facing=Math.abs(fx)>Math.abs(fz)?(fx>0?'east (Towards positive X)':'west (Towards negative X)'):(fz>0?'south (Towards positive Z)':'north (Towards negative Z)');
   const bx=Math.floor(p[0]),by=Math.floor(p[1]),bz=Math.floor(p[2]);const L=lightAt(bx,by,bz);
-  const left=[`Minecraft 1.8 (Battle Browser Edition)`,`${Math.round(fpsS)} fps`,'',`XYZ: ${f(p[0])} / ${f(p[1])} / ${f(p[2])}`,`Block: ${bx} ${by} ${bz}`,`Chunk: ${bx&15} ${by&15} ${bz&15} in ${bx>>4} ${by>>4} ${bz>>4}`,
+  const left=[`Minecraft 1.8 (Battle Browser Edition)`,`${Math.round(fpsS)} fps`+(clickFix()?` · click fix x${CLK.scale.toFixed(2)}`:'')+(net&&net.ping!=null?` · ping ${Math.round(net.ping)} ms`+(net.tr&&net.tr.url?' to '+net.tr.url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,''):''):''),'',`XYZ: ${f(p[0])} / ${f(p[1])} / ${f(p[2])}`,`Block: ${bx} ${by} ${bz}`,`Chunk: ${bx&15} ${by&15} ${bz&15} in ${bx>>4} ${by>>4} ${bz>>4}`,
     `Facing: ${facing} (${my.toFixed(1)} / ${(-player.pitch*R).toFixed(1)})`,`Light: ${Math.max(L&15,(L>>4)&15)} (${(L>>4)&15} sky, ${L&15} block)`,`Map: ${(MAPS.find(m=>m.id===mapInfo.id)||{name:mapInfo.id}).name}`,
     `Mode: ${MATCH.mode==='br'?'Battle Royale':'Battle'} (${MATCH.state})`,`E: ${ents.filter(e=>e.alive).length}/${ents.length}  Drops: ${drops.length}`,`Net: ${net?net.kind+(isHost()?' (host)':' (client)'):'offline'}`];
   const gli=gl.getExtension('WEBGL_debug_renderer_info');const rend=gli?gl.getParameter(gli.UNMASKED_RENDERER_WEBGL):'WebGL';

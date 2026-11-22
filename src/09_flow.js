@@ -172,10 +172,10 @@ function onNetEvent(code,d,from){
   switch(code){
   case N.SKIN:onSkinNet(d);break;
   case N.STATE:{if(!d||!d.id)return;let e=entById(d.id);
-    if(!e){if(MATCH.state==='menu')return;e=new Ent(d.id,d.n,'player');e.skin=d.sk||'gen:'+d.n;e.color=ents.length;ents.push(e);e.pos=d.p.slice();if(MATCH.state==='play'&&!d.al){e.alive=false;e.bat=true;e.spectator=!!d.sp;}}
+    if(!e){if(MATCH.state==='menu')return;const nm=d.n||((net&&net.members.get(+String(d.id).slice(1)))||{}).name||'Player';e=new Ent(d.id,nm,'player');e.skin=d.sk||'gen:'+nm;e.color=ents.length;ents.push(e);e.pos=d.p.slice();if(MATCH.state==='play'&&!d.al){e.alive=false;e.bat=true;e.spectator=!!d.sp;}}
     if(e.isLocal)return;const hp0=e.health;pushSnap(e,d.p,d.v,d.y,d.pi,d.ts,d.g);e.name=String(d.n||e.name).slice(0,16);if(d.sk)e.skin=d.sk;
-    e.inv=new Array(9).fill(null);e.sel=0;if(d.h)e.inv[0]={id:d.h,count:1};e.armor=d.a||[null,null,null,null];e.health=d.hp;e.food=d.f;if(d.sw)e.swing=Math.max(e.swing,d.sw);e.using=d.u||null;e.useT=d.ut||0;
-    e.fire=d.fi||0;if(d.hp<hp0-.4){e.hurtT=.5;sfx('hurt',{pos:e.pos});}e.effects=d.ef?Object.fromEntries(d.ef.map(n=>[n,{t:9,amp:0,tick:0}])):{};e.sprint=!!d.sr;e.sneak=!!d.sn;e.openChest=d.oc||null;e.ready=!!d.r;e.bat=!!d.b;
+    e.inv=new Array(9).fill(null);e.sel=0;if(d.h)e.inv[0]={id:d.h,count:1};if(d.a)e.armor=d.a;if(d.pg!=null)e.ping=d.pg;e.health=d.hp;e.food=d.f;if(d.sw)e.swing=Math.max(e.swing,d.sw);e.using=d.u||null;e.useT=d.ut||0;
+    e.fire=d.fi||0;if(d.hp<hp0-.4){const pred=e.hitPred&&performance.now()-e.hitPred<800;if(!pred)sfx('hurt',{pos:e.pos});if(!(e.hurtT>0))e.hurtT=.5;}e.effects=d.ef?Object.fromEntries(d.ef.map(n=>[n,{t:9,amp:0,tick:0}])):{};e.sprint=!!d.sr;e.sneak=!!d.sn;e.openChest=d.oc||null;e.ready=!!d.r;e.bat=!!d.b;
     if(MATCH.state==='lobby'){e.alive=true;e.bat=false;}
     break;}
   case N.HIT:{const t=entById(d.t);if(!t||!owned(t))return;const a=d.a?entById(d.a):null;if(a)a.heldHint=typeof d.w==='string'&&ITEMS[d.w]?d.w:null;const ok=hurt(t,d.d,a,d.c,d.kb,!!d.r);if(a)a.heldHint=null;if(d.fx&&(ok||d.d===0))for(const f of d.fx)giveEffect(t,...f);break;}
@@ -190,8 +190,8 @@ function onNetEvent(code,d,from){
   case N.DROPREQ:if(isHost())hostSpawnDrop(d.p,d.id,d.c,d.v);break;
   case N.PICK:{if(!isHost())return;const x=drops.find(x=>x.did===d.did&&!x.dead);if(!x)return;x.dead=true;netSend(N.DROPDEL,{did:x.did});netSend(N.GIVE,{to:'p'+from,items:[{id:x.id,count:x.count}]},from);break;}
   case N.PROJ:{const o=entById(d.o);spawnProj(d.k,d.p,d.v,o,d.d,d.pot,false);break;}
-  case N.BOTS:for(const b of d){const e=entById(b[0]);if(!e)continue;pushSnap(e,[b[1],b[2],b[3]],[b[4],b[5],b[6]],b[7],b[8],b[17]);if(b[9]<e.health-.4){e.hurtT=.5;sfx('hurt',{pos:e.pos});}e.health=b[9];
-      e.inv=new Array(9).fill(null);e.sel=0;if(b[10])e.inv[0]={id:b[10],count:1};e.armor=b[11];e.using=b[12];e.useT=b[13];if(b[14])e.swing=Math.max(e.swing,b[14]);e.fire=b[15];e.effects=b[16]?{invis:{t:9,amp:0}}:{};}break;
+  case N.BOTS:for(const b of d){const e=entById(b[0]);if(!e)continue;pushSnap(e,[b[1],b[2],b[3]],[b[4],b[5],b[6]],b[7],b[8],b[17]);if(b[9]<e.health-.4){const pred=e.hitPred&&performance.now()-e.hitPred<800;if(!pred)sfx('hurt',{pos:e.pos});if(!(e.hurtT>0))e.hurtT=.5;}e.health=b[9];
+      e.inv=new Array(9).fill(null);e.sel=0;if(b[10])e.inv[0]={id:b[10],count:1};if(b[11])e.armor=b[11];e.using=b[12];e.useT=b[13];if(b[14])e.swing=Math.max(e.swing,b[14]);e.fire=b[15];e.effects=b[16]?{invis:{t:9,amp:0}}:{};}break;
   case N.PHASE:if(!fromHost)return;if(d.pre!=null&&Math.abs((MATCH.preT||0)-d.pre)>.5)MATCH.preT=d.pre;if(Math.abs(MATCH.gameT-d.t)>.5)MATCH.gameT=d.t;MATCH.showdown=d.sd;MATCH.refillAt=d.r;suddenDeath=d.bs;break;
   case N.BR:if(!br)return;br.T=d.T;br.ev=d.ev;br.border=d.border;br.lastCx=d.lastCx;br.lastCz=d.lastCz;break;
   case N.START:if(!fromHost)return;applyStart(d,d.join||null);showLoading(d.join?'Joining game':'Loading level',null);break;
@@ -221,15 +221,20 @@ function onHostChanged(){
   if(net.isHost()&&MATCH.state!=='lobby'){netSend(N.TOLOBBY,{});enterLobby();}
 }
 // state broadcast for my player
-let stateT=0;
+let stateT=0,stateFullT=0,stateFullKey='';
 function sendMyState(dt){
-  if(!net||!player)return;stateT-=dt;if(stateT>0)return;stateT=.05;const p=player;const h=p.inv[p.sel];
-  netSend(N.STATE,{ts:Math.round(performance.now()),g:p.onGround?1:0,id:p.id,n:myName,sk:mySkin,p:p.pos.map(v=>Math.round(v*100)/100),v:p.vel.map(v=>Math.round(v*100)/100),y:+p.yaw.toFixed(3),pi:+p.pitch.toFixed(3),h:h?h.id:null,a:p.armor,hp:Math.round(p.health*10)/10,f:p.food,
-    sw:p.swing>.5?p.swing:0,u:p.using,ut:p.useT,fi:p.fire>0?1:0,ef:Object.keys(p.effects).filter(k=>k==='invis'),sr:p.sprint?1:0,sn:p.sneak?1:0,r:p.ready?1:0,b:p.bat?1:0,al:p.alive?1:0,sp:p.spectator?1:0,oc:chestOpen&&!chestOpen.inv?key(chestOpen.x,chestOpen.y,chestOpen.z):0});
+  if(!net||!player)return;stateT-=dt;stateFullT-=dt;if(stateT>0)return;stateT=.05;const p=player;const h=p.inv[p.sel];
+  // the parts that rarely change ride along once a second, or straight away when they do
+  const fk=myName+'|'+mySkin+'|'+p.armor.join(',');const full=stateFullT<=0||fk!==stateFullKey;if(full){stateFullT=1;stateFullKey=fk;}
+  const d={ts:Math.round(performance.now()),g:p.onGround?1:0,id:p.id,p:p.pos.map(v=>Math.round(v*100)/100),v:p.vel.map(v=>Math.round(v*100)/100),y:+p.yaw.toFixed(3),pi:+p.pitch.toFixed(3),h:h?h.id:null,hp:Math.round(p.health*10)/10,f:p.food,
+    sw:p.swing>.5?p.swing:0,u:p.using,ut:p.useT,fi:p.fire>0?1:0,ef:Object.keys(p.effects).filter(k=>k==='invis'),sr:p.sprint?1:0,sn:p.sneak?1:0,r:p.ready?1:0,b:p.bat?1:0,al:p.alive?1:0,sp:p.spectator?1:0,oc:chestOpen&&!chestOpen.inv?key(chestOpen.x,chestOpen.y,chestOpen.z):0};
+  if(full){d.n=myName;d.sk=mySkin;d.a=p.armor;if(net.ping!=null)d.pg=Math.round(net.ping);}
+  for(const k of ['h','sw','u','ut','fi','sr','sn','r','b','sp','oc'])if(!d[k])delete d[k];if(!d.ef.length)delete d.ef;   // empty / zero fields: the receiver treats missing as off
+  netSend(N.STATE,d);
 }
-let botsT=0;
-function sendBots(dt){if(!net||!isHost())return;botsT-=dt;if(botsT>0)return;botsT=.08;const arr=ents.filter(e=>e.kind==='bot'&&e.alive).map(e=>{const h=e.inv[e.sel];
-  return [e.id,+e.pos[0].toFixed(2),+e.pos[1].toFixed(2),+e.pos[2].toFixed(2),+e.vel[0].toFixed(2),+e.vel[1].toFixed(2),+e.vel[2].toFixed(2),+e.yaw.toFixed(3),+e.pitch.toFixed(3),Math.round(e.health*10)/10,h?h.id:null,e.armor,e.using,e.useT,e.swing>.5?e.swing:0,e.fire>0?1:0,e.effects.invis?1:0,Math.round(performance.now())];});
+let botsT=0,botsFullT=0;
+function sendBots(dt){if(!net||!isHost())return;botsT-=dt;botsFullT-=dt;if(botsT>0)return;botsT=.08;const full=botsFullT<=0;if(full)botsFullT=1;const arr=ents.filter(e=>e.kind==='bot'&&e.alive).map(e=>{const h=e.inv[e.sel];
+  return [e.id,+e.pos[0].toFixed(2),+e.pos[1].toFixed(2),+e.pos[2].toFixed(2),+e.vel[0].toFixed(2),+e.vel[1].toFixed(2),+e.vel[2].toFixed(2),+e.yaw.toFixed(3),+e.pitch.toFixed(3),Math.round(e.health*10)/10,h?h.id:null,full?e.armor:0,e.using,e.useT,e.swing>.5?e.swing:0,e.fire>0?1:0,e.effects.invis?1:0,Math.round(performance.now())];});
   if(arr.length)netSend(N.BOTS,arr);}
 // ---- remote player / bot smoothing ----
 // Snapshots are stamped with the sender's clock and kept in a short buffer. We draw everyone slightly in the past

@@ -30,23 +30,28 @@ const pfFloor=v=>!!v&&BD[v].solid&&!BD[v].fence&&!BD[v].ladder&&v!==B.BARRIER&&p
 function pfStand(x,y,z){if(x<0||z<0||x>=WX||z>=WZ||y<1||y>=WY-2)return false;const f=getB(x,y,z);if(!pfPass(f)||!pfPass(getB(x,y+1,z)))return false;
   if(f&&BD[f].ladder)return true;const u=getB(x,y-1,z);return pfFloor(u)||(!!u&&BD[u].liquid==='water');}
 function pfStart(p){const x=Math.floor(p[0]),z=Math.floor(p[2]);let y=Math.floor(p[1]+.01);for(const dy of [0,1,-1,2])if(pfStand(x,y+dy,z))return [x,y+dy,z];return null;}
-function findPath(from,to,maxN=3000){const s=pfStart(from),t=pfStart(to)||[Math.floor(to[0]),Math.floor(to[1]+.01),Math.floor(to[2])];if(!s)return null;
-  const K=(x,y,z)=>(x*512+z)*256+y,open=[],came=new Map(),g=new Map(),h=(x,y,z)=>Math.abs(x-t[0])+Math.abs(z-t[2])+Math.abs(y-t[1])*1.5;
-  const push=n=>{open.push(n);let i=open.length-1;while(i>0){const p=(i-1)>>1;if(open[p].f<=n.f)break;open[i]=open[p];i=p;}open[i]=n;};
+let PF=null;   // search scratch arrays, reused between searches (no garbage = no pauses on the host)
+function findPath(from,to,maxN=3000,budgetMs=3){const tEnd=performance.now()+budgetMs;let cut=false;findPath.partial=false;
+  const s=pfStart(from),t=pfStart(to)||[Math.floor(to[0]),Math.floor(to[1]+.01),Math.floor(to[2])];if(!s)return null;
+  const NN=WX*WY*WZ;if(!PF||PF.n!==NN)PF={n:NN,gen:new Uint16Array(NN),g:new Float32Array(NN),came:new Int32Array(NN),st:0};if(++PF.st>65000){PF.gen.fill(0);PF.st=1;}
+  const ST=PF.st,GEN=PF.gen,G=PF.g,CAME=PF.came,K=(x,y,z)=>(y*WZ+z)*WX+x,h=(x,y,z)=>Math.abs(x-t[0])+Math.abs(z-t[2])+Math.abs(y-t[1])*1.5,open=[];
+  const push=nd=>{open.push(nd);let i=open.length-1;while(i>0){const p=(i-1)>>1;if(open[p].f<=nd.f)break;open[i]=open[p];i=p;}open[i]=nd;};
   const pop=()=>{const top=open[0],last=open.pop();if(open.length){let i=0;for(;;){let l=i*2+1,r=l+1,m=i;if(l<open.length&&open[l].f<open[m].f)m=l;if(r<open.length&&open[r].f<open[m].f)m=r;if(m===i)break;open[i]=open[m];i=m;}open[i]=last;}return top;};
-  push({x:s[0],y:s[1],z:s[2],f:h(...s)});g.set(K(...s),0);let n=0,best=null,bh=1e9;
-  while(open.length&&n++<maxN){const c=pop();const ck=K(c.x,c.y,c.z),cg=g.get(ck);const hh=h(c.x,c.y,c.z);if(hh<bh){bh=hh;best=c;}
+  const sk=K(...s);GEN[sk]=ST;G[sk]=0;CAME[sk]=-1;push({x:s[0],y:s[1],z:s[2],g:0,f:h(...s)});let n=0,best=null,bh=1e9;
+  while(open.length){if(n++>=maxN||((n&31)===0&&performance.now()>tEnd)){cut=true;break;}const c=pop();const ck=K(c.x,c.y,c.z);if(c.g>G[ck]+1e-6)continue;   // stale queue entry
+    const hh=h(c.x,c.y,c.z);if(hh<bh){bh=hh;best=c;}
     if(Math.abs(c.x-t[0])<=1&&Math.abs(c.z-t[2])<=1&&Math.abs(c.y-t[1])<=1){best=c;bh=0;break;}
     const nb=[];const cb=getB(c.x,c.y,c.z),lad=!!cb&&!!BD[cb].ladder;
     for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const x=c.x+dx,z=c.z+dz;
-      if(pfStand(x,c.y,z)){nb.push([x,c.y,z,1]);continue;}
-      if(pfStand(x,c.y+1,z)&&pfPass(getB(c.x,c.y+2,c.z))){nb.push([x,c.y+1,z,2]);continue;}                  // step / jump up one
-      if(pfPass(getB(x,c.y,z))&&pfPass(getB(x,c.y+1,z)))for(let d=1;d<=3;d++){if(pfStand(x,c.y-d,z)){nb.push([x,c.y-d,z,1+d*.6]);break;}if(!pfPass(getB(x,c.y-d,z)))break;}}  // drop
-    if(lad&&pfStand(c.x,c.y+1,c.z))nb.push([c.x,c.y+1,c.z,1.5]);
-    const bb=getB(c.x,c.y-1,c.z);if(bb&&BD[bb].ladder&&pfStand(c.x,c.y-1,c.z))nb.push([c.x,c.y-1,c.z,1.2]);
-    for(const [x,y,z,w] of nb){const k=K(x,y,z),ng=cg+w;if(ng<(g.has(k)?g.get(k):1e9)){g.set(k,ng);came.set(k,ck);push({x,y,z,f:ng+h(x,y,z)});}}}
-  if(!best||bh>2.5)return null;   // couldn't get (near enough) there
-  const out=[];let k=K(best.x,best.y,best.z);const sk=K(...s);while(k!==undefined&&k!==sk){const y=k%256,r=(k-y)/256,z=r%512,x=(r-z)/512;out.push([x,y,z]);k=came.get(k);}
+      if(pfStand(x,c.y,z)){nb.push(x,c.y,z,1);continue;}
+      if(pfStand(x,c.y+1,z)&&pfPass(getB(c.x,c.y+2,c.z))){nb.push(x,c.y+1,z,2);continue;}                  // step / jump up one
+      if(pfPass(getB(x,c.y,z))&&pfPass(getB(x,c.y+1,z)))for(let d=1;d<=3;d++){if(pfStand(x,c.y-d,z)){nb.push(x,c.y-d,z,1+d*.6);break;}if(!pfPass(getB(x,c.y-d,z)))break;}}  // drop
+    if(lad&&pfStand(c.x,c.y+1,c.z))nb.push(c.x,c.y+1,c.z,1.5);
+    const bb=getB(c.x,c.y-1,c.z);if(bb&&BD[bb].ladder&&pfStand(c.x,c.y-1,c.z))nb.push(c.x,c.y-1,c.z,1.2);
+    for(let q=0;q<nb.length;q+=4){const x=nb[q],y=nb[q+1],z=nb[q+2],k=K(x,y,z),ng=c.g+nb[q+3];if(GEN[k]!==ST||ng<G[k]){GEN[k]=ST;G[k]=ng;CAME[k]=ck;push({x,y,z,g:ng,f:ng+h(x,y,z)});}}}
+  if(!best)return null;
+  if(bh>2.5){if(!cut||bh>h(...s)-4)return null;findPath.partial=true;}   // ran out of time: a route that gets well on the way is still worth walking, then plan again
+  const out=[];let k=K(best.x,best.y,best.z);while(k!==sk&&k>=0){const x=k%WX,r=(k-x)/WX,z=r%WZ,y=(r-z)/WZ;out.push([x,y,z]);k=CAME[k];}
   return out.reverse();}
 // follow the current path: returns the point to walk at (and sets jump / ladder climbing), or null to walk straight at the goal
 function botWaypoint(b){const ai=b.ai;if(!ai.path||!ai.path.length)return null;
@@ -60,7 +65,8 @@ function botWaypoint(b){const ai=b.ai;if(!ai.path||!ai.path.length)return null;
 // (re)plan towards a point now and then; a failed plan just means walking straight at it like before
 function botPlan(b,to){const ai=b.ai,now=MATCH.gameT;if(hdist(b.pos,to)<2.2&&Math.abs(to[1]-b.pos[1])<1.5){ai.path=null;return;}
   if(ai.pathTo&&now<ai.pathT&&hdist(ai.pathTo,to)<2.5&&Math.abs(ai.pathTo[1]-to[1])<1.5)return;   // also remembers a failed search for a while
-  ai.path=findPath(b.pos,to);ai.pathTo=[to[0],to[1],to[2]];ai.pathT=now+(ai.path?1.5:3)+Math.random()*.5;}
+  if(botPlan.frame===now)return;botPlan.frame=now;   // at most one search per game frame, so bots never hold up the host
+  ai.path=findPath(b.pos,to);ai.pathTo=[to[0],to[1],to[2]];ai.pathT=now+(ai.path?(findPath.partial?.7:1.5):3)+Math.random()*.5;}
 // how far can it walk in direction a without hitting a wall it can't step over or a drop it won't take (no pathfinding, so it feels its way like this)
 // (returns the distance, and whether a wall rather than a drop stopped it)
 function walkLen(b,a,maxD){const sol=v=>v&&(BD[v].solid||v===B.BARRIER);const drop=MATCH.mode==='br'?(b.health>12?9:5):5;let y=Math.floor(b.pos[1]+.01),n=0;

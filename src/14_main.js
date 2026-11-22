@@ -22,7 +22,9 @@ chestAcc+=dt;while(chestAcc>=TICK){chestAcc-=TICK;tickChestLids();}
   for(const f of feed)f.t-=dt;feed=feed.filter(f=>f.t>0);for(const m of msgs)m.t-=dt;msgs=msgs.filter(m=>m.t>0);for(const c of chat)c.t-=dt;chat=chat.filter(c=>c.t>0);
   selShow=Math.max(0,selShow-dt);
   sendMyState(dt);sendBots(dt);
+  if(net&&net.ping>250){slowT+=dt;if(slowT>10&&!slowWarned){slowWarned=true;chatMsg(`Slow connection to the game server (${Math.round(net.ping)} ms). Other players will look laggy; a server closer to everyone helps.`,'#ffaa00',false);}}else slowT=0;
 }
+let slowT=0,slowWarned=false;
 let last=performance.now();
 let lastDraw=0;
 function frame(now){const cap=[0,60,30][OPT.fps|0];if(cap&&now-lastDraw<1000/cap-2){requestAnimationFrame(frame);return;}lastDraw=now;const dt=Math.min(.05,(now-last)/1000);last=now;perfT+=dt;dtFrame=dt;try{update(dt);render();}catch(err){console.error(err);}requestAnimationFrame(frame);}
