@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xbox Minecraft Battle Mode Browser Edition</title>
+<meta name="description" content="Xbox Minecraft Battle Mode Browser Edition: a fan-made browser tribute to the Legacy Console Battle mini game, with bots, online play and Battle Royale.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+/* VOICE: classic Java Edition menus, plain and blocky
+   IDEA: the game's own gray container screens and stone buttons
+   PICTURE: the live 3D world (or a loaded title panorama) behind every menu
+   COLOUR and TYPE: #c6c6c6 bevelled panels, gray buttons, a pixel font
+   LAYOUT: full-screen game; centred panels over it */
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:'VT323','Courier New',monospace;user-select:none;-webkit-user-select:none}
+#gl,#hud{position:fixed;inset:0;width:100%;height:100%;display:block}#hud{pointer-events:none}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.45);text-shadow:2px 2px 0 #000;padding:16px;box-sizing:border-box;overflow:auto}
+.hidden{display:none!important}
+h1{font-size:clamp(56px,12vw,112px);margin:0;letter-spacing:4px;color:#d8d8d8;text-shadow:3px 3px 0 #555,6px 6px 0 #2a2a2a,9px 9px 0 rgba(0,0,0,.5);font-weight:normal;line-height:1.05;text-align:center}
+h2{margin:0 0 10px;font-size:40px;color:#fff;font-weight:normal;text-align:center}
+.sub{opacity:.95;margin:8px 0 18px;font-size:22px;color:#ffff55;text-align:center;max-width:680px}
+.btn{background:#6d6d6d;border:3px solid #000;box-shadow:inset -3px -3px 0 #3d3d3d,inset 3px 3px 0 #a8a8a8;color:#fff;font:24px 'VT323','Courier New',monospace;padding:9px 26px;margin:5px;cursor:pointer;text-shadow:2px 2px 0 #333;min-width:260px;min-height:44px}
+.btn:hover,.btn:focus-visible{background:#7b84b8;outline:2px solid #fff;outline-offset:-3px;color:#ffffa0}.btn.small{min-width:0;font-size:20px;padding:6px 14px;min-height:36px}
+.panel{background:#c6c6c6;border:2px solid #000;box-shadow:inset 3px 3px 0 #fff,inset -3px -3px 0 #555;border-radius:3px;padding:14px 18px;color:#3f3f3f;text-shadow:none;font-size:18px;max-width:min(96vw,760px);max-height:88vh;overflow:auto;box-sizing:border-box}
+.panel h3{margin:4px 0 6px;font-size:22px;color:#3f3f3f;font-weight:normal}
+.grid{display:grid;grid-template-columns:repeat(9,48px);gap:3px;margin:4px 0 10px}
+.slot{width:48px;height:48px;background:#8b8b8b;box-shadow:inset 2px 2px 0 #373737,inset -2px -2px 0 #fff;box-sizing:border-box;position:relative;cursor:pointer}
+.slot:hover{background:#a8a8a8}.slot canvas{position:absolute;left:5px;top:5px;width:34px;height:34px;image-rendering:pixelated}
+.slot span{position:absolute;right:3px;bottom:1px;color:#fff;font-weight:bold;text-shadow:2px 2px 0 #333;font-size:20px;font-family:'VT323',monospace}.slot.sel{outline:3px solid #fff;outline-offset:-1px}
+.form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:8px 14px;align-items:center;margin:8px 0}
+.form label{font-size:20px}select,input[type=text],input[type=number],input[type=password]{font:20px 'VT323','Courier New',monospace;min-height:34px;background:#000;color:#e0e0e0;border:2px solid #a0a0a0;padding:2px 6px;box-sizing:border-box;width:100%}
+input[type=checkbox]{width:20px;height:20px;accent-color:#555}
+.maps{display:flex;flex-wrap:wrap;gap:8px}.maps label{background:#8b8b8b;color:#fff;text-shadow:1px 1px 0 #333;border:2px solid #555;padding:6px 10px;cursor:pointer}
+.note{font-size:17px;opacity:.85;line-height:1.5;margin-top:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.controls{font-size:19px;line-height:1.7;opacity:.95;margin-top:14px;text-align:center;max-width:680px}.controls b{color:#ffd54a}
+/* console title screen */
+.lce{background:radial-gradient(ellipse at center,rgba(0,0,0,0) 40%,rgba(0,0,0,.45));justify-content:flex-start;padding-top:4vh}
+#logo{width:min(760px,92vw);height:auto;image-rendering:pixelated;filter:drop-shadow(0 6px 0 rgba(0,0,0,.35))}
+#edition{margin-top:-8px;font-size:clamp(18px,3vw,28px);letter-spacing:3px;color:#fff;text-shadow:2px 2px 0 #3a3a3a,0 0 6px rgba(0,0,0,.6)}
+#splash{position:relative;left:min(260px,28vw);top:-58px;margin-bottom:-40px;color:#ffff3f;font-size:clamp(20px,3.2vw,30px);text-shadow:2px 2px 0 #3f3f00;transform:rotate(-20deg);animation:pulse .45s ease-in-out infinite alternate;pointer-events:none;white-space:nowrap}
+@keyframes pulse{from{transform:rotate(-20deg) scale(1)}to{transform:rotate(-20deg) scale(1.08)}}
+@media (prefers-reduced-motion:reduce){#splash{animation:none}}
+#splash.onlogo{top:-92px;left:min(300px,30vw);margin-bottom:-52px}
+.menuList{display:flex;flex-direction:column;gap:8px;margin-top:18px;width:min(400px,86vw)}
+.lbtn{height:40px;font:24px 'VT323','Courier New',monospace;color:#e8e8e8;text-shadow:2px 2px 0 #383838;cursor:pointer;border:2px solid #000;
+  background:#6f6f6f repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 3px,rgba(0,0,0,.05) 3px 6px);box-shadow:inset 2px 2px 0 #a5a5a5,inset -2px -2px 0 #4a4a4a}
+@keyframes scrIn{from{opacity:0;transform:scale(1.015)}to{opacity:1;transform:none}}
+.screen:not(.hidden){animation:scrIn .18s ease-out}
+.lbtn{transition:background .08s,transform .08s}.lbtn.sel{transform:scale(1.02)}
+.lbtn.sel,.lbtn:focus-visible{background:#7680d3;color:#ffff55;box-shadow:inset 2px 2px 0 #b8bff5,inset -2px -2px 0 #3f479a;outline:2px solid #fff;outline-offset:-4px}
+#prompts{position:fixed;left:24px;bottom:18px;font-size:22px;color:#fff;text-shadow:2px 2px 0 #333}
+#prompts .key{display:inline-block;background:#e8e8e8;color:#333;text-shadow:none;border-radius:4px;padding:0 6px;margin-right:4px;box-shadow:0 2px 0 #777}
+#verTag{position:fixed;right:20px;bottom:18px;font-size:18px;color:#ddd;text-shadow:2px 2px 0 #333}
+#status{font-size:18px;margin-top:8px;color:#204080;min-height:18px}
+#skinRow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:8px 0}#skinRow canvas{width:40px;height:40px;image-rendering:pixelated;border:2px solid #000;cursor:pointer;background:#555}#skinRow canvas.on{border-color:#fff}
+table.res{border-collapse:collapse;margin:8px auto;font-size:22px}table.res td{padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.15)}table.res td:last-child,table.res td:nth-child(3),table.res td:nth-child(4){text-align:right}
+
+/* ===== Legacy Console (Xbox) look: --S is the console GUI scale (1 at 360p, 2 at 720p, 3 at 1080p) ===== */
+:root{--S:2;--btn:none;--btnSel:none}
+.lce{background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(0,0,0,.35));justify-content:flex-start;padding-top:calc(var(--S)*27px)}
+#logoWrap{position:relative;width:calc(var(--S)*262px);text-align:center}
+#logo{width:100%;height:auto;image-rendering:pixelated;display:block;filter:none}
+#edition{margin-top:calc(var(--S)*-2px)}
+#splash{position:absolute;left:calc(100% - var(--S)*95px);right:auto;top:auto;bottom:calc(var(--S)*3px);margin:0;transform:rotate(-20deg);transform-origin:center;animation:lcepulse .5s ease-in-out infinite alternate;pointer-events:none}
+#splash.onlogo{top:auto;left:auto;margin:0}
+#splash canvas{display:block;image-rendering:pixelated}
+@keyframes lcepulse{from{transform:rotate(-20deg) scale(.96)}to{transform:rotate(-20deg) scale(1.06)}}
+@media (prefers-reduced-motion:reduce){#splash{animation:none}}
+.menuList{display:flex;flex-direction:column;align-items:center;gap:calc(var(--S)*4px);margin-top:calc(var(--S)*30px);width:auto}
+.lbtn{width:calc(var(--S)*210px);height:calc(var(--S)*20px);padding:0;border:0;outline:0;box-shadow:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  background:#6f6f6f var(--btn) 0 0/100% 100% no-repeat;image-rendering:pixelated;transition:none;transform:none;font:0/0 a;color:transparent;text-shadow:none}
+.lbtn.sel,.lbtn:focus-visible{background:#9da2d8 var(--btnSel) 0 0/100% 100% no-repeat;transform:none;outline:0;box-shadow:none}
+.lbtn canvas{image-rendering:pixelated;display:block;pointer-events:none}.lbtn canvas.s,.lbtn.sel canvas.n,.lbtn:focus-visible canvas.n{display:none}.lbtn.sel canvas.s,.lbtn:focus-visible canvas.s{display:block}
+.lprompts{position:fixed;left:calc(var(--S)*30px);bottom:calc(var(--S)*18px);display:flex;gap:calc(var(--S)*12px);align-items:center;font-size:0}
+#invPrompts{max-width:calc(50vw - var(--S)*104px);flex-wrap:wrap;row-gap:calc(var(--S)*3px)}
+.lp{display:flex;align-items:center;gap:calc(var(--S)*3px);cursor:pointer}
+.lp .pb{width:calc(var(--S)*10px);height:calc(var(--S)*10px);border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--c) 55%,#fff),var(--c) 55%,color-mix(in srgb,var(--c) 60%,#000));box-shadow:0 0 0 calc(var(--S)*1px) rgba(0,0,0,.55)}
+.lp .pb.bump{width:calc(var(--S)*16px);border-radius:calc(var(--S)*3px) calc(var(--S)*3px) calc(var(--S)*2px) calc(var(--S)*2px);background:linear-gradient(#e8e8e8,#9a9a9a)}
+.lp .pb.key{width:auto;min-width:calc(var(--S)*10px);padding:0 calc(var(--S)*3px);border-radius:calc(var(--S)*2px);background:linear-gradient(#f2f2f2,#bdbdbd)}
+.lp canvas{image-rendering:pixelated;display:block}
+/* container screens (chest / inventory / leaderboards) */
+.lpanel{background:#c6c6c6;border-radius:calc(var(--S)*4px);padding:calc(var(--S)*6px) calc(var(--S)*8px) calc(var(--S)*8px);
+  box-shadow:0 0 0 calc(var(--S)*1px) #000,inset calc(var(--S)*2px) calc(var(--S)*2px) 0 #fff,inset calc(var(--S)*-2px) calc(var(--S)*-2px) 0 #555;color:#404040;text-shadow:none;max-width:96vw;max-height:92vh;overflow:auto;box-sizing:border-box}
+.lhead,.lab,.lnote{display:flex;justify-content:center;align-items:center;min-height:calc(var(--S)*12px)}.lhead{min-height:calc(var(--S)*14px)}
+.lhead canvas,.lab canvas,.lnote canvas,.lbt canvas{image-rendering:pixelated;display:block}
+.lsub{background:#c6c6c6;border-radius:calc(var(--S)*2px);padding:calc(var(--S)*3px) calc(var(--S)*5px) calc(var(--S)*5px);margin-top:calc(var(--S)*4px);
+  box-shadow:inset 0 0 0 calc(var(--S)*1px) #8b8b8b,inset calc(var(--S)*2px) calc(var(--S)*2px) 0 calc(var(--S)*0px) #e3e3e3}
+.lab.left,#x{}
+#invTip{position:fixed;z-index:9;pointer-events:none;font-size:0;padding:calc(var(--S)*3px) calc(var(--S)*4px);background:rgba(16,0,16,.94);border-radius:calc(var(--S)*1px);box-shadow:inset 0 0 0 calc(var(--S)*1px) #2b0f5c,0 0 0 calc(var(--S)*1px) rgba(16,0,16,.94)}#invTip canvas{display:block;image-rendering:pixelated}
+.lab.left{justify-content:flex-start;padding-left:calc(var(--S)*1px)}
+.lrow{display:flex;gap:calc(var(--S)*4px);align-items:stretch}.lrow .lsub{flex:0 0 auto}
+.lgrid{display:grid;grid-template-columns:repeat(9,calc(var(--S)*18px));gap:0;justify-content:center}.lgrid.g4{grid-template-columns:repeat(4,calc(var(--S)*18px))}
+.lgrid .slot{width:calc(var(--S)*18px);height:calc(var(--S)*18px);background:#8b8b8b;box-shadow:inset var(--S0) var(--S0) 0 #373737,inset calc(var(--S)*-1px) calc(var(--S)*-1px) 0 #fff;
+  --S0:calc(var(--S)*1px);box-sizing:border-box;position:relative;cursor:pointer}
+.lgrid .slot:hover{background:#a9a9a9}.lgrid .slot.sel{background:#b8b8b8;box-shadow:inset 0 0 0 calc(var(--S)*1px) #fff,inset 0 0 0 calc(var(--S)*2px) #3f3f3f}
+.lgrid .slot canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;left:0;top:0}
+.ver{position:fixed;bottom:calc(var(--S)*2px);font-size:0;pointer-events:none}#verL{left:calc(var(--S)*2px)}#verR{right:calc(var(--S)*2px)}.ver canvas{display:block;image-rendering:pixelated}
+#menu .lprompts{bottom:calc(var(--S)*16px)}
+#pvWrap{position:fixed;right:max(4vw,calc(50% - var(--S)*105px - var(--S)*150px));top:calc(var(--S)*118px);display:flex;flex-direction:column;align-items:center;gap:calc(var(--S)*2px);z-index:5}
+#pvName{font-size:0;min-height:calc(var(--S)*9px)}#pvName canvas{display:block;image-rendering:pixelated}
+#pvCanvas{width:calc(var(--S)*46px);height:calc(var(--S)*80px);image-rendering:pixelated}
+.sbtn{height:calc(var(--S)*14px);padding:0 calc(var(--S)*5px);border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0;
+  background:#d4d4d4;box-shadow:0 0 0 calc(var(--S)*1px) #2b2b2b,inset calc(var(--S)*1px) calc(var(--S)*1px) 0 #fff,inset calc(var(--S)*-1px) calc(var(--S)*-1px) 0 #8b8b8b}
+.sbtn:hover,.sbtn:focus-visible{background:#b9bcec;outline:0}.sbtn canvas{display:block;image-rendering:pixelated}
+#dressPanel{align-items:flex-start;padding-left:max(4vw,calc(50% - var(--S)*230px))}
+#dressBox{width:calc(var(--S)*236px)}#dressBox .lsub{display:flex;flex-direction:column;align-items:center}#dressBox .row{width:100%}#dressGrid{grid-template-columns:repeat(8,calc(var(--S)*18px))}#dressGrid .slot canvas{inset:calc(var(--S)*1px);width:auto;height:auto;width:calc(100% - var(--S)*2px);height:calc(100% - var(--S)*2px)}
+#dressName{font:calc(var(--S)*10px) 'VT323',monospace;width:100%;background:#000;color:#e0e0e0;border:calc(var(--S)*1px) solid #a0a0a0;min-height:calc(var(--S)*14px)}
+.lbt{border-collapse:collapse}.lbt td{padding:calc(var(--S)*2px) calc(var(--S)*6px)}.lbt tr:first-child td{border-bottom:calc(var(--S)*1px) solid #8b8b8b}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas><canvas id="hud"></canvas>
+
+<div id="menu" class="screen lce">
+  <div id="logoWrap"><canvas id="logo" width="760" height="150" aria-label="Xbox Minecraft Battle Mode Browser Edition"></canvas><div id="edition">BATTLE EDITION</div><div id="splash">Now with Photon!</div></div>
+  <div class="menuList" id="menuList">
+    <button class="lbtn main" id="soloBtn">Play Game</button>
+    <button class="lbtn main" id="miniBtn">Mini Games</button>
+    <button class="lbtn main" id="lbBtn">Leaderboards</button>
+    <button class="lbtn main" id="optBtn">Help &amp; Options</button>
+    <button class="lbtn main" id="packBtn">Texture Packs</button>
+    <button class="lbtn mini hidden" id="battleBtn">Battle</button>
+    <button class="lbtn mini hidden" id="brBtn">Battle Royale</button>
+    <button class="lbtn mini hidden" id="onlineBtn">Play Online</button>
+    <button class="lbtn mini hidden" id="practiceBtn">Practice</button>
+  </div>
+  <div id="prompts" class="lprompts"></div>
+  <div id="verL" class="ver" data-t="Minecraft 1.8 Battle Browser Edition">Minecraft 1.8 Battle Browser Edition</div><div id="verR" class="ver" data-t="Copyright Logjang AB. Do not distribute!">Copyright Logjang AB. Do not distribute!</div>
+</div>
+<div id="pvWrap" class="hidden"><div id="pvName"></div><canvas id="pvCanvas" aria-label="Your skin"></canvas><button class="sbtn" id="dressBtn">Dressing Room</button></div>
+
+<div id="dressPanel" class="screen hidden"><div class="lpanel" id="dressBox">
+  <div class="lhead" data-t="Dressing Room">Dressing Room</div>
+  <div class="lsub"><div class="lab" data-t="Choose User">Choose User</div><div class="row" style="margin:0"><input id="dressName" type="text" maxlength="16" placeholder="Your name" aria-label="Your name"></div></div>
+  <div class="lsub"><div class="lab" data-t="Skins">Skins</div><div id="dressGrid" class="lgrid"></div>
+    <div class="row" style="margin-top:6px"><button class="sbtn" id="skinImport">Import Skin</button><button class="sbtn hidden" id="skinDel">Remove Skin</button></div>
+    <div class="lnote" id="dressMsg"></div></div>
+  <div class="lnote" data-t="64x64 or 64x32 PNG skins.">64x64 or 64x32 PNG skins.</div><div class="lnote" data-t="Saved here and shown to others online.">Saved here and shown to others online.</div>
+  <input id="skinFile" type="file" accept="image/png" class="hidden"><button class="hidden" id="dressClose"></button>
+</div><div class="lprompts" id="dressPrompts"></div></div>
+
+
+<div id="lbPanel" class="screen hidden"><div class="lpanel">
+  <div class="lhead" data-t="Leaderboards">Leaderboards</div>
+  <div class="lsub"><table class="lbt" id="lbTable"></table></div>
+  <div class="lnote" id="lbNote" data-t="Stats from matches played in this browser">Stats from matches played in this browser</div>
+</div><div class="lprompts" id="lbPrompts"></div><button class="hidden" id="lbClose"></button></div>
+
+<div id="optPanel" class="screen hidden"><div class="panel">
+  <h3>Profile</h3>
+  <div class="row" style="margin:0;justify-content:flex-start"><input id="nameIn" type="text" maxlength="16" placeholder="Your name" style="max-width:260px"></div>
+  <div id="skinRow" style="justify-content:flex-start"></div>
+  <h3>Controls</h3>
+  <div class="note" style="margin-top:0">WASD move · Space jump, swim up, climb · Shift sneak · Ctrl or double-tap W sprint · Mouse look · LMB attack (hold to mine in Battle Royale) · RMB open chest, hold to eat, drink or draw a bow, throw splash potions, equip armour, place blocks · 1-9 or wheel hotbar · E chest · Q drop · R ready (lobby) · Tab lobby · Esc pause</div>
+  <h3>Look</h3>
+  <div class="form"><label for="o_sens">Sensitivity</label><input id="o_sens" type="range" min="0" max="200" value="100"><label for="o_invy">Invert Look</label><input id="o_invy" type="checkbox"></div>
+  <h3>Game Options</h3>
+  <div class="form">
+    <label for="o_mode">Mode</label><select id="o_mode"><option value="battle">Battle</option><option value="br">Battle Royale (MCBR datapack)</option></select>
+    <label for="o_round">Round Length</label><select id="o_round"><option value="180">3 minutes</option><option value="300">5 minutes</option><option value="600" selected>10 minutes</option><option value="900">15 minutes</option><option value="1200">20 minutes</option><option value="1800">30 minutes</option><option value="2700">45 minutes</option><option value="3600">60 minutes</option><option value="0">Unlimited</option></select>
+    <label for="o_hunger">Hunger Rate</label><select id="o_hunger"><option value="0.5">Slow</option><option value="1" selected>Normal</option><option value="2">Fast</option></select>
+    <label for="o_refill">Item Respawn</label><select id="o_refill"><option value="30">30 seconds</option><option value="60">1 minute</option><option value="120" selected>2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option><option value="0">No respawns</option></select>
+    <label for="o_grace">Grace Period</label><select id="o_grace"><option value="0">Disabled</option><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="15" selected>15 seconds</option><option value="20">20 seconds</option><option value="25">25 seconds</option><option value="30">30 seconds</option></select>
+    <label for="o_show">Enable Showdown</label><input id="o_show" type="checkbox" checked>
+    <label for="o_take">Enable Take Everything</label><input id="o_take" type="checkbox" checked>
+    <label for="o_central">Central Spawn</label><input id="o_central" type="checkbox" checked>
+    <label for="o_bots">Bots</label><input id="o_bots" type="number" min="0" max="15" value="5">
+    <label for="o_diff">Bot difficulty</label><select id="o_diff"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option><option value="3">Sweaty</option></select>
+    <label for="o_brlen">Battle Royale length</label><select id="o_brlen"><option value="0.2">Quick (~7 min)</option><option value="0.4">Medium (~15 min)</option><option value="1">Original datapack (~37 min)</option></select>
+    <label for="o_brx">BR extra loot chests</label><input id="o_brx" type="checkbox" checked>
+  </div>
+  <h3>Select Maps</h3><div class="maps" id="mapChecks"></div>
+  <div class="row"><button class="btn small" id="optClose">Done</button></div>
+</div></div>
+
+<div id="onlinePanel" class="screen hidden"><div class="panel">
+  <h3>Play Online</h3>
+  <div class="form">
+    <label for="n_kind">Connection</label><select id="n_kind"><option value="photon">Photon Realtime (internet)</option><option value="local">Same browser, other tabs (LAN test)</option></select>
+    <label for="n_app">Photon AppId</label><input id="n_app" type="password" placeholder="Realtime AppId from dashboard.photonengine.com">
+    <label for="n_region">Region</label><select id="n_region"><option>us</option><option>usw</option><option>eu</option><option>asia</option><option>jp</option><option>au</option><option>sa</option><option>kr</option><option>in</option></select>
+    <label for="n_room">Room code</label><input id="n_room" type="text" maxlength="24" value="battle">
+    <label for="n_sdk">Photon SDK URL (optional)</label><input id="n_sdk" type="text" placeholder="photon.min.js next to this page">
+  </div>
+  <div class="note">Photon needs your own free Realtime AppId and the Photon JavaScript SDK (put <code>photon.min.js</code> beside this page, or give its URL). Hosted pages work; this preview blocks outside connections, so use "Same browser, other tabs" here. The first player in a room hosts: it runs the bots, chests and round timer.</div>
+  <div id="status"></div>
+  <div class="row"><button class="btn small" id="connectBtn">Connect</button><button class="btn small" id="onlineClose">Back</button></div>
+</div></div>
+
+<div id="packPanel" class="screen hidden"><div class="panel">
+  <h3>Resource Packs</h3>
+  <div class="note">Load Java Edition resource packs (.zip) or a Minecraft client .jar you own. They're read on this device only and remembered in this browser. Packs stack: load a full texture source (for example the 1.21 client jar or Programmer Art) first, then the Legacy Console pack for its panorama, bat and sounds.</div>
+  <div class="row"><input id="packFile" type="file" accept=".zip,.jar" multiple></div>
+  <div class="row"><label class="note" for="logoFile" style="margin:0">Title logo image:</label><input id="logoFile" type="file" accept="image/*"><button class="btn small" id="logoClear">Reset logo</button></div>
+  <div id="packList" class="note"></div>
+  <div class="row"><button class="btn small" id="packClear">Remove all packs</button><button class="btn small" id="packClose">Done</button></div>
+</div></div>
+
+<div id="chestUI" class="screen hidden" style="background:rgba(0,0,0,.3)"><div class="lpanel">
+  <div class="lhead" id="invHead"></div><div id="invTip" class="hidden"></div>
+  <div class="lsub" id="chestSub"><div class="lab left" data-t="Chest">Chest</div><div id="chestGrid" class="lgrid"></div></div>
+  <div class="lrow">
+    <div class="lsub" id="armorSub"><div class="lab left" data-t="Armour">Armour</div><div id="armorGrid" class="lgrid g4"></div></div>
+    <div class="lsub"><div class="lab left" data-t="Inventory">Inventory</div><div id="invGrid" class="lgrid"></div></div>
+  </div>
+</div><div class="lprompts" id="invPrompts"></div>
+<button class="hidden" id="takeAll"></button><button class="hidden" id="closeChest"></button></div>
+
+<div id="pause" class="screen hidden"><h2>Paused</h2>
+  <button class="btn" id="resumeBtn">Resume</button><button class="btn" id="leaveBtn">Leave game</button></div>
+<div id="lobbyPanel" class="screen hidden"><div class="panel"><h3>Lobby</h3><div id="lobbyInfo"></div>
+  <div class="row"><button class="btn small" id="lobbyReady">Ready (R)</button><button class="btn small" id="lobbyOpts">Game Options</button><button class="btn small" id="lobbyStart">Start now</button><button class="btn small" id="lobbyClose">Close (Tab)</button></div></div></div>
+<div id="results" class="screen hidden"><h2 id="resTitle">Results</h2><table class="res" id="resTable"></table><div id="resNote" class="note"></div>
+  <div class="row"><button class="btn small" id="nextBtn">Next map</button><button class="btn small" id="menuBtn">Menu</button></div></div>
+<div id="loading" class="screen hidden" style="background:#000 url() center/cover;background:radial-gradient(ellipse at center,#2b2b2b,#050505)"><div style="width:min(560px,86vw);text-align:center">
+  <div id="loadTitle" style="font-size:30px;color:#fff;text-shadow:2px 2px 0 #333">Loading level</div>
+  <div style="margin:14px auto;height:14px;border:2px solid #000;background:#3a3a3a;box-shadow:inset 0 0 0 2px #808080"><div id="loadBar" style="height:100%;width:0;background:#7ec850;transition:width .06s"></div></div>
+  <div id="loadTip" style="font-size:20px;color:#ffff55;text-shadow:2px 2px 0 #3f3f00;margin-top:24px"></div></div></div>
+<div id="clickResume" class="screen hidden" style="background:rgba(0,0,0,.25)"><h2>Click to play</h2></div>
+<script>
+{
+/*__SCRIPT__*/
+}
+</script>
+</body>
+</html>
