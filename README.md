@@ -40,7 +40,7 @@ Open `index.html` in a browser, or host it with GitHub Pages (below).
 ### Online multiplayer (Photon)
 
 1. Create a free **Photon Realtime** app at dashboard.photonengine.com and copy its AppId.
-2. Download the Photon JavaScript SDK and put `photon.min.js` next to `index.html` (or paste its URL in Play Online).
+2. Download the **Realtime JavaScript SDK** from photonengine.com (SDKs page, sign in) and copy `lib/photon.min.js` from it next to `index.html` (or paste its URL in Play Online). Use this official, current file: older copies of the SDK connect to the master server and then get dropped by the game server with error 2003.
 3. Put the AppId in Play Online (it's remembered), or change `DEFAULT_APPID` in `src/13_ui.js` and rebuild.
 
 ### Resource packs

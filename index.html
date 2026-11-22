@@ -1701,7 +1701,7 @@ class PhotonNet{
     c.onError=(code,msg)=>{if(c!==this.c||this.left)return;
       // a dropped game-server connection before we got into the room: try again a couple of times
       if(!this.joined&&code>=2001&&code<=2004&&this.retries<2){this.retries++;setNetStatus(`Photon: game server dropped the connection, retrying (${this.retries}/2)...`);try{c.disconnect();}catch(e){}setTimeout(()=>{if(!this.left)this.connect();},1500);return;}
-      onFail&&onFail(photonHelp(code,msg));};
+      onFail&&onFail(photonHelp(code,msg)+(PHOTON_SDK_URL?' [SDK loaded from: '+PHOTON_SDK_URL+']':''));};
     try{c.myActor().setName(String(name||'Player').slice(0,16));}catch(e){}
     try{c.connectToRegionMaster(region||'us');}catch(e){onFail&&onFail('Photon failed to start: '+e.message);}
   }
@@ -1714,12 +1714,19 @@ class PhotonNet{
   leave(){this.left=true;try{this.c.disconnect();}catch(e){}}
 }
 function loadScript(u){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+// Photon JavaScript SDK: prefer the official SDK file next to the page (lib/photon.min.js from the Realtime JavaScript SDK download).
+// The old 2017 npm copy is no longer tried: an outdated SDK gets past the master server and is then dropped by the game server (error 2003).
+let PHOTON_SDK_URL=null;
 async function loadPhotonSDK(custom){
   if(window.Photon&&window.Photon.LoadBalancing)return true;
-  const urls=[custom,'photon.min.js','photon.js','Photon-Javascript_SDK.min.js','Photon-Javascript_SDK.js','lib/photon.min.js',
-    'https://cdn.jsdelivr.net/npm/photon-realtime@4.3.2/photon.min.js','https://cdn.jsdelivr.net/npm/photon-realtime@4.3.2/photon.js','https://cdn.jsdelivr.net/npm/photon-realtime@4.3.2/dist/photon.min.js',
-    'https://cdn.jsdelivr.net/npm/photon-javascript-sdk@0.0.3/lib/Photon-Javascript_SDK.min.js'].filter(Boolean);
-  for(const u of urls){try{await loadScript(u);if(window.Photon&&window.Photon.LoadBalancing)return true;}catch(e){}}
+  const local=[custom,'photon.min.js','photon.js','lib/photon.min.js','Photon-Javascript_SDK.min.js','Photon-Javascript_SDK.js'].filter(Boolean);
+  for(const u of local){try{await loadScript(u);if(window.Photon&&window.Photon.LoadBalancing){PHOTON_SDK_URL=u;return true;}}catch(e){}}
+  // npm build of the current SDK, written for require(): give it a CommonJS shim and pick up its exports
+  for(const u of ['https://cdn.jsdelivr.net/npm/photon-realtime@4/photon.min.js','https://cdn.jsdelivr.net/npm/photon-realtime@4/photon.js','https://cdn.jsdelivr.net/npm/photon-realtime@4']){
+    const hadM='module' in window,hadE='exports' in window;window.module={exports:{}};window.exports=window.module.exports;
+    try{await loadScript(u);const ex=window.module.exports;if(!window.Photon&&ex&&(ex.LoadBalancing||(ex.Photon&&ex.Photon.LoadBalancing)))window.Photon=ex.LoadBalancing?ex:ex.Photon;}catch(e){}
+    if(!hadM)delete window.module;if(!hadE)delete window.exports;
+    if(window.Photon&&window.Photon.LoadBalancing){PHOTON_SDK_URL=u;return true;}}
   return false;
 }
 
@@ -2583,7 +2590,8 @@ $('connectBtn').addEventListener('click',async()=>{
   if(kind==='local'){setNetStatus('Joining room "'+room+'" in this browser...');net=new LocalNet(room,myName);wire();net.onReady=ready;return;}
   if(!$('n_app').value.trim()){setNetStatus('Enter your Photon Realtime AppId first.');return;}
   setNetStatus('Loading Photon SDK...');const ok=await loadPhotonSDK($('n_sdk').value.trim());
-  if(!ok){setNetStatus('Could not load the Photon JavaScript SDK. Put photon.min.js next to this page or paste its URL.');return;}
+  if(!ok){setNetStatus('Could not load the Photon JavaScript SDK. Download the Photon Realtime JavaScript SDK from photonengine.com and put lib/photon.min.js next to index.html (or paste its URL).');return;}
+  setNetStatus('Photon SDK: '+PHOTON_SDK_URL);
   try{net=new PhotonNet($('n_app').value.trim(),$('n_region').value,room,myName,ready,msg=>setNetStatus(msg));wire();}catch(err){setNetStatus('Photon failed: '+err.message);net=null;}
 });
 $('resumeBtn').addEventListener('click',()=>{paused=false;hide('pause');lockPointer();});
