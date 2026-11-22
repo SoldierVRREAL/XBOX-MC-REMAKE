@@ -173,7 +173,7 @@ function refreshSkinPicker(){const row=$('skinRow');const opts=availableSkins().
   for(const k of opts){const c=mkCanvas(16,16);const g=c.getContext('2d');g.imageSmoothingEnabled=false;const S=skinTex(k).img;g.drawImage(S,8,8,8,8,0,0,16,16);g.drawImage(S,40,8,8,8,0,0,16,16);c.title=k.replace(/^(pack|gen):/,'');if(k===mySkin)c.classList.add('on');
     c.addEventListener('click',()=>{mySkin=k;store('bb_skin',k);refreshSkinPicker();sfx('click');});row.appendChild(c);}}
 $('nameIn').addEventListener('change',()=>{if(mySkin.startsWith('gen:'))mySkin='gen:'+($('nameIn').value||'Player');refreshSkinPicker();});
-const DEFAULT_APPID='d20d4904-60a7-49e7-8d96-7976eadfcaf6';$('n_kind').value=store('bb_nkind')||'photon';$('n_app').value=store('bb_app')||DEFAULT_APPID;$('n_region').value=store('bb_region')||'us';$('n_room').value=store('bb_room')||'battle';$('n_sdk').value=store('bb_sdk')||'';
+const DEFAULT_APPID='d4f1dd7f-3b87-4c28-ae83-c1ea4b649097',OLD_APPIDS=['d20d4904-60a7-49e7-8d96-7976eadfcaf6'];$('n_kind').value=store('bb_nkind')||'photon';{const sv=store('bb_app');$('n_app').value=(!sv||OLD_APPIDS.includes(sv))?DEFAULT_APPID:sv;}$('n_region').value=store('bb_region')||'us';$('n_room').value=store('bb_room')||'battle';$('n_sdk').value=store('bb_sdk')||'';
 $('connectBtn').addEventListener('click',async()=>{
   const kind=$('n_kind').value,room=($('n_room').value||'battle').trim();store('bb_nkind',kind);store('bb_app',$('n_app').value);store('bb_region',$('n_region').value);store('bb_room',room);store('bb_sdk',$('n_sdk').value);
   if(net){net.leave();net=null;}readOptions();
