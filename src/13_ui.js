@@ -183,7 +183,8 @@ $('connectBtn').addEventListener('click',async()=>{
   if(kind==='local'){setNetStatus('Joining room "'+room+'" in this browser...');net=new LocalNet(room,myName);wire();net.onReady=ready;return;}
   if(!$('n_app').value.trim()){setNetStatus('Enter your Photon Realtime AppId first.');return;}
   setNetStatus('Loading Photon SDK...');const ok=await loadPhotonSDK($('n_sdk').value.trim());
-  if(!ok){setNetStatus('Could not load the Photon JavaScript SDK. Put photon.min.js next to this page or paste its URL.');return;}
+  if(!ok){setNetStatus('Could not load the Photon JavaScript SDK. Download the Photon Realtime JavaScript SDK from photonengine.com and put lib/photon.min.js next to index.html (or paste its URL).');return;}
+  setNetStatus('Photon SDK: '+PHOTON_SDK_URL);
   try{net=new PhotonNet($('n_app').value.trim(),$('n_region').value,room,myName,ready,msg=>setNetStatus(msg));wire();}catch(err){setNetStatus('Photon failed: '+err.message);net=null;}
 });
 $('resumeBtn').addEventListener('click',()=>{paused=false;hide('pause');lockPointer();});
