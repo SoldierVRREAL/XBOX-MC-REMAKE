@@ -33,7 +33,7 @@ function nameTag(e,col){const p=project([e.pos[0],e.pos[1]+(e.bat?.6:2.05),e.pos
 function drawHUD(){
   hc.setTransform(DPR,0,0,DPR,0,0);hc.clearRect(0,0,W,H);hc.imageSmoothingEnabled=false;
   if(MATCH.state==='menu'||!player)return;
-  if(hideGui)return;
+  if(hideGui||loadingUp()||!$('results').classList.contains('hidden'))return;   // the loading screen and scoreboard cover the HUD, as on console
   if(showDebug)drawDebug();else if(OPT.showFps)drawFps();
   // name tags: lobby shows everyone; in Battle they are hidden until Showdown reveals the survivors
   for(const e of ents){if(e===player||!e.alive)continue;
@@ -45,12 +45,13 @@ function drawHUD(){
   else if(MATCH.mode==='br')drawBRHud();
   else drawBattleTop();
   // kill feed
-  const fy=MATCH.mode==='br'?190:56;feed.forEach((f,i)=>{hc.globalAlpha=Math.min(1,f.t);txt(f.txt,W-14,fy+i*22,14,'#fff','right');});hc.globalAlpha=1;
-  // chat (bottom left)
-  {const cw=Math.min(W*.6,640),lh=18,by=H-(chatUI?40:120);chat.forEach((c,i)=>{const y=by-(chat.length-1-i)*lh;const a=chatUI?1:Math.min(1,c.t);if(a<=0)return;hc.globalAlpha=a;hc.fillStyle='rgba(0,0,0,.5)';hc.fillRect(4,y-lh+3,cw,lh);txt(c.txt,8,y,13,c.col&&c.col.length>=4?c.col:'#ffffff','left');});hc.globalAlpha=1;}
+  // kill messages and chat share the console chat area: left side, just above the HUD, newest at the bottom
+  {const G=hudGeom(),x0=Math.round(W*.05),lh=20,lines=[];for(let i=feed.length-1;i>=0;i--)lines.push([feed[i].txt,'#ffffff',Math.min(1,feed[i].t)]);
+    for(const c of chat)lines.push([c.txt,c.col&&c.col.length>=4?c.col:'#ffffff',chatUI?1:Math.min(1,c.t)]);const by=chatUI?H-40:G.top;
+    lines.forEach(([t,col,a],i)=>{if(a<=0)return;const y=by-(lines.length-1-i)*lh;hc.globalAlpha=a;if(chatUI){hc.fillStyle='rgba(0,0,0,.5)';hc.fillRect(x0-4,y-lh+4,Math.min(W*.6,640),lh);}txt(t,x0,y,14,col,'left');});hc.globalAlpha=1;}
   if(msgs.length){const m=msgs[msgs.length-1];hc.globalAlpha=Math.min(1,m.t);txt(m.txt,W/2,H/2-80,44,'#ffd54a','center');if(m.sub)txt(m.sub,W/2,H/2-48,18,'#fff','center');hc.globalAlpha=1;}
-  drawPrompts();
-  if(MATCH.state==='play'&&MATCH.preT>0){const n=Math.ceil(MATCH.preT);txt(`Time to start: ${n} second${n===1?'':'s'}`,W/2,30,18,'#fff','center');}
+  drawPrompts();drawBlockHint();
+  if(MATCH.state==='play'&&MATCH.preT>0&&MATCH.mode!=='battle'){const n=Math.ceil(MATCH.preT);txt(`Time to start: ${n} second${n===1?'':'s'}`,W/2,30,18,'#fff','center');}
   if(!player.alive){drawBatHud();return;}
   if(player.fire>0){const g=hc.createLinearGradient(0,H,0,H*.5);g.addColorStop(0,'rgba(255,120,0,.45)');g.addColorStop(1,'rgba(255,120,0,0)');hc.fillStyle=g;hc.fillRect(0,0,W,H);}
   if(fluidAt(camPos[0],camPos[1],camPos[2])==='water'){hc.fillStyle='rgba(30,60,200,.35)';hc.fillRect(0,0,W,H);}
@@ -60,21 +61,58 @@ function drawHUD(){
   // crosshair: DOM element #xhair (difference blend, like vanilla's inverted crosshair)
   if(MATCH.state==='play'&&locked&&!chestOpen&&lookChest())txt('[RMB] Open chest',W/2,H/2+34,14,'#fff','center');
   if(player.using&&player.using!=='block'){const pr=player.using==='bow'?bowCharge(player.useT):Math.min(1,player.useT/1.6);hc.fillStyle='rgba(0,0,0,.6)';hc.fillRect(W/2-30,H/2+14,60,6);hc.fillStyle=player.using==='bow'&&pr>=1?'#ffd54a':'#fff';hc.fillRect(W/2-30,H/2+14,60*pr,6);}
-  drawHotbar();drawArmorDoll();drawEffects();
+  drawHotbar();if(OPT.animChar===false)drawArmorDoll();drawEffects();   // the animated character (11_render.js) shows armour otherwise
 }
+// console HUD layout (TV safe zone): hotbar about 42% of a 16:9 screen wide, raised off the bottom edge, prompts underneath
+function hudGeom(){const S=Math.round(Math.min(H*.084,(W-20)/9.5,76)),hx=Math.round(W/2-S*4.5),hy=Math.round(H*.87-S);const s=Math.max(2,Math.floor(S/16));
+  const barH=Math.max(4,Math.round(S*.11)),barTop=hy-Math.round(S*.2)-barH,hy2=barTop-Math.round(S*.12)-9*s;return {S,hx,hy,s,barH,barTop,hy2,top:hy2-9*s-12};}
+// in-game tooltips (console "In-Game Tooltips"): look at a block for a moment and a panel in the top right names it, once per block type per session
+const BLOCK_TIPS={1:'A block of dirt with grass growing on top.',2:'Common soil found under the grass.',3:'Solid rock found all over the world.',4:'A section of an oak tree trunk.',
+  5:'Leaves from an oak tree.',6:'Wooden boards cut from oak logs.',7:'Fine sand from beaches and deserts.',8:['Chest','Holds items. Battle chests are stocked with gear and get refilled during the round.'],
+  9:'Rough, broken stone.',10:'Fired clay bricks stacked into a sturdy block.',11:'A clear block you can see straight through.',12:'Soft dyed wool.',13:'Loose stones and grit.',
+  14:'Cobblestone overgrown with moss.',17:'A glowing block that lights up everything around it.',18:'A block of packed bones.',19:'Sand pressed into solid stone.',20:'Stone cut into neat bricks.',
+  21:'Old stone bricks covered in moss.',22:'Stone bricks carved with a decorative pattern.',23:'A solid block of shiny gold.',24:'A solid block of diamonds. Nice to look at, but it stays here.',
+  25:'A solid block of emeralds.',26:'Dark volcanic glass, one of the toughest blocks there is.',27:'Crumbly red rock from the Nether.',
+  33:['Ice','Slippery frozen water. You slide further when you run across it.'],34:['Slime Block','A bouncy block: land on it to spring back up, unless you are sneaking.'],
+  35:['Soul Sand','Grainy sand that slows down anything walking over it.'],36:['Cobweb','Sticky web that slows you right down while you are inside it.'],
+  41:['Slab','Half a block tall, so you can step up onto it.'],42:['Stairs','Walk up a level without jumping.'],46:'Walk up a level without jumping.',50:'Half a block tall, so you can step up onto it.',
+  51:'A section of a spruce tree trunk.',52:'Wooden boards cut from spruce logs.',53:'A barrier you can see over but cannot jump.',56:'Metal bars that block the way but let you see through.',
+  57:'Smooth white quartz.',58:'Leaves from a jungle tree.',59:'Coal packed into a solid block.',60:'Stone bricks that have cracked with age.',61:'Sandstone carved with a pattern.',
+  62:'Sandstone polished smooth.',63:'A block that gives off a constant redstone signal.',64:'A section of a jungle tree trunk.',65:'Half a block of sandstone.',66:'Half a block of stone bricks.',
+  67:'Stone brick steps.',71:'Soft white wool.',72:'Spruce wood steps.'};
+const HINT_SEEN=new Set();let hintCur=null,hintLook=null,hintLookT=0;
+function wrapText(s,maxW,size){const meas=t=>{if(FONT)return bmpWidth(t,Math.max(1,Math.round(size*1.15/9)));hc.font=`${Math.round(size*1.3)}px ${HFONT}`;return hc.measureText(t).width;};
+  const out=[];let cur='';for(const w of String(s).split(' ')){const t=cur?cur+' '+w:w;if(meas(t)>maxW&&cur){out.push(cur);cur=w;}else cur=t;}if(cur)out.push(cur);return out;}
+function drawBlockHint(){
+  const able=OPT.tips!==false&&player&&player.alive&&!chestOpen&&(MATCH.state==='play'&&!(MATCH.preT>0)||MATCH.state==='lobby')&&(locked||padActive||touchActive);
+  if(!able)hintLook=null;
+  else{const h=raycastBlock(eye(player),fwd(player),5);const b=h?h.b:0;
+    if(b&&BLOCK_TIPS[b]&&!HINT_SEEN.has(b)){if(hintLook===b)hintLookT+=dtFrame;else{hintLook=b;hintLookT=0;}if(hintLookT>.6){HINT_SEEN.add(b);hintCur={b,t:5};hintLook=null;}}else hintLook=null;}
+  if(!hintCur)return;hintCur.t-=dtFrame;if(hintCur.t<=0){hintCur=null;return;}
+  const tip=BLOCK_TIPS[hintCur.b],name=Array.isArray(tip)?tip[0]:(BLOCK_NAMES[hintCur.b]||''),desc=Array.isArray(tip)?tip[1]:tip;
+  const w=Math.round(Math.min(W*.4,500)),x=Math.round(W*.955-w),y=Math.round(H*.065),pad=12,sz=14;const lines=wrapText(desc,w-pad*2,sz-1);
+  const ic=ICONS['b'+hintCur.b],iconS=ic?Math.round(H*.05):0;const h=pad*2+24+lines.length*20+(ic?iconS+16:0);
+  hc.globalAlpha=Math.min(1,hintCur.t*2);hc.fillStyle='rgba(24,38,42,.86)';hc.fillRect(x,y,w,h);hc.strokeStyle='rgba(200,218,222,.9)';hc.lineWidth=2;hc.strokeRect(x+1,y+1,w-2,h-2);
+  txt(name,x+pad,y+pad+14,sz,'#ffffff');lines.forEach((l,i)=>txt(l,x+pad,y+pad+38+i*20,sz-1,'#e8e8e8'));
+  if(ic){const iy=y+h-pad-iconS,ix=Math.round(x+w/2-iconS/2);hc.fillStyle='rgba(225,232,234,.95)';hc.fillRect(ix-4,iy-4,iconS+8,iconS+8);hc.strokeStyle='#555';hc.lineWidth=1;hc.strokeRect(ix-3.5,iy-3.5,iconS+7,iconS+7);hc.drawImage(ic,ix,iy,iconS,iconS);}
+  hc.globalAlpha=1;}
 function drawHotbar(){
-  const p=player;const S=Math.min(46,(W-20)/9.5),hx=Math.round(W/2-S*4.5),hy=Math.round(H-S-12);
+  const p=player;const G=hudGeom(),S=G.S,hx=G.hx,hy=G.hy;
   if(PACK.gui.hotbar){hc.drawImage(PACK.gui.hotbar,hx-S*.05,hy-S*.05,S*9+S*.1,S*1.1);}
   else{const u=S/20;hc.fillStyle='rgba(0,0,0,.55)';hc.fillRect(hx-u,hy-u,S*9+2*u,S+2*u);
     for(let i=0;i<9;i++){const x=hx+i*S;hc.fillStyle='rgba(139,139,139,.42)';hc.fillRect(x+u,hy+u,S-2*u,S-2*u);hc.fillStyle='rgba(55,55,55,.75)';hc.fillRect(x+u,hy+u,S-2*u,u);hc.fillRect(x+u,hy+u,u,S-2*u);
       hc.fillStyle='rgba(200,200,200,.45)';hc.fillRect(x+u,hy+S-2*u,S-2*u,u);hc.fillRect(x+S-2*u,hy+u,u,S-2*u);}}
   for(let i=0;i<9;i++){const x=hx+i*S;const s=p.inv[i];if(s){hc.drawImage(ICONS[s.id],x+S*.14,hy+S*.14,S*.72,S*.72);if(s.count>1)txt(String(s.count),x+S-4,hy+S-5,13,'#fff','right');}}
   const sx=hx+p.sel*S;if(PACK.gui.hotbar_sel)hc.drawImage(PACK.gui.hotbar_sel,sx-S*.08,hy-S*.1,S*1.16,S*1.2);else{const u=S/20;hc.strokeStyle='#000';hc.lineWidth=u;hc.strokeRect(sx-1.5*u,hy-1.5*u,S+3*u,S+3*u);hc.strokeStyle='#e6e6e6';hc.lineWidth=2*u;hc.strokeRect(sx,hy,S,S);hc.strokeStyle='#8a8a8a';hc.lineWidth=u;hc.strokeRect(sx+1.5*u,hy+1.5*u,S-3*u,S-3*u);const it=p.inv[p.sel];if(it){hc.drawImage(ICONS[it.id],sx+S*.14,hy+S*.14,S*.72,S*.72);if(it.count>1)txt(String(it.count),sx+S-4,hy+S-5,13,'#fff','right');}}
-  const s=Math.max(2,Math.floor(S/16)),step=8*s;const left=hx,right=hx+S*9;
+  const s=G.s,step=8*s;const left=hx,right=hx+S*9;
   // player pills (one per player in the round; dim when out)
-  if(MATCH.state==='play'||MATCH.state==='over'){const list=ents.filter(e=>!e.spectator).slice(0,16);const pw=Math.min(36,(S*9)/list.length-4);let x=W/2-list.length*(pw+4)/2;
-    for(const e of list){hc.fillStyle='#000';hc.fillRect(x-1,hy-14-1,pw+2,7);hc.fillStyle=e.alive?PLAYER_COLORS[e.color%16]:'#333';hc.globalAlpha=e.alive?1:.6;hc.fillRect(x,hy-14,pw,5);hc.globalAlpha=1;if(e===p){hc.fillStyle='#fff';hc.fillRect(x,hy-9,pw,1);}x+=pw+4;}}
-  const hy2=hy-14-10-8*s;
+  // player strip: one slot per player across the full hotbar width (8 slots, more when there are more players); out = dim, empty = dark
+  {const lob=MATCH.state==='lobby';const list=(lob?ents.filter(e=>e.kind==='player'):ents.filter(e=>!e.spectator)).slice(0,16);const n=Math.max(8,list.length),slot=S*9/n,pw=Math.round(slot*.82),bh=G.barH,by=G.barTop;
+    for(let i=0;i<n;i++){const e=list[i],x=Math.round(hx+i*slot+(slot-pw)/2);hc.fillStyle='rgba(0,0,0,.7)';hc.fillRect(x-1,by-1,pw+2,bh+2);
+      if(e){const on=lob||e.alive;hc.fillStyle=on?PLAYER_COLORS[e.color%16]:'#3a3a3a';hc.fillRect(x,by,pw,bh);if(on){hc.fillStyle='rgba(255,255,255,.35)';hc.fillRect(x,by,pw,Math.max(1,bh/3|0));}}
+      else{hc.fillStyle='rgba(70,70,70,.5)';hc.fillRect(x,by,pw,bh);}}}
+  if(MATCH.state==='lobby')return;   // the lobby HUD is just the player strip and the hotbar
+  const hy2=G.hy2;
   // hearts (left) with absorption + poison
   const pois=!!p.effects.poison;for(let i=0;i<10;i++){const v=clamp(p.health-i*2,0,2)/2;const x=left+i*step,y=hy2+(p.health<=4?(Math.random()-.5)*3:0);
     if(PACK.gui.heart_full){spr('heart_container',x,y,9*s,9*s);if(v>0)spr(pois?(v>=1?'heart_poison_full':'heart_poison_half'):(v>=1?'heart_full':'heart_half'),x,y,9*s,9*s);}
@@ -87,7 +125,7 @@ function drawHotbar(){
   if(p.air!=null&&p.air<300){const nb=Math.ceil((p.air-2)*10/300),part=Math.ceil(p.air*10/300)-nb;for(let i=0;i<10;i++){const x=right-(i+1)*step+1,y=hy2-9*s-4;if(i<nb){hc.fillStyle='#000';hc.beginPath();hc.arc(x+4.5*s,y+4.5*s,4*s,0,7);hc.fill();hc.fillStyle='#4a8ae8';hc.beginPath();hc.arc(x+4.5*s,y+4.5*s,3*s,0,7);hc.fill();hc.fillStyle='#fff';hc.fillRect(x+3*s,y+2.5*s,s,s);}else if(i<nb+part){hc.strokeStyle='#fff';hc.lineWidth=s;hc.beginPath();hc.arc(x+4.5*s,y+4.5*s,3*s,0,7);hc.stroke();}}}
   // armor bar above hearts
   const ap=armorPts(p);if(ap>0){const y=hy2-9*s-4-(p.absorb>0?9*s+2:0);for(let i=0;i<10;i++){const v=clamp(ap-i*2,0,2)/2,x=left+i*step;if(PACK.gui.armor_full){spr(v>=1?'armor_full':v>0?'armor_half':'armor_empty',x,y,9*s,9*s);}else icon9(ICON9.armor,x,y,s,v,ARMOR_PAL);}}
-  if(selShow>0){const it=p.inv[p.sel];if(it){hc.globalAlpha=Math.min(1,selShow);txt(ITEMS[it.id].name,W/2,hy2-(ap?20*s:10*s)-10,16,'#fff','center');hc.globalAlpha=1;}}
+  if(selShow>0){const it=p.inv[p.sel];if(it){hc.globalAlpha=Math.min(1,selShow);txt(ITEMS[it.id].name,W/2,hy2-(ap?20*s:10*s)-10,16,ITEMS[it.id].ench?'#55ffff':'#fff','center');hc.globalAlpha=1;}}
 }
 function drawArmorDoll(){ // small figure on the left showing equipped armour, like the console HUD
   const p=player;if(!p.armor.some(Boolean))return;const x=18,y=H/2-60,s=4;const col=i=>p.armor[i]?ITEMS[p.armor[i]].color:'rgba(255,255,255,.15)';
@@ -98,11 +136,10 @@ function drawEffects(){const ef=Object.entries(player.effects);if(!ef.length)ret
   for(const [k,f] of ef){if(k==='heal'||k==='harm')continue;hc.fillStyle='rgba(0,0,0,.45)';hc.fillRect(x-170,y-14,170,20);hc.fillStyle=EFFECT_COL[k]||'#fff';hc.fillRect(x-168,y-12,6,16);
     txt(`${EFFECT_NAMES[k]||k}${f.amp?' II':''} ${fmtTime(f.t)}`,x-6,y+1,13,'#fff','right');y+=22;}}
 function drawBattleTop(){
-  const alive=aliveList().length,tot=ents.filter(e=>!e.spectator).length;
-  txt(`${alive}/${tot} alive`,14,26,17);txt(`Kills: ${player.kills}`,14,48,15,'#ffd54a');
-  if(MATCH.state==='play'&&!(MATCH.preT>0)){
+  if(MATCH.state==='play'&&!(MATCH.preT>0)){const since=MATCH.gameT-SET.grace;
     if(inGrace())txt(`Invulnerability wears off in ${Math.ceil(SET.grace-MATCH.gameT)} seconds!`,W/2,30,18,'#fff','center');
-    else if(SET.roundLen>0)txt('Time left '+fmtTime(SET.roundLen-MATCH.gameT),W/2,30,16,SET.roundLen-MATCH.gameT<=60?'#ff6a5a':'#fff','center');
+    else if(SET.grace>0&&since>=0&&since<4){hc.globalAlpha=Math.min(1,4-since);txt('Invulnerability has worn off! Fight!',W/2,30,18,'#fff','center');hc.globalAlpha=1;}
+    else if(SET.roundLen>0&&SET.roundLen-MATCH.gameT<=60)txt('Time left '+fmtTime(SET.roundLen-MATCH.gameT),W/2,30,16,'#ff6a5a','center');   // only a last-minute warning
     if(MATCH.showdown)txt('SHOWDOWN',W/2,52,16,'#ff5a4a','center');
     if(SET.refill>0&&MATCH.refillAt-MATCH.gameT<=10&&MATCH.refillAt-MATCH.gameT>0)txt('Chests refill in '+Math.ceil(MATCH.refillAt-MATCH.gameT),W/2,72,14,'#ffff88','center');
   }
@@ -111,9 +148,7 @@ function drawLobbyHud(){
   const humans=ents.filter(e=>e.kind==='player').length;const name=MATCH.nextMap?(MATCH.nextMap==='br'?'Battle Royale':(MAPS.find(m=>m.id===MATCH.nextMap)||{}).name):'';
   if(!online){txt('Practice  -  Esc for menu',W/2,30,18,'#fff','center');return;}
   if(MATCH.lobbyCD>=0)txt(`Time to game change: ${Math.ceil(MATCH.lobbyCD)} seconds`,W/2,30,18,'#fff','center');else txt(humans<2&&!SET.bots?'Waiting for players...':'Waiting...',W/2,30,18,'#fff','center');
-  if(name)txt('Next map: '+name,W/2,52,15,'#ffd54a','center');
-
-  let y=80;txt('Players',14,y,15,'#ffd54a');for(const e of ents.filter(e=>e.kind==='player')){y+=20;txt(`${e.ready?'✓':'·'} ${e.name}${net&&e.id==='p'+net.hostId()?' (host)':''}`,14,y,14,e.ready?'#7f7':'#fff');}
+  // next map and the player list are on the Tab lobby panel
 }
 function drawBatHud(){
   txt('You are a bat',W/2,H-70,20,'#ffd54a','center');

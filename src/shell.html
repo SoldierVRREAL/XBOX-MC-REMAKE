@@ -55,6 +55,16 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#555}
 #verTag{position:fixed;right:20px;bottom:18px;font-size:18px;color:#ddd;text-shadow:2px 2px 0 #333}
 #status{font-size:18px;margin-top:8px;color:#204080;min-height:18px}
 #skinRow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:8px 0}#skinRow canvas{width:40px;height:40px;image-rendering:pixelated;border:2px solid #000;cursor:pointer;background:#555}#skinRow canvas.on{border-color:#fff}
+#sbWrap{display:flex;gap:18px;align-items:flex-start;max-width:96vw;flex-wrap:wrap;justify-content:center}
+.sbPanel{background:rgba(66,80,90,.84);border:2px solid rgba(205,220,226,.8);border-radius:6px;padding:10px 12px;box-shadow:0 0 0 2px rgba(0,0,0,.35)}
+#sbPlayers{width:min(560px,92vw)}#sbSide{width:min(230px,92vw)}
+.sbHead{display:flex;align-items:center;gap:10px;font-size:24px;padding:0 6px 6px}.sbHead span:first-child{flex:1}
+.sbIco{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center}.sbPanel canvas{image-rendering:pixelated;display:block}
+.sbRow{display:flex;align-items:center;gap:10px;font-size:22px;padding:3px 6px;border-top:1px solid rgba(255,255,255,.12);cursor:pointer}
+.sbRow.sel{background:rgba(125,195,205,.4);outline:2px solid rgba(225,242,246,.9)}.sbRow.me .nm{color:#ffff77}
+.sbRow .dot{width:9px;height:14px;border-radius:2px;box-shadow:0 0 0 1px #000;flex:none}.sbRow .nm{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.sbRow .k{width:26px;text-align:center}
+.sbStat{display:flex;align-items:center;gap:12px;font-size:21px;min-height:44px}
+#sbWinner{text-align:center;font-size:25px;margin:12px 0;min-height:28px}#sbTime{text-align:center;font-size:25px;padding:6px;border:2px solid rgba(205,220,226,.75);background:rgba(36,46,54,.6)}
 table.res{border-collapse:collapse;margin:8px auto;font-size:22px}table.res td{padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.15)}table.res td:last-child,table.res td:nth-child(3),table.res td:nth-child(4){text-align:right}
 
 /* ===== Legacy Console (Xbox) look: --S is the console GUI scale (1 at 360p, 2 at 720p, 3 at 1080p) ===== */
@@ -199,6 +209,7 @@ body.touch #clickResume{display:none!important}
     <label for="o_diff">Bot difficulty</label><select id="o_diff"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option><option value="3">Sweaty</option></select>
     <label for="o_brlen">Battle Royale length</label><select id="o_brlen"><option value="0.2">Quick (~7 min)</option><option value="0.4">Medium (~15 min)</option><option value="1">Original datapack (~37 min)</option></select>
     <label for="o_brx">BR extra loot chests</label><input id="o_brx" type="checkbox" checked>
+    <label for="o_ench">Enchanted loot</label><input id="o_ench" type="checkbox" checked>
   </div>
   <h3>Select Maps</h3><div class="maps" id="mapChecks"></div>
   <div class="row"><button class="btn small" id="optClose">Done</button></div>
@@ -247,12 +258,16 @@ body.touch #clickResume{display:none!important}
   <button class="tb" id="tAttack" aria-label="Attack"><b>&#9876;</b></button><button class="tb big" id="tJump" aria-label="Jump"><b>&#9650;</b></button><button class="tb" id="tReady" aria-label="Ready"><b>R</b></button><button class="tb" id="tList" aria-label="Players"><b>&#9776;</b></button></div>
 <div id="lobbyPanel" class="screen hidden"><div class="panel"><h3>Lobby</h3><div id="lobbyInfo"></div>
   <div class="row"><button class="btn small" id="lobbyReady">Ready (R)</button><button class="btn small" id="lobbyOpts">Game Options</button><button class="btn small" id="lobbyStart">Start now</button><button class="btn small" id="lobbyClose">Close (Tab)</button></div></div></div>
-<div id="results" class="screen hidden"><h2 id="resTitle">Results</h2><table class="res" id="resTable"></table><div id="resNote" class="note"></div>
+<div id="results" class="screen hidden">
+  <div id="sbWrap"><div class="sbPanel" id="sbPlayers"><div class="sbHead"><span>Players</span><span class="sbIco" id="sbKillIco"></span><span class="sbIco" id="sbAwIco"></span></div><div id="sbRows"></div></div>
+    <div class="sbPanel" id="sbSide"><div class="sbStat" id="sbAward"></div><div class="sbStat" id="sbFav"></div><div class="sbStat" id="sbDealt"></div><div class="sbStat" id="sbTaken"></div><div id="sbWinner"></div><div id="sbTime"></div></div></div>
+  <div id="resNote" class="note"></div>
   <div class="row"><button class="btn small" id="nextBtn">Next map</button><button class="btn small" id="menuBtn">Menu</button></div></div>
-<div id="loading" class="screen hidden" style="background:#000 url() center/cover;background:radial-gradient(ellipse at center,#2b2b2b,#050505)"><div style="width:min(560px,86vw);text-align:center">
-  <div id="loadTitle" style="font-size:30px;color:#fff;text-shadow:2px 2px 0 #333">Loading level</div>
-  <div style="margin:14px auto;height:14px;border:2px solid #000;background:#3a3a3a;box-shadow:inset 0 0 0 2px #808080"><div id="loadBar" style="height:100%;width:0;background:#7ec850;transition:width .06s"></div></div>
-  <div id="loadTip" style="font-size:20px;color:#ffff55;text-shadow:2px 2px 0 #3f3f00;margin-top:24px"></div></div></div>
+<div id="loading" class="screen hidden" style="background:rgba(0,0,0,.3)"><div style="width:min(640px,90vw);text-align:center">
+  <img id="loadLogo" alt="" style="width:min(460px,76vw);image-rendering:pixelated;display:block;margin:0 auto 7vh">
+  <div id="loadTitle" style="font-size:32px;color:#fff;text-shadow:2px 2px 0 #333">Loading level</div>
+  <div style="margin:10px auto 0;width:min(430px,72vw);height:6px;background:#4a4a4a;border:1px solid #1a1a1a"><div id="loadBar" style="height:100%;width:0;background:#dcdcdc;transition:width .06s"></div></div>
+  <div id="loadTip" style="margin:9vh auto 0;padding:10px 18px;max-width:560px;font-size:21px;color:#fff;background:rgba(32,32,32,.74);border:2px solid #c4c4c4;text-shadow:2px 2px 0 #000"></div></div></div>
 <div id="clickResume" class="screen hidden" style="background:rgba(0,0,0,.25)"><h2>Click to play</h2></div>
 <script>
 {

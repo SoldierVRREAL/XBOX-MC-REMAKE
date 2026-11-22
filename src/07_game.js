@@ -4,7 +4,7 @@ const PLAYER_COLORS=['#e8e8e8','#5cd65c','#e04848','#4a8cf0','#f070c8','#f0d040'
 const BOT_NAMES=['Cubert','PixelPete','Sir Blocksalot','LagSpike','Grassman','NoobSlayer99','Tofu','Bonk','xX_Sweaty_Xx','ChunkyMonkey','Gravelord','AFK_Andy','DiamondDave','Bread Enjoyer','SpleefQueen','NotABot','Mr. Chest','Sprinty','Ctrl+W','Pebble'];
 class Ent{
   constructor(id,name,kind){Object.assign(this,{id,name,kind,pos:[0,0,0],vel:[0,0,0],yaw:0,pitch:0,onGround:false,health:20,food:20,sat:5,exh:0,alive:true,bat:false,
-    inv:new Array(9).fill(null),armor:[null,null,null,null],sel:0,invuln:0,hurtT:0,atkCD:0,swing:0,walkT:0,lastHurt:99,regenT:0,starveT:0,fallStart:null,kills:0,dmgDealt:0,
+    inv:new Array(9).fill(null),armor:[null,null,null,null],sel:0,invuln:0,hurtT:0,atkCD:0,swing:0,walkT:0,lastHurt:99,regenT:0,starveT:0,fallStart:null,kills:0,dmgDealt:0,dmgTaken:0,wpn:null,
     useT:0,using:null,collidedH:false,mot:[0,0,0],prev:null,rpos:null,acc:0,in:null,jump:false,jumpTicks:0,fallDist:0,inWeb:false,sneak:false,lastAttacker:null,lastAttackT:99,place:0,effects:{},absorb:0,fire:0,fireT:0,inWater:false,inLava:false,skin:'gen:'+name,color:0,sprint:false,net:null,isLocal:false,ready:false,bodyYaw:0});}
 }
 let ents=[],player=null,projs=[],drops=[],particles=[],feed=[],msgs=[],chat=[];
@@ -82,7 +82,7 @@ function hurt(e,amt,src,cause,kb,raw,ignoreInvuln){
   if(!raw){amt*=1-Math.min(20,armorPts(e))*.04;const ep=enchProt(e);if(ep)amt*=1-Math.min(20,ep)*.04;}                            // armour: 4% per point
   if(e.absorb>0){const a2=Math.min(e.absorb,amt);e.absorb-=a2;amt-=a2;}
   e.health-=amt;e.lastHurt=0;exhaust(e,.3);
-  if(src&&src!==e){e.lastAttacker=src;e.lastAttackT=0;creditDamage(src,amt);}
+  creditTaken(e,amt);if(src&&src!==e){e.lastAttacker=src;e.lastAttackT=0;creditDamage(src,amt,cause);}
   if(fresh){
     if(kb)knockback(e,kb[0],kb[1],kb[2]||0,kb[3]||0,kb[4]||0);
     sfx(cause==='fall'?(amt>4?'fallbig':'fall'):cause==='fire'||cause==='lava'?'burn':cause==='drown'?'drown':'hurt',{pos:e.pos});
@@ -91,18 +91,22 @@ function hurt(e,amt,src,cause,kb,raw,ignoreInvuln){
   if(e.health<=0)kill(e,src,cause);
   return true;
 }
-function creditDamage(src,amt){if(isHost())src.dmgDealt+=amt;else netSend(N.DEALT,{a:src.id,d:amt});}
+// scoreboard stats live on the host: damage dealt (and with what), damage received
+function creditDamage(src,amt,cause){const s=src.inv&&src.inv[src.sel],sid=src.heldHint||(s&&s.id),it=sid&&ITEMS[sid];const w=cause==='shot'?'bow':cause==='magic'?'splash_harming':(it&&it.type==='weapon'?sid:'hand');
+  if(isHost()){src.dmgDealt+=amt;addWpn(src,w,amt);}else netSend(N.DEALT,{a:src.id,d:amt,w});}
+function addWpn(e,w,amt){if(!w)return;const m=e.wpn||(e.wpn={});m[w]=(m[w]||0)+amt;}
+function creditTaken(e,amt){if(!(amt>0))return;if(isHost())e.dmgTaken=(e.dmgTaken||0)+amt;else netSend(N.DEALT,{tk:e.id,d:amt});}
 // route damage to whoever owns the target
 function damage(t,amt,src,cause,kb,raw,fx){
   if(owned(t)){const ok=hurt(t,amt,src,cause,kb,raw);if(fx&&(ok||amt===0))for(const f of fx)giveEffect(t,...f);return ok;}
-  netSend(N.HIT,{t:t.id,d:amt,a:src?src.id:null,c:cause,kb,r:raw?1:0,fx},null);return true;
+  const hs=src&&src.inv&&src.inv[src.sel];netSend(N.HIT,{t:t.id,d:amt,a:src?src.id:null,c:cause,kb,r:raw?1:0,fx,w:hs?hs.id:null},null);return true;
 }
 function deathText(e,killer,cause){
   const nm=x=>x===player?'You':x.name;const was=x=>x===player?'You were':x.name+' was';
   if(cause==='void')return killer?`${was(e)} knocked into the void by ${nm(killer)}`:`${nm(e)} fell out of the world`;
   if(cause==='shot')return `${was(e)} shot by ${nm(killer)}`;
   if(cause==='border')return `${was(e)} killed by the world border`;
-  if(cause==='fall')return killer?`${was(e)} doomed to fall by ${nm(killer)}`:`${nm(e)} hit the ground too hard`;
+  if(cause==='fall')return killer?`${was(e)} doomed to fall by ${nm(killer)}`:`${nm(e)} fell from a high place`;
   if(cause==='lava')return killer?`${nm(e)} tried to swim in lava to escape ${nm(killer)}`:`${nm(e)} tried to swim in lava`;
   if(cause==='fire')return `${nm(e)} burned to death`;
   if(cause==='starve')return `${nm(e)} starved to death`;

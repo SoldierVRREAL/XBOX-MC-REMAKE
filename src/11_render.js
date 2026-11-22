@@ -98,7 +98,7 @@ function camera(){
 }
 let skyCol=[.53,.74,.96];
 function render(){
-  gl.viewport(0,0,cv.width,cv.height);const wantBlur=MATCH.state==='menu'?'blur(3px) brightness(.95)':'';if(cv.style.filter!==wantBlur)cv.style.filter=wantBlur;
+  gl.viewport(0,0,cv.width,cv.height);const wantBlur=MATCH.state==='menu'||loadingUp()?'blur(3px) brightness(.95)':'';if(cv.style.filter!==wantBlur)cv.style.filter=wantBlur;
   camera();
   const info=mapInfo||{sky:[.53,.74,.96],fog:[.53,.74,.96],fogDist:110};skyCol=info.sky;
   const fogF=MATCH.state==='menu'?150:info.fogDist*[.45,.7,1,1.35][OPT.rd];curFog={c:info.fog,n:fogF*.55,f:fogF};
@@ -163,11 +163,24 @@ function render(){
   // first-person hand
   if(player&&player.alive&&MATCH.state!=='menu'&&!camMode&&!hideGui){gl.clear(gl.DEPTH_BUFFER_BIT);drawHand(M4.persp(70*Math.PI/180,W/H,.05,10),pre);}
   // underwater / lava tint
+  drawMiniPlayer();
   drawHUD();
+}
+// console "Animated Character": a small live model of you on the left of the screen (walks, sneaks, swings, blocks, draws the bow, wears your armour)
+function drawMiniPlayer(){
+  const p=player;if(!p||!p.alive||p.bat||p.spectator||MATCH.state==='menu'||hideGui||OPT.animChar===false||!mapInfo||loadingUp())return;
+  const k=cv.width/W,w=Math.max(8,Math.round(H*.11*k)),h=Math.max(16,Math.round(H*.18*k)),x=Math.round(W*.028*k),y=Math.round(cv.height-H*.56*k);
+  const sv={rpos:p.rpos,yaw:p.yaw,pitch:p.pitch,by:p.bodyYaw,cam:camPos,vp:VP};let d=sv.yaw-(sv.by==null?sv.yaw:sv.by);while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;
+  try{gl.viewport(x,y,w,h);gl.enable(gl.SCISSOR_TEST);gl.scissor(x,y,w,h);gl.clear(gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);
+    const face=Math.PI-.5;p.rpos=[0,0,0];p.bodyYaw=face;p.yaw=face+clamp(d,-.8,.8)*.6;p.pitch=sv.pitch*.4;camPos=[0,1e4,0];
+    VP=M4.mul(M4.persp(26*Math.PI/180,w/h,.1,40),M4.tr(0,-.97,-4.8));useTex(VP,camPos);gl.uniform1f(PT.u.fogN,1e8);gl.uniform1f(PT.u.fogF,1e9);
+    drawHumanoid(p);}
+  finally{p.rpos=sv.rpos;p.yaw=sv.yaw;p.pitch=sv.pitch;p.bodyYaw=sv.by;camPos=sv.cam;VP=sv.vp;gl.disable(gl.SCISSOR_TEST);gl.viewport(0,0,cv.width,cv.height);}
 }
 function setEntLight(p){const x=Math.floor(p[0]),z=Math.floor(p[2]),y=Math.floor(p[1]+.5);const a=lightAt(x,y,z),b=lightAt(x,y+1,z);const L=Math.max(a>>4,b>>4)<<4|Math.max(a&15,b&15);const v=Math.max(LB[(L>>4)&15]*(mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1),LB[L&15],mapInfo&&mapInfo.dark?.12:.2);gl.uniform1f(PT.u.bright,v);}
 // ModelBiped / ModelPlayer.setRotationAngles (1.8). Our parts are the vanilla model flipped by scale(-1,-1,1), so X and Y rotations change sign.
-function limbTick(e){const dts=dtFrame*20;const v=Math.hypot(e.vel[0],e.vel[2])/20;const tgt=Math.min(1,v*4);
+function limbTick(e){if(e._lt===perfT)return;e._lt=perfT;   // once per frame, even when the model is drawn twice (world + animated character)
+  const dts=dtFrame*20;const v=Math.hypot(e.vel[0],e.vel[2])/20;const tgt=Math.min(1,v*4);
   e.limbAmt=(e.limbAmt||0)+(tgt-(e.limbAmt||0))*(1-Math.pow(.6,dts));e.limbSwing=(e.limbSwing||0)+e.limbAmt*dts;}
 function drawHumanoid(e){
   const invis=e.effects.invis;const S=skinTex(e.skin);const M=S.slim?MODELS.slim:MODELS.wide;limbTick(e);

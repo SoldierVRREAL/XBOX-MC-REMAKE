@@ -1,12 +1,13 @@
 // ================= main loop =================
 function update(dt){
+  tickLoadHold();
   pollPad(dt);tickAmbience(dt);tickLCE(dt);
   if(MATCH.state==='menu'||!player)return;
   if(paused&&!online)return;
 chestAcc+=dt;while(chestAcc>=TICK){chestAcc-=TICK;tickChestLids();}
   if(MATCH.state==='play'){
     if(MATCH.preT>0){const prev=Math.ceil(MATCH.preT);MATCH.preT-=dt;const now=Math.ceil(MATCH.preT);if(now!==prev&&now>0&&now<=5)sfx('tick');
-      if(MATCH.preT<=0){MATCH.preT=0;sfx('go');if(MATCH.mode==='battle'){if(SET.grace>0)chatMsg(`Invulnerability wears off in ${SET.grace} seconds!`,'#fff',false);}else{chatMsg('Let the games begin!','#fff',false);announce('Let the games begin!','',2.5,false);}}}
+      if(MATCH.preT<=0){MATCH.preT=0;sfx('go');if(MATCH.mode!=='battle'){chatMsg('Let the games begin!','#fff',false);announce('Let the games begin!','',2.5,false);}}}
     else MATCH.gameT+=dt;}
   for(const e of ents){
     e.invuln=Math.max(0,e.invuln-dt);e.hurtT=Math.max(0,e.hurtT-dt);e.atkCD-=dt;e.swing=Math.max(0,e.swing-dt*4);e.lastHurt+=dt;e.lastAttackT+=dt;

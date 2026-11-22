@@ -37,7 +37,9 @@ JPAGES.video=()=>({title:'Video Settings',items:[
   jSlider(()=>OPT.bright<=0?'Brightness: Moody':OPT.bright>=1?'Brightness: Bright':'Brightness: +'+Math.round(OPT.bright*100)+'%',()=>OPT.bright,v=>{OPT.bright=v;},20,()=>{rebuildLB();remesh();}),
   jBtn(()=>'Clouds: '+onOff(OPT.clouds),()=>{OPT.clouds=!OPT.clouds;saveOpt();}),
   jBtn(()=>'Particles: '+['Minimal','Decreased','All'][OPT.particles],()=>{OPT.particles=(OPT.particles+2)%3;saveOpt();}),
-  jBtn(()=>'Show FPS: '+onOff(OPT.showFps),()=>{OPT.showFps=!OPT.showFps;saveOpt();})]});
+  jBtn(()=>'Show FPS: '+onOff(OPT.showFps),()=>{OPT.showFps=!OPT.showFps;saveOpt();}),
+  jBtn(()=>'In-Game Tooltips: '+onOff(OPT.tips!==false),()=>{OPT.tips=OPT.tips===false;saveOpt();}),
+  jBtn(()=>'Animated Character: '+onOff(OPT.animChar!==false),()=>{OPT.animChar=OPT.animChar===false;saveOpt();})]});
 JPAGES.sound=()=>({title:'Music & Sound Options',items:[
   jSlider(()=>'Master Volume: '+(OPT.vol>0?Math.round(OPT.vol*100)+'%':'OFF'),()=>OPT.vol,v=>{OPT.vol=v;if(masterOut)masterOut.gain.value=v;},20),
   jSlider(()=>'Music: '+(OPT.music>0?Math.round(OPT.music*100)+'%':'OFF'),()=>OPT.music,v=>{OPT.music=v;if(musicGain)musicGain.gain.value=.35*v;},20)]});
@@ -46,7 +48,7 @@ JPAGES.controls=()=>{const keys=[['Attack','Left Click'],['Use Item','Right Clic
   jSlider(()=>SENS<=0?'Sensitivity: *yawn*':SENS>=1?'Sensitivity: HYPERSPEED!!!':'Sensitivity: '+Math.round(SENS*200)+'%',()=>SENS,v=>{SENS=v;store('bb_sens',SENS);if($('o_sens'))$('o_sens').value=Math.round(SENS*200);},40),
   jBtn(()=>'Invert Mouse: '+onOff(INVY),()=>{INVY=!INVY;store('bb_invy',INVY?'1':'0');if($('o_invy'))$('o_invy').checked=INVY;})].concat(keys.map(([a,k])=>jBtn(`${a}: ${k}`,null,'off')))};};
 JPAGES.rules=()=>({title:'Game Rules',items:[ruleBtn('o_mode','Mode'),ruleBtn('o_round','Round Length'),ruleBtn('o_hunger','Hunger Rate'),ruleBtn('o_refill','Item Respawn'),ruleBtn('o_grace','Grace Period'),
-  ruleBtn('o_show','Showdown'),ruleBtn('o_take','Take Everything'),ruleBtn('o_central','Central Spawn'),ruleBtn('o_bots','Bots'),ruleBtn('o_diff','Bot Difficulty'),ruleBtn('o_brlen','Battle Royale Length'),ruleBtn('o_brx','BR Extra Loot')]});
+  ruleBtn('o_show','Showdown'),ruleBtn('o_take','Take Everything'),ruleBtn('o_central','Central Spawn'),ruleBtn('o_bots','Bots'),ruleBtn('o_diff','Bot Difficulty'),ruleBtn('o_brlen','Battle Royale Length'),ruleBtn('o_brx','BR Extra Loot'),ruleBtn('o_ench','Enchanted Loot')]});
 JPAGES.maps=()=>({title:'Maps',items:MAPS.map(m=>jBtn(()=>`${m.name}: ${onOff($('map_'+m.id).checked)}`,()=>{const el=$('map_'+m.id);el.checked=!el.checked;if(!MAPS.some(q=>$('map_'+q.id).checked))el.checked=true;readOptions();}))});
 function jRender(){const P=JPAGES[jPage]();pxSet($('jTitle'),P.title,'#ffffff');const g=$('jGrid');g.textContent='';for(const it of P.items)g.appendChild(it);
   if(P.items.length%2)P.items[P.items.length-1].classList.add('full');

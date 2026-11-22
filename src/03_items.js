@@ -45,7 +45,11 @@ for(const k of Object.keys(ITEMS)){const it=ITEMS[k];
   if(set)for(const p of set)ITEMS[enchId(k,enchKey(p))]=Object.assign({},it,{base:k,ench:Object.fromEntries(p)});}
 const enchLvl=(id,k)=>{const it=id&&ITEMS[id];return(it&&it.ench&&it.ench[k])||0;};
 const enchScore=id=>{const it=id&&ITEMS[id];return it&&it.ench?Object.values(it.ench).reduce((a,b)=>a+b,0):0;};
-const itemTipLines=id=>Object.entries((ITEMS[id]&&ITEMS[id].ench)||{}).map(([k,l])=>ENCH_NAMES[k]+(k==='flame'||k==='infinity'?'':' '+ROMAN[l]));
+// tooltip lines: enchantments, then potion effects (prefix ~ = good effect, ! = harmful, so the tooltip can colour them)
+const FX_TIP={heal:'Instant Health',harm:'Instant Damage'},FX_BAD={harm:1,poison:1,slowness:1,weakness:1};
+const itemTipLines=id=>{const it=ITEMS[id];if(!it)return [];const out=Object.entries(it.ench||{}).map(([k,l])=>ENCH_NAMES[k]+(k==='flame'||k==='infinity'?'':' '+ROMAN[l]));
+  if((it.type==='potion'||it.type==='splash')&&it.fx)for(const [n,d,a] of it.fx)out.push((FX_BAD[n]?'!':'~')+(FX_TIP[n]||EFFECT_NAMES[n]||n)+(a?' II':'')+(d>0?' ('+Math.floor(d/60)+':'+String(d%60).padStart(2,'0')+')':''));
+  return out;};
 const MINE_T={1:.6,2:.5,3:2.2,4:1.4,5:.25,6:1.4,7:.5,9:2.6,10:2.6,11:.4,12:.9,13:.6,14:2.6,17:.6,18:2,19:1.2,20:2.4,21:2.4,22:2.4};
 const MINE_DROP={1:'b2',2:'b2',3:'b9',4:'b4',5:null,6:'b6',7:'b7',9:'b9',10:'b10',11:null,12:'b12',13:'b13',14:'b14',17:'b17',18:'b18',19:'b19',20:'b20',21:'b21',22:'b22'};
 

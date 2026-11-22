@@ -1,5 +1,5 @@
 // ================= match flow: settings, start/end, lobby hub, phases, chests, MCBR timeline, net handlers =================
-const SET={mode:'battle',roundLen:600,hunger:1,refill:120,grace:15,showdown:true,takeAll:true,central:true,bots:5,difficulty:1,
+const SET={mode:'battle',roundLen:600,hunger:1,refill:120,grace:30,showdown:true,takeAll:true,central:true,bots:5,difficulty:1,
   maps:{cavern:true,cove:true,crucible:true,skyhold:true},brLen:.2,brExtra:true,enchants:true,lobbyWait:45};
 const MATCH={state:'menu',mode:'battle',map:null,seed:0,gameT:0,showdown:false,refillAt:0,mapIdx:0,lobbyCD:-1,winner:null,phaseT:0,graceAnn:false,edits:[],nextMap:null};
 let suddenDeath=false,br=null,myName='Player',mySkin='gen:Player',online=false;
@@ -21,7 +21,7 @@ function hostStartMatch(){
   for(let i=0;i<nb;i++)list.push({id:'b'+i,name:names[i%names.length],kind:'bot',skin:skins.length?skins[i%skins.length]:'gen:'+names[i%names.length]+i,color:ci++});
   let sp=(SET.central&&SET.mode==='battle'?mapInfo.central:mapInfo.spawns).slice();if(!SET.central||SET.mode!=='battle')sp.sort(()=>Math.random()-.5);
   list.forEach((e,i)=>e.sp=sp[i%sp.length]);
-  const payload={mode:SET.mode,map:mapId,seed,pre:SET.mode==='br'?5:10,set:JSON.parse(JSON.stringify(SET)),ents:list,chests:[...chests].map(([k,c])=>[k,c.items])};
+  const payload={mode:SET.mode,map:mapId,seed,pre:SET.mode==='br'?5:4,set:JSON.parse(JSON.stringify(SET)),ents:list,chests:[...chests].map(([k,c])=>[k,c.items])};
   netSend(N.START,payload);applyStart(payload,null);
 }
 function applyStart(p,lateJoinId){
@@ -71,7 +71,7 @@ function aliveList(){return ents.filter(e=>e.alive&&!e.spectator);}
 function hostMatchTick(dt){
   if(MATCH.preT>0){MATCH.phaseT-=dt;if(MATCH.phaseT<=0){MATCH.phaseT=1;netSend(N.PHASE,{pre:MATCH.preT,t:MATCH.gameT,sd:MATCH.showdown,r:MATCH.refillAt,bs:suddenDeath});}return;}
   if(MATCH.mode==='battle'){
-    if(!MATCH.graceAnn&&SET.grace>0&&MATCH.gameT>=SET.grace){MATCH.graceAnn=true;chatMsg('Invulnerability has worn off!','#ff5555');announce('Fight!','',2);}
+    if(!MATCH.graceAnn&&SET.grace>0&&MATCH.gameT>=SET.grace){MATCH.graceAnn=true;}   // the HUD shows 'Invulnerability has worn off! Fight!' at the top
     if(SET.refill>0&&MATCH.gameT>=MATCH.refillAt){MATCH.refillAt+=SET.refill;for(const c of chests.values())c.items=rollLoot(c.center);netSend(N.CHESTS,[...chests].map(([k,c])=>[k,c.items]));chatMsg('The chests have been refilled!','#ffff55');sfx('chest');if(chestOpen)renderChest();}
     const alive=aliveList().length,total=ents.filter(e=>!e.spectator).length;
     if(SET.showdown&&!MATCH.showdown&&total>2&&(alive<=(total>=6?3:2)||(SET.roundLen>0&&SET.roundLen-MATCH.gameT<=60))){MATCH.showdown=true;announce('Showdown!','The remaining players have been revealed',3.5);sfx('go');}
@@ -84,11 +84,17 @@ function hostMatchTick(dt){
 function hostEndMatch(w){
   if(MATCH.state!=='play')return;
   const alive=aliveList();alive.sort((a,b)=>b.dmgDealt-a.dmgDealt);let pl=1;if(w)w.place=1;for(const e of alive)if(e!==w)e.place=++pl;
-  const res=ents.filter(e=>!e.spectator).map(e=>({id:e.id,name:e.name,k:e.kills,p:e.place||1,d:Math.round(e.dmgDealt)}));
-  const m={w:w?w.id:null,res};netSend(N.END,m);applyEnd(m);
+  const list=ents.filter(e=>!e.spectator),aw=assignAwards(list);
+  const res=list.map(e=>({id:e.id,name:e.name,k:e.kills,p:e.place||1,d:Math.round(e.dmgDealt),r:Math.round(e.dmgTaken||0),fw:favWeapon(e),aw:aw.get(e)||'contender'}));
+  const m={w:w?w.id:null,res,t:Math.round(MATCH.gameT)};netSend(N.END,m);applyEnd(m);
   MATCH.mapIdx++;
   if(online)setTimeout(()=>{if(isHost()&&MATCH.state==='over'){netSend(N.TOLOBBY,{});enterLobby();}},10000);
 }
+// end-of-round scoreboard: favourite weapon = the one that did the most damage; every player gets one award
+function favWeapon(e){let best=null,bv=0;for(const [k,v] of Object.entries(e.wpn||{}))if(k!=='hand'&&v>bv){bv=v;best=k;}return best;}
+function assignAwards(list){const out=new Map();const sum=(e,f)=>Object.entries(e.wpn||{}).reduce((s,[k,v])=>s+(f(k)?v:0),0);
+  const tests=[['slayer',e=>e.kills],['sharp',e=>sum(e,k=>ITEMS[k]&&ITEMS[k].type==='bow')],['brawler',e=>e.dmgDealt],['potion',e=>sum(e,k=>k.startsWith('splash_'))],['tank',e=>e.dmgTaken||0],['survivor',e=>100-(e.place||99)]];
+  for(const [k,f] of tests){let best=null,bv=0;for(const e of list){if(out.has(e))continue;const v=f(e);if(v>bv){bv=v;best=e;}}if(best)out.set(best,k);}return out;}
 function applyEnd(m){
   MATCH.state='over';const w=m.w?entById(m.w):null;MATCH.winner=w;if(w)w.invuln=999;
   for(const r of m.res){const e=entById(r.id);if(e){e.place=r.p;e.kills=r.k;e.dmgDealt=r.d;}}
@@ -171,9 +177,9 @@ function onNetEvent(code,d,from){
     e.fire=d.fi||0;if(d.hp<hp0-.4){e.hurtT=.5;sfx('hurt',{pos:e.pos});}e.effects=d.ef?Object.fromEntries(d.ef.map(n=>[n,{t:9,amp:0,tick:0}])):{};e.sprint=!!d.sr;e.sneak=!!d.sn;e.openChest=d.oc||null;e.ready=!!d.r;e.bat=!!d.b;
     if(MATCH.state==='lobby'){e.alive=true;e.bat=false;}
     break;}
-  case N.HIT:{const t=entById(d.t);if(!t||!owned(t))return;const a=d.a?entById(d.a):null;const ok=hurt(t,d.d,a,d.c,d.kb,!!d.r);if(d.fx&&(ok||d.d===0))for(const f of d.fx)giveEffect(t,...f);break;}
+  case N.HIT:{const t=entById(d.t);if(!t||!owned(t))return;const a=d.a?entById(d.a):null;if(a)a.heldHint=typeof d.w==='string'&&ITEMS[d.w]?d.w:null;const ok=hurt(t,d.d,a,d.c,d.kb,!!d.r);if(a)a.heldHint=null;if(d.fx&&(ok||d.d===0))for(const f of d.fx)giveEffect(t,...f);break;}
   case N.DEATH:onDeath(d);break;
-  case N.DEALT:{if(!isHost())return;const a=entById(d.a);if(a)a.dmgDealt+=d.d;break;}
+  case N.DEALT:{if(!isHost())return;if(d.tk){const t=entById(d.tk);if(t)t.dmgTaken=(t.dmgTaken||0)+d.d;break;}const a=entById(d.a);if(a){a.dmgDealt+=d.d;addWpn(a,typeof d.w==='string'&&(ITEMS[d.w]||d.w==='hand')?d.w:null,d.d);}break;}
   case N.CHESTREQ:{if(!isHost())return;const who=entById('p'+from);if(who)hostChestOp(d.k,d.op,d.slot,who,d.item);break;}
   case N.CHEST:{const c=chests.get(d.k);if(c){c.items=d.items;if(chestOpen===c)renderChest();}break;}
   case N.CHESTS:for(const [k,items] of d){const c=chests.get(k);if(c)c.items=items;}if(chestOpen)renderChest();break;
@@ -221,7 +227,7 @@ function sendMyState(dt){
     sw:p.swing>.5?p.swing:0,u:p.using,ut:p.useT,fi:p.fire>0?1:0,ef:Object.keys(p.effects).filter(k=>k==='invis'),sr:p.sprint?1:0,sn:p.sneak?1:0,r:p.ready?1:0,b:p.bat?1:0,al:p.alive?1:0,sp:p.spectator?1:0,oc:chestOpen&&!chestOpen.inv?key(chestOpen.x,chestOpen.y,chestOpen.z):0});
 }
 let botsT=0;
-function sendBots(dt){if(!net||!isHost())return;botsT-=dt;if(botsT>0)return;botsT=.12;const arr=ents.filter(e=>e.kind==='bot'&&e.alive).map(e=>{const h=e.inv[e.sel];
+function sendBots(dt){if(!net||!isHost())return;botsT-=dt;if(botsT>0)return;botsT=.08;const arr=ents.filter(e=>e.kind==='bot'&&e.alive).map(e=>{const h=e.inv[e.sel];
   return [e.id,+e.pos[0].toFixed(2),+e.pos[1].toFixed(2),+e.pos[2].toFixed(2),+e.vel[0].toFixed(2),+e.vel[1].toFixed(2),+e.vel[2].toFixed(2),+e.yaw.toFixed(3),+e.pitch.toFixed(3),Math.round(e.health*10)/10,h?h.id:null,e.armor,e.using,e.useT,e.swing>.5?e.swing:0,e.fire>0?1:0,e.effects.invis?1:0,Math.round(performance.now())];});
   if(arr.length)netSend(N.BOTS,arr);}
 // ---- remote player / bot smoothing ----
@@ -229,9 +235,9 @@ function sendBots(dt){if(!net||!isHost())return;botsT-=dt;if(botsT>0)return;bots
 // (about 2 packets) and interpolate between two real snapshots, so late or uneven packets no longer make people stutter.
 function lerpAng(a,b,f){let d=b-a;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return a+d*f;}
 function pushSnap(e,p,v,yaw,pitch,ts,g){
-  const now=performance.now();let n=e.net;if(!n||!n.buf)n=e.net={buf:[],off:null,iv:100};
+  const now=performance.now();let n=e.net;if(!n||!n.buf)n=e.net={buf:[],off:null,iv:60,dev:0};
   let t=now;
-  if(typeof ts==='number'){const s=now-ts;if(n.off==null||s<n.off)n.off=s;else n.off+=(s-n.off)*.02;t=ts+n.off;n.pk=Math.max(s-n.off,(n.pk||0)*.99);}   // sender clock -> our clock (tracks the fastest packets)
+  if(typeof ts==='number'){const s=now-ts;if(n.off==null||s<n.off)n.off=s;else n.off+=(s-n.off)*.02;t=ts+n.off;n.dev+=(Math.max(0,s-n.off)-n.dev)*.1;}   // sender clock -> our clock (tracks the fastest packets)
   const b=n.buf,last=b[b.length-1];
   if(last){if(t<=last.t){if(typeof ts==='number')return;t=last.t+1;}const gap=t-last.t;if(gap<400)n.iv+=(gap-n.iv)*.1;
     if(Math.hypot(p[0]-last.p[0],p[1]-last.p[1],p[2]-last.p[2])>6){b.length=0;n.snap=true;}}   // teleport / respawn: don't glide across the map
@@ -239,7 +245,7 @@ function pushSnap(e,p,v,yaw,pitch,ts,g){
 }
 function interpRemote(e,dt){
   const n=e.net;if(!n||!n.buf||!n.buf.length)return;const b=n.buf,first=b[0],last=b[b.length-1];
-  const rt=performance.now()-Math.min(300,Math.max(90,n.iv+(n.pk||0)+20));
+  const rt=performance.now()-Math.min(200,Math.max(55,n.iv*1.2+n.dev*2+8));
   let p,v,yaw,pitch,g;
   if(b.length===1||rt<=first.t){p=first.p;v=first.v;yaw=first.y;pitch=first.pi;g=first.g;}
   else if(rt>=last.t){   // ran out of snapshots: coast briefly. Grounded players report a small downward speed from gravity, so only coast vertically while airborne
@@ -248,7 +254,7 @@ function interpRemote(e,dt){
   else{let i=b.length-2;while(i>0&&b[i].t>rt)i--;const a=b[i],c=b[i+1],f=Math.max(0,Math.min(1,(rt-a.t)/(c.t-a.t)));
     p=[a.p[0]+(c.p[0]-a.p[0])*f,a.p[1]+(c.p[1]-a.p[1])*f,a.p[2]+(c.p[2]-a.p[2])*f];v=[a.v[0]+(c.v[0]-a.v[0])*f,a.v[1]+(c.v[1]-a.v[1])*f,a.v[2]+(c.v[2]-a.v[2])*f];
     yaw=lerpAng(a.y,c.y,f);pitch=a.pi+(c.pi-a.pi)*f;g=c.g;}
-  if(n.snap||dist(p,e.pos)>6){n.snap=false;e.pos=p.slice();}else{const k=Math.min(1,dt*30);for(let i=0;i<3;i++)e.pos[i]+=(p[i]-e.pos[i])*k;}
+  if(n.snap||dist(p,e.pos)>6){n.snap=false;e.pos=p.slice();}else{const k=Math.min(1,dt*50);for(let i=0;i<3;i++)e.pos[i]+=(p[i]-e.pos[i])*k;}
   if(e.alive!==false){const fb=[e.pos[0]-HW+.05,e.pos[1]+.03,e.pos[2]-HW+.05,e.pos[0]+HW-.05,e.pos[1]+.35,e.pos[2]+HW-.05];let top=-1e9;for(const c of collisionBoxes(fb))if(c[4]-e.pos[1]<=.6)top=Math.max(top,c[4]);if(top>e.pos[1])e.pos[1]=top;}
   e.vel=v.slice();e.yaw=yaw;e.pitch=pitch;if(e.onGround!==false)e.walkT+=dt*Math.hypot(e.vel[0],e.vel[2]);
   e.onGround=g!==undefined?!!g:Math.abs(v[1])<2;e.rpos=e.pos;}

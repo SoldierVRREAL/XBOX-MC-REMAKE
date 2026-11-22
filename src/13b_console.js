@@ -45,23 +45,32 @@ window.addEventListener('gamepadconnected',()=>{chatMsg('Controller connected','
 const TIPS=['Armour you take from a chest is equipped automatically.','Sprint-hitting knocks players back further.','Hold a sword up to block and take less damage.',
   'Chests refill during the round, so check them again.','Hunger still matters in Battle: eat before you run out.','Bats can watch other players: switch with LB and RB.',
   'Falling while you attack lands a critical hit.','When only a few players are left, Showdown reveals where they are.','Splash potions affect everyone close to where they land.'];
-function showLoading(title,then){const el=$('loading');$('loadTitle').textContent=title;$('loadTip').textContent=TIPS[Math.random()*TIPS.length|0];el.classList.remove('hidden');
-  const bar=$('loadBar');bar.style.width='0%';let p=0;const step=()=>{p=Math.min(100,p+8+Math.random()*14);bar.style.width=p+'%';if(p<100)setTimeout(step,60);else setTimeout(()=>{try{then&&then();}finally{el.classList.add('hidden');}},120);};setTimeout(step,80);}
+function loadingUp(){const el=$('loading');return !!el&&!el.classList.contains('hidden');}
+function loadLogo(){const im=$('loadLogo');if(!im)return;try{im.src=$('logo').toDataURL();im.style.display='';}catch(e){im.style.display='none';}}
+// a Battle round starts behind the loading screen: it stays up through the short pre-round wait, then you spawn straight into the invulnerability countdown
+function loadHold(){return MATCH.state==='play'&&MATCH.mode==='battle'&&MATCH.preT>0;}
+let holdShown=false,holdT0=1;
+function tickLoadHold(){const el=$('loading');if(loadHold()){if(!holdShown){holdShown=true;holdT0=Math.max(MATCH.preT,.01);$('loadTitle').textContent=isHost()?'Building terrain':'Downloading terrain';
+      if(el.classList.contains('hidden')){$('loadTip').textContent=TIPS[Math.random()*TIPS.length|0];loadLogo();el.classList.remove('hidden');}}
+    $('loadBar').style.width=Math.round(100*(1-MATCH.preT/holdT0))+'%';}
+  else if(holdShown){holdShown=false;el.classList.add('hidden');}}
+function showLoading(title,then){const el=$('loading');$('loadTitle').textContent=title;$('loadTip').textContent=TIPS[Math.random()*TIPS.length|0];loadLogo();el.classList.remove('hidden');
+  const bar=$('loadBar');bar.style.width='0%';let p=0;const step=()=>{p=Math.min(100,p+8+Math.random()*14);bar.style.width=p+'%';if(p<100)setTimeout(step,60);else setTimeout(()=>{try{then&&then();}finally{if(!loadHold())el.classList.add('hidden');}},120);};setTimeout(step,80);}
 
 // ---------- contextual button prompts (bottom left, like the console HUD) ----------
 function promptLabels(){
   const p=player;if(!p||MATCH.state==='menu')return [];const out=[];const pad=padActive;const K=(m,g)=>pad?g:m;
   if(!p.alive){out.push([K('LMB','RT'),'Squeak'],[K('Q/E','LB/RB'),'Previous/Next'],[K('F','X'),'Fly']);return out;}
   if(MATCH.state==='lobby'){out.push([K('R','X'),p.ready?'Not Ready':'Ready'],[K('E','Y'),'Inventory']);if(online)out.push([K('Tab','Back'),'Lobby']);return out;}
-  const s=p.inv[p.sel],it=s&&ITEMS[s.id];if(MATCH.state==='play')out.push([K('E','Y'),'Inventory']);
+  const s=p.inv[p.sel],it=s&&ITEMS[s.id];if(MATCH.state==='play'){if(p.inWater)out.push([K('Space','A'),'Swim Up']);out.push([K('E','Y'),'Inventory']);}
   if(lookChest())out.push([K('RMB','LT'),'Open']);
   else if(it){if(it.type==='food'&&(p.food<20||it.always))out.push([K('RMB','LT'),'Eat']);else if(it.type==='potion')out.push([K('RMB','LT'),'Drink']);else if(it.type==='splash')out.push([K('RMB','LT'),'Throw']);
-    else if(it.type==='bow')out.push([K('RMB','LT'),'Draw']);else if(it.tool==='sword')out.push([K('RMB','LT'),'Block']);else if(it.type==='armor')out.push([K('RMB','LT'),'Equip']);else if(it.type==='block'&&MATCH.mode==='br')out.push([K('RMB','LT'),'Place']);
+    else if(it.type==='bow')out.push([K('RMB','LT'),p.using==='bow'?'Release':'Draw']);else if(it.tool==='sword')out.push([K('RMB','LT'),'Block']);else if(it.type==='armor')out.push([K('RMB','LT'),'Equip']);else if(it.type==='block'&&MATCH.mode==='br')out.push([K('RMB','LT'),'Place']);
     out.push([K('Q','B'),'Drop']);}
   return out;
 }
 const PAD_COL={A:'#5cb85c',B:'#d9534f',X:'#428bca',Y:'#f0ad4e'};
-function drawPrompts(){if(chestOpen||touchActive)return;const list=promptLabels();let x=16;const y=H-18;
+function drawPrompts(){if(chestOpen||touchActive)return;const list=promptLabels();let x=Math.round(W*.05);const y=Math.round(H*.94);
   for(const [k,label] of list){const col=PAD_COL[k];hc.font="18px "+HFONT;const kw=Math.max(22,hc.measureText(k).width+12);
     if(col){hc.fillStyle=col;hc.beginPath();hc.arc(x+11,y-6,11,0,7);hc.fill();hc.fillStyle='#fff';hc.textAlign='center';hc.fillText(k,x+11,y);x+=26;}
     else{hc.fillStyle='rgba(230,230,230,.95)';hc.fillRect(x,y-17,kw,22);hc.fillStyle='#333';hc.textAlign='center';hc.fillText(k,x+kw/2,y);x+=kw+6;}
