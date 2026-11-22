@@ -63,7 +63,9 @@ Players can load any Java Edition resource pack (`.zip`) or a client `.jar` they
 
 **Java keys:** F5 cycles first person / third person behind / in front, F1 hides the GUI, F3 shows the debug screen, T (or /) opens chat in multiplayer.
 
-**Mouse:** Controls > Raw Mouse Input picks between raw input (no OS acceleration) and normal input. Auto uses normal input on Macs, where raw input speeds up the camera while a mouse button is held, and raw input everywhere else.
+**Mouse:** some Mac browsers report mouse movement too big while a button is held, which made the camera turn faster whenever you clicked. Mac Click Fix (Controls, Auto = on for Macs) undoes it: it learns how much the browser inflates movement from how fast you move just before and after each click, and divides it back out. Controls > Raw Mouse Input picks between raw input (no OS acceleration) and normal input; Auto uses normal input on Macs.
+
+**Connection:** the Tab lobby panel and the F3 screen show your ping to the game server and which server you are on, and you get a warning in chat if it stays above 250 ms. The game server itself relays 16 players at 20 updates a second in under 5 ms, so lag comes from distance: host it in a region close to your players, and avoid the free public relays.
 
 **Options & mobile:** Help & Options opens Java-style Options screens (Video Settings, Music & Sounds, Controls, Game Rules, Maps). Mobile Controls (Auto/ON/OFF) adds a touch joystick, drag-to-look, tap-to-attack, hold-to-use and buttons for jump, sneak, sprint, inventory and drop. Settings are saved in the browser.
 
