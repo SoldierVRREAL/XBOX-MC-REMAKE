@@ -3,7 +3,11 @@ let sprintTap=false,lastWUp=-1;const keys={};let lmb=false,rmb=false,rmbEdge=fal
 const OVERLAYS=['jOpt','lbPanel','dressPanel','menu','optPanel','onlinePanel','packPanel','chestUI','pause','lobbyPanel','results','clickResume'];
 function show(id){$(id).classList.remove('hidden');}function hide(id){$(id).classList.add('hidden');}
 function hideOverlays(){for(const id of OVERLAYS)hide(id);}
-function lockPointer(){if(padActive||touchActive)return;try{let r=null;try{r=cv.requestPointerLock({unadjustedMovement:true});}catch(e){r=null;}if(r&&r.catch)r.catch(()=>{try{const r2=cv.requestPointerLock();if(r2&&r2.catch)r2.catch(()=>{});}catch(e){}});else if(!r&&!document.pointerLockElement){}}catch(e){}}
+// raw mouse input (unadjustedMovement) skips OS acceleration, but on macOS it inflates movement while a mouse button is held,
+// so Auto uses normal input on Macs and raw input elsewhere; Controls > Raw Mouse Input overrides it either way
+const IS_MAC=/Mac|iPhone|iPad/i.test((navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||navigator.userAgent||'');
+const rawMouse=()=>OPT.rawMouse==='on'||(OPT.rawMouse!=='off'&&!IS_MAC);
+function lockPointer(){if(padActive||touchActive)return;try{let r=null;try{r=rawMouse()?cv.requestPointerLock({unadjustedMovement:true}):cv.requestPointerLock();}catch(e){r=null;}if(r&&r.catch)r.catch(()=>{try{const r2=cv.requestPointerLock();if(r2&&r2.catch)r2.catch(()=>{});}catch(e){}});else if(!r&&!document.pointerLockElement){}}catch(e){}}
 let SENS=+(store('bb_sens')||.5),INVY=store('bb_invy')==='1';
 function lookDelta(dx,dy){const f=SENS*.6+.2,k=f*f*f*8*.15*Math.PI/180;player.yaw-=dx*k;player.pitch=clamp(player.pitch-(INVY?-dy:dy)*k,-Math.PI/2,Math.PI/2);}
 function setNetStatus(s){const el=$('status');if(el)el.textContent=s;}
@@ -12,7 +16,10 @@ document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockEl
   else if((MATCH.state==='play'||MATCH.state==='lobby')&&!chestOpen&&!chatUI&&$('lobbyPanel').classList.contains('hidden')&&$('results').classList.contains('hidden')){if(!online)paused=true;show('pause');}});
 cv.addEventListener('click',()=>{if((MATCH.state==='play'||MATCH.state==='lobby')&&!locked&&!chestOpen)lockPointer();});
 $('clickResume').addEventListener('click',()=>lockPointer());
-document.addEventListener('mousemove',e=>{if(!locked||!player)return;if(!player.alive&&spectate.mode==='follow')return;const dx=e.movementX,dy=e.movementY;if(Math.abs(dx)>350||Math.abs(dy)>350)return;lookDelta(dx,dy);});
+// mouse look; some browsers deliver the same drag movement twice while a button is held, so an exact repeat (same time, same deltas) is skipped
+let lastMove={t:-1,dx:0,dy:0};
+document.addEventListener('mousemove',e=>{if(!locked||!player)return;if(!player.alive&&spectate.mode==='follow')return;const dx=e.movementX,dy=e.movementY;if(!dx&&!dy)return;
+  if(e.timeStamp===lastMove.t&&dx===lastMove.dx&&dy===lastMove.dy)return;lastMove={t:e.timeStamp,dx,dy};if(Math.abs(dx)>350||Math.abs(dy)>350)return;lookDelta(dx,dy);});
 document.addEventListener('mousedown',e=>{if(!locked)return;if(e.button===0){lmb=true;lmbEdge=true;}if(e.button===2){rmb=true;rmbEdge=true;}});
 document.addEventListener('mouseup',e=>{if(e.button===0)lmb=false;if(e.button===2)rmb=false;});
 document.addEventListener('contextmenu',e=>e.preventDefault());

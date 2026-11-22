@@ -31,7 +31,7 @@ $('tStickZone').addEventListener('pointerup',stickEnd);$('tStickZone').addEventL
 const looks=new Map();
 $('tLook').addEventListener('pointerdown',e=>{e.preventDefault();try{e.target.setPointerCapture(e.pointerId);}catch(_){}
   // tapping the hotbar selects a slot
-  const S=Math.min(46,(W-20)/9.5),hx=Math.round(W/2-S*4.5),hy=Math.round(H-S-12);
+  const G=hudGeom(),S=G.S,hx=G.hx,hy=G.hy;   // same layout the HUD draws
   if(player&&e.clientY>=hy-4&&e.clientY<=hy+S+4&&e.clientX>=hx&&e.clientX<=hx+S*9){player.sel=clamp(Math.floor((e.clientX-hx)/S),0,8);player.using=null;selShow=2;return;}
   const L={x:e.clientX,y:e.clientY,t:performance.now(),moved:0,held:false};L.timer=setTimeout(()=>{if(L.moved<10){L.held=true;rmb=true;rmbEdge=true;}},380);looks.set(e.pointerId,L);});
 $('tLook').addEventListener('pointermove',e=>{const L=looks.get(e.pointerId);if(!L||!player)return;const dx=e.clientX-L.x,dy=e.clientY-L.y;L.x=e.clientX;L.y=e.clientY;L.moved+=Math.abs(dx)+Math.abs(dy);

@@ -46,7 +46,8 @@ JPAGES.sound=()=>({title:'Music & Sound Options',items:[
 JPAGES.controls=()=>{const keys=[['Attack','Left Click'],['Use Item','Right Click'],['Forward / Back','W / S'],['Left / Right','A / D'],['Jump','Space'],['Sneak','Shift'],['Sprint','Ctrl or W W'],['Inventory','E'],['Drop Item','Q'],['Hotbar','1-9, Wheel'],['Ready (lobby)','R'],['Player List','Tab']];
   return {title:'Controls',items:[
   jSlider(()=>SENS<=0?'Sensitivity: *yawn*':SENS>=1?'Sensitivity: HYPERSPEED!!!':'Sensitivity: '+Math.round(SENS*200)+'%',()=>SENS,v=>{SENS=v;store('bb_sens',SENS);if($('o_sens'))$('o_sens').value=Math.round(SENS*200);},40),
-  jBtn(()=>'Invert Mouse: '+onOff(INVY),()=>{INVY=!INVY;store('bb_invy',INVY?'1':'0');if($('o_invy'))$('o_invy').checked=INVY;})].concat(keys.map(([a,k])=>jBtn(`${a}: ${k}`,null,'off')))};};
+  jBtn(()=>'Invert Mouse: '+onOff(INVY),()=>{INVY=!INVY;store('bb_invy',INVY?'1':'0');if($('o_invy'))$('o_invy').checked=INVY;}),
+  jBtn(()=>'Raw Mouse Input: '+({on:'ON',off:'OFF'}[OPT.rawMouse]||'Auto ('+(IS_MAC?'OFF':'ON')+')'),()=>{OPT.rawMouse=OPT.rawMouse==='on'?'off':OPT.rawMouse==='off'?'auto':'on';saveOpt();if(document.pointerLockElement)document.exitPointerLock();})].concat(keys.map(([a,k])=>jBtn(`${a}: ${k}`,null,'off')))};};
 JPAGES.rules=()=>({title:'Game Rules',items:[ruleBtn('o_mode','Mode'),ruleBtn('o_round','Round Length'),ruleBtn('o_hunger','Hunger Rate'),ruleBtn('o_refill','Item Respawn'),ruleBtn('o_grace','Grace Period'),
   ruleBtn('o_show','Showdown'),ruleBtn('o_take','Take Everything'),ruleBtn('o_central','Central Spawn'),ruleBtn('o_bots','Bots'),ruleBtn('o_diff','Bot Difficulty'),ruleBtn('o_brlen','Battle Royale Length'),ruleBtn('o_brx','BR Extra Loot'),ruleBtn('o_ench','Enchanted Loot')]});
 JPAGES.maps=()=>({title:'Maps',items:MAPS.map(m=>jBtn(()=>`${m.name}: ${onOff($('map_'+m.id).checked)}`,()=>{const el=$('map_'+m.id);el.checked=!el.checked;if(!MAPS.some(q=>$('map_'+q.id).checked))el.checked=true;readOptions();}))});
