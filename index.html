@@ -320,7 +320,7 @@ async function readZip(buf){
 // ================= blocks =================
 const B={ICE:33,SLIME:34,SOUL:35,WEB:36,LADDER:37,SLAB:41,STAIRS:42,TGRASS:30,POPPY:31,DANDELION:32,AIR:0,GRASS:1,DIRT:2,STONE:3,LOG:4,LEAVES:5,PLANKS:6,SAND:7,CHEST:8,COBBLE:9,BRICK:10,GLASS:11,WOOL:12,GRAVEL:13,MOSSY:14,
   WATER:15,LAVA:16,GLOW:17,BONE:18,SANDSTONE:19,SBRICK:20,MSBRICK:21,CHISELED:22,GOLDB:23,DIAMONDB:24,EMERALDB:25,OBSIDIAN:26,NETHERRACK:27,BARRIER:28,BEACON:29,
-  OAK_STAIRS:46,OAK_SLAB:50,SPRUCE_LOG:51,SPRUCE_PLANKS:52,FENCE:53,TORCH:54,CARPET:55,IRON_BARS:56,QUARTZ:57,JLEAVES:58,COAL:59,CRACKED:60,CSANDSTONE:61,SSANDSTONE:62,REDSTONE:63,JLOG:64,SST_SLAB:65,SBR_SLAB:66,SBR_STAIRS:67,WOOL_W:71,SPRUCE_STAIRS:72};
+  OAK_STAIRS:46,OAK_SLAB:50,SPRUCE_LOG:51,SPRUCE_PLANKS:52,FENCE:53,TORCH:54,CARPET:55,IRON_BARS:56,QUARTZ:57,JLEAVES:58,COAL:59,CRACKED:60,CSANDSTONE:61,SSANDSTONE:62,REDSTONE:63,JLOG:64,SST_SLAB:65,SBR_SLAB:66,SBR_STAIRS:67,WOOL_W:71,SPRUCE_STAIRS:72,VINE:76,LILY:77};
 const BD=[];
 function def(id,top,side,bottom,o={}){BD[id]=Object.assign({top,side,bottom,front:side,solid:true,opaque:true,liquid:false,light:0,render:true},o);}
 def(1,0,1,2);def(2,2,2,2);def(3,3,3,3);def(4,5,4,5);def(5,6,6,6,{opaque:false});def(6,7,7,7);def(7,8,8,8);
@@ -349,6 +349,8 @@ def(57,51,50,51);def(58,52,52,52,{opaque:false});def(59,53,53,53);def(60,54,54,5
 def(65,24,23,24,{opaque:false,shape:[[0,0,0,1,.5,1]],col:[[0,0,0,1,.5,1]]});def(66,25,25,25,{opaque:false,shape:[[0,0,0,1,.5,1]],col:[[0,0,0,1,.5,1]]});
 for(let k=0;k<4;k++)def(67+k,25,25,25,{opaque:false,shape:[[0,0,0,1,.5,1],stairTop(k)],col:[[0,0,0,1,.5,1],stairTop(k)]});
 def(71,59,59,59);
+def(76,60,60,60,{solid:false,opaque:false,cross:true});   // vines: hanging strands you walk through
+def(77,61,61,61,{opaque:false,shape:[[0,0,0,1,1/64,1]],col:[[0,0,0,1,1/64,1]]});   // lily pad: floats on water and holds you up
 for(let k=0;k<4;k++)def(72+k,47,47,47,{opaque:false,shape:[[0,0,0,1,.5,1],stairTop(k)],col:[[0,0,0,1,.5,1],stairTop(k)]});
 def(8,10,9,10,{front:11,opaque:false,render:false,tileEnt:true,shape:[[1/16,0,1/16,15/16,14/16,15/16]],col:[[1/16,0,1/16,15/16,14/16,15/16]]});
 // fences join to neighbouring fences and full blocks
@@ -357,14 +359,14 @@ function fenceBoxes(x,y,z,col){const top=col?1.5:1;const out=[[6/16,0,6/16,10/16
   const add=(x0,z0,x1,z1)=>{if(col)out.push([x0,0,z0,x1,1.5,z1]);else{out.push([x0,12/16,z0,x1,15/16,z1]);out.push([x0,6/16,z0,x1,9/16,z1]);}};
   if(fenceJoin(x+1,y,z))add(10/16,7/16,1,9/16);if(fenceJoin(x-1,y,z))add(0,7/16,6/16,9/16);if(fenceJoin(x,y,z+1))add(7/16,10/16,9/16,1);if(fenceJoin(x,y,z-1))add(7/16,0,9/16,6/16);return out;}
 const BLOCK_NAMES={1:'Grass Block',2:'Dirt',3:'Stone',4:'Oak Log',5:'Oak Leaves',6:'Oak Planks',7:'Sand',9:'Cobblestone',10:'Bricks',11:'Glass',12:'Red Wool',13:'Gravel',14:'Mossy Cobblestone',
-  17:'Glowstone',18:'Bone Block',19:'Sandstone',20:'Stone Bricks',21:'Mossy Stone Bricks',22:'Chiseled Stone Bricks',23:'Block of Gold',24:'Block of Diamond',25:'Block of Emerald',26:'Obsidian',27:'Netherrack',46:'Oak Stairs',50:'Oak Slab',51:'Spruce Wood',52:'Spruce Planks',53:'Oak Fence',54:'Torch',55:'Red Carpet',56:'Iron Bars',57:'Block of Quartz',58:'Jungle Leaves',59:'Block of Coal',60:'Cracked Stone Bricks',61:'Chiseled Sandstone',62:'Smooth Sandstone',63:'Block of Redstone',64:'Jungle Wood',65:'Sandstone Slab',66:'Stone Brick Slab',67:'Stone Brick Stairs',71:'White Wool',72:'Spruce Stairs'};
-const BLOCK_COL={1:'#5f9f35',2:'#866043',3:'#7f7f7f',4:'#665032',5:'#3a8228',6:'#a2824e',7:'#dbcfa3',8:'#9c6c2c',9:'#7a7a7a',10:'#964a3a',11:'#d8f0f5',12:'#cc3430',13:'#8c8682',14:'#62784a',
+  17:'Glowstone',18:'Bone Block',19:'Sandstone',20:'Stone Bricks',21:'Mossy Stone Bricks',22:'Chiseled Stone Bricks',23:'Block of Gold',24:'Block of Diamond',25:'Block of Emerald',26:'Obsidian',27:'Netherrack',46:'Oak Stairs',50:'Oak Slab',51:'Spruce Wood',52:'Spruce Planks',53:'Oak Fence',54:'Torch',55:'Red Carpet',56:'Iron Bars',57:'Block of Quartz',58:'Jungle Leaves',59:'Block of Coal',60:'Cracked Stone Bricks',61:'Chiseled Sandstone',62:'Smooth Sandstone',63:'Block of Redstone',64:'Jungle Wood',76:'Vines',77:'Lily Pad',65:'Sandstone Slab',66:'Stone Brick Slab',67:'Stone Brick Stairs',71:'White Wool',72:'Spruce Stairs'};
+const BLOCK_COL={76:'#3c8020',77:'#2f7a2a',1:'#5f9f35',2:'#866043',3:'#7f7f7f',4:'#665032',5:'#3a8228',6:'#a2824e',7:'#dbcfa3',8:'#9c6c2c',9:'#7a7a7a',10:'#964a3a',11:'#d8f0f5',12:'#cc3430',13:'#8c8682',14:'#62784a',
   15:'#3f6fe0',16:'#e8701a',17:'#f2d07a',18:'#e6e0cc',19:'#d8cb94',20:'#7c7c7c',21:'#6c7a5a',22:'#7a7a7a',23:'#f5d43a',24:'#5fe3d6',25:'#3fd46a',26:'#1c1426',27:'#7a2e2e',29:'#7fe9e0',46:'#a2824e',47:'#a2824e',48:'#a2824e',49:'#a2824e',50:'#a2824e',51:'#3d2c18',52:'#69492c',53:'#a2824e',54:'#ffd060',55:'#cc3430',56:'#8a8a8a',57:'#ebe6dc',58:'#3c8020',59:'#1a1a1a',60:'#6a6a6a',61:'#d8cb94',62:'#d8cb94',63:'#b01a0e',64:'#5a481c',65:'#d8cb94',66:'#7c7c7c',67:'#7c7c7c',68:'#7c7c7c',69:'#7c7c7c',70:'#7c7c7c',71:'#ebebeb',72:'#69492c',73:'#69492c',74:'#69492c',75:'#69492c'};
 // pack texture names for each atlas tile
 const TILE_PACK=['grass_block_top','grass_block_side','dirt','stone','oak_log','oak_log_top','oak_leaves','oak_planks','sand','~chest_side','~chest_top','~chest_front','cobblestone','bricks','glass','red_wool',
   'gravel','mossy_cobblestone','water_still','lava_still','glowstone','bone_block_side','bone_block_top','sandstone','sandstone_top','stone_bricks','mossy_stone_bricks','chiseled_stone_bricks','gold_block','diamond_block','emerald_block','obsidian',
   'netherrack','sandstone_bottom','beacon','short_grass','poppy','dandelion','ice','slime_block','soul_sand','cobweb','ladder','smooth_stone_slab_side','smooth_stone',
-  'spruce_log','spruce_log_top','spruce_planks','torch','iron_bars','quartz_block_side','quartz_block_top','jungle_leaves','coal_block','cracked_stone_bricks','chiseled_sandstone','cut_sandstone','redstone_block','jungle_log','white_wool'];
+  'spruce_log','spruce_log_top','spruce_planks','torch','iron_bars','quartz_block_side','quartz_block_top','jungle_leaves','coal_block','cracked_stone_bricks','chiseled_sandstone','cut_sandstone','redstone_block','jungle_log','white_wool','vine','lily_pad'];
 let TILE=16;const ACOLS=8;
 let atlasCanvas=null;
 // vanilla-style 16x16 tiles: small palettes + clustered noise, drawn from scratch
@@ -445,6 +447,10 @@ function procTile(t,x,y){
   case 57:return pk(P.rs,(x==0||y==0||x==15||y==15)?.1:.35+cl(x,y,73,2)*.65);
   case 58:{const col=Math.floor(x+h(Math.floor(y/5),x>>2,74)*2);return pk(P.jbark,(x%4==1?.1:.5)+h(col,Math.floor(y/4),75)*.5);}
   case 59:{const v=.82+h(x,y,76)*.12+cl(x,y,77,1.5)*.06;return [235*v|0,235*v|0,235*v|0];}
+  case 60:{for(const sx of [2,6,10,13]){const xx=sx+Math.round(Math.sin(y*.7+sx)*1.2);if(x===xx)return pk(P.jleaf,.15+h(x,y,80)*.3);
+      if(Math.abs(x-xx)<=2&&h(x>>1,y>>1,81+sx)<.33)return pk(P.jleaf,.4+h(x,y,82)*.55);}return [0,0,0,0];}
+  case 61:{const dx=x-7.5,dy=y-7.5,r=Math.hypot(dx,dy);if(r>7.4)return [0,0,0,0];const a=Math.atan2(dy,dx);if(Math.abs(a-.6)<.24&&r>.8)return [0,0,0,0];
+      const vein=(Math.abs(Math.sin(a*4))<.13&&r>1.5)||r>6.5;return pk(P.leaf,vein?.12:.45+h(x,y,83)*.45);}
   }
   return [255,0,255];
 }
@@ -647,6 +653,7 @@ function ringSpawns(r,n){const out=[];for(let i=0;i<n;i++){const a=i/n*Math.PI*2
 function barrierWalls(){for(let y=0;y<WY;y++)for(let i=0;i<WX;i++){setB(i,y,0,B.BARRIER);setB(i,y,WZ-1,B.BARRIER);}for(let y=0;y<WY;y++)for(let i=0;i<WZ;i++){setB(0,y,i,B.BARRIER);setB(WX-1,y,i,B.BARRIER);}}
 
 const MAPS=[
+  {id:'temple',name:'Temple',desc:'A ruined temple deep in a jungle cave, ringed by a lily-pad moat with stepping stones, bridges and hanging vines.'},
   {id:'cavern',name:'Cavern',desc:'Underground arena under the bones of a giant beast. Lava, sand dunes, ledges.'},
   {id:'cove',name:'Cove',desc:'A pirate cove inside a cliff bowl: beach, lagoon, shipwreck, waterfalls and boardwalk huts.'},
   {id:'crucible',name:'Crucible',desc:'A lava colosseum at night under the bones of a giant beast, with a sandstone pyramid at its heart.'},
@@ -842,7 +849,7 @@ function genBR(seed,extra){
   return {sky:[.47,.65,1],fog:[.74,.84,1],fogDist:110,skyLight:true,voidY:-12,central:sp,spawns:sp,center:null};
 }
 function generateMap(id,seed,extra){
-  let info;if(id==='hub')info=genHub();else if(id==='cavern')info=genCavern();else if(id==='cove')info=genCove();else if(id==='crucible')info=genCrucible();else if(id==='br')info=genBR(seed,extra);else info=genSkyhold();
+  let info;if(id==='hub')info=genHub();else if(id==='cavern')info=genCavern();else if(id==='cove')info=genCove();else if(id==='crucible')info=genCrucible();else if(id==='temple')info=genTemple();else if(id==='br')info=genBR(seed,extra);else info=genSkyhold();
   if(id!=='cavern'){rs=(seed|0)+77||77;for(let z=1;z<WZ-1;z++)for(let x=1;x<WX-1;x++){const t=topSolid(x,z);if(t<0||getB(x,t,z)!==B.GRASS||getB(x,t+1,z))continue;
     if([...chests.values()].some(c=>Math.abs(c.x-x)<2&&Math.abs(c.z-z)<2))continue;const r=srand();if(r<.16)setB(x,t+1,z,B.TGRASS);else if(r<.175)setB(x,t+1,z,B.POPPY);else if(r<.19)setB(x,t+1,z,B.DANDELION);}}
   info.id=id;mapInfo=info;computeLight();return info;
@@ -1067,6 +1074,97 @@ function genCrucible(){
   return {sky:[.012,.012,.035],fog:[.02,.018,.04],fogDist:100,skyLight:true,skyMul:.45,dark:true,stars:true,noBeam:true,voidY:-12,central,spawns:spawnRing(CX,CZ,15,16,F+4),center:[CX,F+6,CZ]};
 }
 
+// ---------------- Temple: a ruined temple deep in a jungle cave (after the Battle key art) ----------------
+// stepped stone-brick temple with a redstone block over the door, a lily-pad moat crossed by bridges and glowstone
+// stepping stones, a jungle floor with trees and ruins, a gallery round the cave wall, wooden beams and hanging vines
+function genTemple(){
+  setDims(96,52,96);const s=7171;rs=s;const F=12,R=44,T0=F+1;
+  const brick=(x,y,z)=>{const h=hash2(x*3+y,z,s);return h<.15?B.MSBRICK:h<.23?B.CRACKED:B.SBRICK;};
+  const rock=(x,y,z)=>{const h=hash2(x,y*3+z,s+1);return h<.12?B.MOSSY:h<.3?B.COBBLE:h<.33?B.GRAVEL:B.STONE;};
+  const ceil=(x,z)=>{const r=Math.hypot(x-CX,z-CZ)/R;return Math.min(WY-3,F+34-Math.floor(r*r*14+fbm(x*.08,z*.08,s+2)*5));};
+  const m=(x,z)=>Math.max(Math.abs(x-CX),Math.abs(z-CZ));
+  // the cave: solid rock hollowed into a dome
+  for(let z=0;z<WZ;z++)for(let x=0;x<WX;x++){const r=Math.hypot(x-CX,z-CZ);const wall=r+(fbm(x*.06,z*.06,s+3)-.5)*4;const top=ceil(x,z);
+    for(let y=1;y<WY-1;y++)setB(x,y,z,rock(x,y,z));if(wall>=41.5)continue;
+    for(let y=F+1;y<top;y++)setB(x,y,z,0);
+    const n=fbm(x*.1,z*.1,s+4);
+    if(r<11){setB(x,F,z,n<.32?B.MSBRICK:hash2(x,z,s+5)<.1?B.CRACKED:B.SBRICK);}                                  // temple island paving
+    else if(r<19.5){setB(x,F,z,B.WATER);setB(x,F-1,z,B.WATER);setB(x,F-2,z,hash2(x,z,s+6)<.5?B.SAND:B.GRAVEL);}  // moat
+    else if(r<21){setB(x,F,z,brick(x,F,z));}                                                                      // kerb
+    else if(r<36){setB(x,F,z,n>.64?B.MOSSY:n>.52?B.DIRT:B.GRASS);setB(x,F-1,z,B.DIRT);
+      if(n>.7&&r>23&&r<33){setB(x,F,z,B.DIRT);setB(x,F+1,z,B.GRASS);}}                                           // jungle floor, a few low mounds
+    else{for(let y=F;y<=F+6;y++)setB(x,y,z,brick(x,y,z));}                                                        // gallery round the wall
+  }
+  // bridges over the moat (north/south/east/west) with slab kerbs
+  for(const [dx,dz] of [[1,0],[0,1],[-1,0],[0,-1]]){const px=-dz,pz=dx;for(let r=10;r<=21;r++)for(let w=-1;w<=1;w++){const x=CX+dx*r+px*w,z=CZ+dz*r+pz*w;setB(x,F,z,brick(x,F,z));setB(x,F-1,z,B.STONE);setB(x,F+1,z,0);}
+    for(let r=12;r<=19;r+=2)for(const w of [-2,2]){const x=CX+dx*r+px*w,z=CZ+dz*r+pz*w;if(r===14||r===18){setB(x,F,z,B.SBRICK);setB(x,F-1,z,B.STONE);setB(x,F+1,z,B.CHISELED);setB(x,F+2,z,B.TORCH);}else setB(x,F+1,z,B.SBR_SLAB);}}
+  // big stepping stones on the diagonals: chiseled ring round a glowstone heart, flush with the water
+  for(const [sx,sz] of [[1,1],[-1,1],[1,-1],[-1,-1]]){const cx=CX+Math.round(sx*10.6),cz=CZ+Math.round(sz*10.6);
+    for(let dx=-2;dx<=2;dx++)for(let dz=-2;dz<=2;dz++){const x=cx+dx,z=cz+dz,e=Math.max(Math.abs(dx),Math.abs(dz));if(Math.hypot(x-CX,z-CZ)<11)continue;
+      setB(x,F,z,e===0?B.GLOW:e===1?(hash2(x,z,s+8)<.4?B.MSBRICK:B.SBRICK):B.CHISELED);setB(x,F-1,z,B.STONE);setB(x,F+1,z,0);}}
+  // small mossy stepping stones dotted round the moat, and lily pads on the open water
+  for(let i=0;i<40;i++){const a=srand()*Math.PI*2,r=12.5+srand()*6;const x=Math.round(CX+Math.cos(a)*r),z=Math.round(CZ+Math.sin(a)*r);if(getB(x,F,z)===B.WATER&&getB(x,F+1,z)===0){setB(x,F,z,srand()<.6?B.MSBRICK:B.MOSSY);setB(x,F-1,z,B.STONE);}}
+  for(let z=0;z<WZ;z++)for(let x=0;x<WX;x++){if(getB(x,F,z)===B.WATER&&getB(x,F+1,z)===0&&hash2(x,z,s+7)<.09)setB(x,F+1,z,B.LILY);if(getB(x,F-1,z)===B.WATER&&(x*7+z*3)%9===0)setB(x,F-2,z,B.GLOW);}
+  // ---- the temple ----
+  for(let dx=-7;dx<=7;dx++)for(let dz=-7;dz<=7;dz++){const x=CX+dx,z=CZ+dz,e=Math.max(Math.abs(dx),Math.abs(dz));
+    setB(x,T0,z,e===7?B.SBR_SLAB:brick(x,T0,z));if(e<=6)setB(x,T0+1,z,e===6?B.SBR_SLAB:brick(x,T0+1,z));}   // two half-block steps up to the floor
+  for(let dx=-5;dx<=5;dx++)for(let dz=-5;dz<=5;dz++){const x=CX+dx,z=CZ+dz,e=Math.max(Math.abs(dx),Math.abs(dz));
+    for(let y=T0+2;y<=T0+10;y++)setB(x,y,z,e===5?((Math.abs(dx)===5&&Math.abs(dz)===5)?B.CHISELED:brick(x,y,z)):0);
+    setB(x,T0+11,z,e===5?B.CHISELED:brick(x,T0+11,z));}
+  for(const [dx,dz] of [[0,1],[1,0],[0,-1],[-1,0]]){const px=-dz,pz=dx;   // doorways with chiseled frames
+    for(let w=-1;w<=1;w++)for(let y=T0+2;y<=T0+5;y++)setB(CX+dx*5+px*w,y,CZ+dz*5+pz*w,0);
+    for(let y=T0+2;y<=T0+6;y++)for(const w of [-2,2])setB(CX+dx*5+px*w,y,CZ+dz*5+pz*w,B.CHISELED);for(let w=-2;w<=2;w++)setB(CX+dx*5+px*w,T0+6,CZ+dz*5+pz*w,B.CHISELED);
+    for(let w=-1;w<=1;w++)for(let y=T0+7;y<=T0+9;y++)setB(CX+dx*5+px*w,y,CZ+dz*5+pz*w,w===0&&y===T0+8?B.REDSTONE:B.CHISELED);
+    for(const w of [-4,4])for(const y of [T0+3,T0+8])setB(CX+dx*5+px*w,y,CZ+dz*5+pz*w,B.GLOW);for(const w of [-2,2])setB(CX+dx*3+px*w,T0+16,CZ+dz*3+pz*w,B.GLOW);}   // the red block over each door
+  setB(CX,T0+1,CZ,B.GLOW);for(const [dx,dz] of [[0,1],[1,0],[0,-1],[-1,0]])placeChest(CX+dx,T0+2,CZ+dz,true,false,Math.atan2(-dx,-dz)+Math.PI);   // centre chests
+  for(const [dx,dz] of [[3,3],[-3,3],[3,-3],[-3,-3]])setB(CX+dx,T0+2,CZ+dz,B.TORCH);
+  for(let y=T0+2;y<=T0+10;y++)setB(CX+2,y,CZ-4,B.LADDER+ladderK(0,1));setB(CX+2,T0+11,CZ-4,0);   // ladder up to the roof
+  for(let dx=-5;dx<=5;dx++)for(let dz=-5;dz<=5;dz++){const e=Math.max(Math.abs(dx),Math.abs(dz));if(e===5&&(dx+dz)%2===0)setB(CX+dx,T0+12,CZ+dz,brick(CX+dx,T0+12,CZ+dz));}   // battlements
+  for(const [dx,dz] of [[5,5],[-5,5],[5,-5],[-5,-5]]){setB(CX+dx,T0+12,CZ+dz,B.NETHERRACK);setB(CX+dx,T0+13,CZ+dz,B.TORCH);}   // braziers on the corners
+  for(let dx=-3;dx<=3;dx++)for(let dz=-3;dz<=3;dz++){const x=CX+dx,z=CZ+dz,e=Math.max(Math.abs(dx),Math.abs(dz)),corner=Math.abs(dx)===3&&Math.abs(dz)===3;   // upper shrine
+    for(let y=T0+12;y<=T0+18;y++)setB(x,y,z,e===3?(corner?B.CHISELED:brick(x,y,z)):0);setB(x,T0+19,z,brick(x,T0+19,z));if(e<=2)setB(x,T0+20,z,e===2?B.CHISELED:brick(x,T0+20,z));if(e<=1)setB(x,T0+21,z,e===0?B.GLOW:B.SBRICK);}
+  for(const [dx,dz] of [[0,1],[1,0],[0,-1],[-1,0]])for(let y=T0+12;y<=T0+14;y++)setB(CX+dx*3,y,CZ+dz*3,0);
+  placeChest(CX,T0+12,CZ,true,false,0);for(const [dx,dz] of [[3,3],[-3,3],[3,-3],[-3,-3]])setB(CX+dx,T0+20,CZ+dz,B.TORCH);
+  for(let i=0;i<70;i++){const dx=Math.round((srand()*2-1)*6),dz=Math.round((srand()*2-1)*6);const e=Math.max(Math.abs(dx),Math.abs(dz));if(e!==6&&e!==4)continue;if(Math.min(Math.abs(dx),Math.abs(dz))<=1)continue;   // keep the doors and red blocks clear   // vines down the walls
+    const top=e===6?T0+10:T0+18,len=2+(srand()*5|0);for(let k=0;k<len;k++){const y=top-k;if(getB(CX+dx,y,CZ+dz)!==0||y<=T0+2)break;setB(CX+dx,y,CZ+dz,B.VINE);}}
+  reserved.push([CX,CZ,12]);
+  // ---- jungle floor: trees, ruined walls, lamp posts, chests ----
+  const nearRoute=(x,z)=>Math.min(Math.abs(x-CX),Math.abs(z-CZ))<4;
+  let trees=0;for(let t=0;t<400&&trees<11;t++){const a=srand()*Math.PI*2,r=24+srand()*9;const x=Math.round(CX+Math.cos(a)*r),z=Math.round(CZ+Math.sin(a)*r);if(nearRoute(x,z)||reserved.some(([rx,rz,rr])=>Math.hypot(rx-x,rz-z)<rr+3))continue;
+    const g=floorAt(x,z,F+3),h=6+(srand()*3|0);for(let y=g+1;y<=g+h;y++)setB(x,y,z,B.JLOG);
+    for(let dy=-2;dy<=1;dy++){const rad=dy===1?1:2.6;for(let dx=-3;dx<=3;dx++)for(let dz=-3;dz<=3;dz++){if(Math.hypot(dx,dz)>rad||!(getB(x+dx,g+h+dy,z+dz)===0))continue;setB(x+dx,g+h+dy,z+dz,B.JLEAVES);
+      if(dy===-2&&srand()<.3)for(let k=1;k<=1+(srand()*4|0);k++){if(getB(x+dx,g+h+dy-k,z+dz)!==0)break;setB(x+dx,g+h+dy-k,z+dz,B.VINE);}}}
+    reserved.push([x,z,3]);trees++;}
+  for(let i=0;i<8;i++){const a=i/8*Math.PI*2+Math.PI/8;const x=Math.round(CX+Math.cos(a)*27),z=Math.round(CZ+Math.sin(a)*27);   // ruins with a chest each
+    const tx=Math.abs(Math.cos(a))>Math.abs(Math.sin(a))?0:1;for(let k=-3;k<=3;k++){const wx=x+(tx?k:0)-(tx?0:2*Math.sign(Math.cos(a))),wz=z+(tx?0:k)-(tx?2*Math.sign(Math.sin(a)):0);const g=floorAt(wx,wz,F+3);const hh=1+(hash2(wx,wz,s+9)*3|0);
+      for(let y=g+1;y<=g+hh;y++)setB(wx,y,wz,brick(wx,y,wz));if(srand()<.35&&getB(wx,g+hh+1,wz)===0)setB(wx,g+hh+1,wz,B.SBR_SLAB);}
+    const g=floorAt(x,z,F+3);for(let y=g+1;y<=g+3;y++)setB(x,y,z,0);chestAt(x,g+1,z,false,Math.atan2(-(CX-x),-(CZ-z))+Math.PI);reserved.push([x,z,3]);}
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2+Math.PI/12;const x=Math.round(CX+Math.cos(a)*21.6),z=Math.round(CZ+Math.sin(a)*21.6);if(nearRoute(x,z))continue;   // lamp posts round the moat
+    const g=floorAt(x,z,F+3);setB(x,g+1,z,B.FENCE);setB(x,g+2,z,B.FENCE);setB(x,g+3,z,B.TORCH);}
+  for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4;const x=Math.round(CX+Math.cos(a)*9.6),z=Math.round(CZ+Math.sin(a)*9.6);setB(x,F,z,B.GLOW);}   // glowing paving at the island corners
+  // ---- gallery round the cave wall: stairs up, railings, alcove chests below, chests and torches on top ----
+  const stair=(x0,z0,dx,dz,y0,n,wide)=>{const px=-dz,pz=dx;for(let j=1;j<=n;j++)for(let w=0;w<wide;w++){const x=x0+dx*j+px*w,z=z0+dz*j+pz*w;
+    for(let y=y0;y<y0+j-1;y++)setB(x,y+1,z,B.SBRICK);setB(x,y0+j,z,B.SBR_STAIRS+stairK(dx,dz));for(let y=y0+j+1;y<=y0+j+3;y++)setB(x,y,z,0);}};
+  stair(CX+29,CZ-1,1,0,F,6,3);stair(CX-29,CZ+1,-1,0,F,6,3);stair(CX+1,CZ+29,0,1,F,6,3);stair(CX-1,CZ-29,0,-1,F,6,3);
+  for(let z=0;z<WZ;z++)for(let x=0;x<WX;x++){const r=Math.hypot(x-CX,z-CZ);if(r>=36&&r<36.9&&getB(x,F+7,z)===0&&!nearRoute(x,z)&&getB(x,F+6,z)&&BD[getB(x,F+6,z)].solid)setB(x,F+7,z,B.FENCE);}
+  for(let i=0;i<8;i++){const a=i/8*Math.PI*2+Math.PI/8;const ax=Math.round(CX+Math.cos(a)*36.5),az=Math.round(CZ+Math.sin(a)*36.5);   // alcoves in the gallery face
+    for(let k=-1;k<=1;k++)for(const d of [0,1])for(let y=F+1;y<=F+3;y++){const t=Math.abs(Math.cos(a))>Math.abs(Math.sin(a));const x=ax+(t?Math.sign(Math.cos(a))*d:k),z=az+(t?k:Math.sign(Math.sin(a))*d);setB(x,y,z,0);}
+    const bx=ax+Math.round(Math.cos(a)),bz=az+Math.round(Math.sin(a));chestAt(bx,F+1,bz,false,Math.atan2(-(CX-bx),-(CZ-bz))+Math.PI);setB(ax,F+3,az,B.TORCH);setB(ax,F+1,az,0);
+    const ux=Math.round(CX+Math.cos(a+Math.PI/8)*39.5),uz=Math.round(CZ+Math.sin(a+Math.PI/8)*39.5);if(i%2===0)chestAt(ux,F+7,uz,false,Math.atan2(-(CX-ux),-(CZ-uz))+Math.PI);
+    const tx=Math.round(CX+Math.cos(a)*40),tz=Math.round(CZ+Math.sin(a)*40);if(getB(tx,F+7,tz)===0)setB(tx,F+7,tz,B.TORCH);}
+  // ---- overhead: dark wooden beams across the cave, glowstone in the rock, vines hanging everywhere ----
+  for(const o of [-15,14])for(let t=-41;t<=41;t++)for(let a=0;a<=1;a++)for(let b=0;b<=1;b++){for(const [x,z] of [[CX+t,CZ+o+a],[CX+o+a,CZ+t]]){const y=F+19+b;if(getB(x,y,z)===0)setB(x,y,z,B.SPRUCE_LOG);}}
+  for(let z=0;z<WZ;z++)for(let x=0;x<WX;x++){const r=Math.hypot(x-CX,z-CZ);if(r>41)continue;let y=WY-2;while(y>F&&getB(x,y,z)!==0)y--;if(y<=F+8)continue;   // y = top air cell under the roof
+    const above=getB(x,y+1,z);if(hash2(x,z,s+11)<.04&&above&&above!==B.SPRUCE_LOG)setB(x,y+1,z,B.GLOW);
+    if(hash2(x,z,s+12)<.07){const len=2+(hash2(x,z,s+13)*7|0);for(let k=0;k<len;k++){if(getB(x,y-k,z)!==0||y-k<=F+8)break;setB(x,y-k,z,B.VINE);}}}
+  for(const o of [-16,16])for(let t=-38;t<=38;t+=3)for(const [x,z] of [[CX+t,CZ+o],[CX+o,CZ+t]])if(hash2(x,z,s+14)<.45){const len=1+(hash2(x,z,s+15)*5|0);for(let k=0;k<len;k++){const y=F+18-k;if(getB(x,y,z)!==0)break;setB(x,y,z,B.VINE);}}
+  for(const o of [-15,14])for(let t=-36;t<=36;t+=9)for(const [x,z] of [[CX+t,CZ+o],[CX+o,CZ+t]])if(getB(x,F+18,z)===0&&Math.abs(t)>8){setB(x,F+18,z,B.FENCE);setB(x,F+17,z,B.GLOW);}   // hanging lamps
+  for(let i=0;i<16;i++){const a=i/16*Math.PI*2;const x=Math.round(CX+Math.cos(a)*40),z=Math.round(CZ+Math.sin(a)*40);if(getB(x,F+7,z)===0)setB(x,F+7,z,B.TORCH);}   // gallery torches
+  barrierWalls();finishSurface();
+  const central=spawnRing(CX,CZ,10,16,F+3),spawns=spawnRing(CX,CZ,28,16,F+4);
+  return {sky:[.035,.045,.035],fog:[.05,.065,.05],fogDist:88,skyLight:false,dark:true,ambient:.2,noBeam:true,voidY:-12,central,spawns,center:[CX,T0+2,CZ]};
+}
+
 // ================= WebGL =================
 const cv=$('gl'),hud=$('hud'),hc=hud.getContext('2d');
 const gl=cv.getContext('webgl',{antialias:false,alpha:false,preserveDrawingBuffer:false});
@@ -1108,11 +1206,11 @@ function buildChunk(ci,cj){
   const out=[],wat=[];const x0=ci*16,z0=cj*16,x1=Math.min(WX,x0+16),z1=Math.min(WZ,z0+16);const AS=ACOLS*TILE;const skyMul=mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1;
   for(let y=0;y<WY;y++)for(let z=z0;z<z1;z++)for(let x=x0;x<x1;x++){
     const b=world[idx(x,y,z)];if(!b)continue;const D=BD[b];if(!D.render)continue;
-    if(D.cross){const tx=(D.side%ACOLS)*TILE,ty=Math.floor(D.side/ACOLS)*TILE;const L=lightAt(x,y,z);const lv=Math.max(LB[(L>>4)&15]*skyMul,LB[L&15],.12)*.9;const j=(hash2(x,z,5)-.5)*.3;
+    if(D.cross){const tx=(D.side%ACOLS)*TILE,ty=Math.floor(D.side/ACOLS)*TILE;const L=lightAt(x,y,z);const lv=Math.max(LB[(L>>4)&15]*skyMul,LB[L&15],mapInfo&&mapInfo.ambient||.12)*.9;const j=(hash2(x,z,5)-.5)*.3;
       const u0=(tx+.02)/AS,u1=(tx+TILE-.02)/AS,v0=(ty+.02)/AS,v1=(ty+TILE-.02)/AS;
       for(const [ax,az,bx,bz] of [[.15,.15,.85,.85],[.15,.85,.85,.15]]){const q=[[x+ax+j,y+1,z+az,u0,v0],[x+bx+j,y+1,z+bz,u1,v0],[x+bx+j,y,z+bz,u1,v1],[x+ax+j,y,z+az,u0,v1]];
         for(const i of [0,1,2,0,2,3])out.push(q[i][0],q[i][1],q[i][2],q[i][3],q[i][4],lv);}continue;}
-    if(D.shape){const Lo=lightAt(x,y,z),Lu=lightAt(x,y+1,z);const lvB=Math.max(LB[Math.max(Lo>>4,Lu>>4)&15]*skyMul,LB[Math.max(Lo&15,Lu&15)],mapInfo&&mapInfo.dark?.07:.12);
+    if(D.shape){const Lo=lightAt(x,y,z),Lu=lightAt(x,y+1,z);const lvB=Math.max(LB[Math.max(Lo>>4,Lu>>4)&15]*skyMul,LB[Math.max(Lo&15,Lu&15)],mapInfo&&mapInfo.dark?(mapInfo.ambient||.07):.12);
       for(const bx of (D.fence?fenceBoxes(x,y,z,false):D.shape))for(let f=0;f<6;f++){const d=f>>1,s=(f&1)?-1:1;const u=(d+1)%3,v=(d+2)%3;const lo=[bx[0],bx[1],bx[2]],hi=[bx[3],bx[4],bx[5]];
         const plane=s>0?hi[d]:lo[d];
         if((s>0&&plane>=1)||(s<0&&plane<=0)){const nx=x+(d==0?s:0),ny=y+(d==1?s:0),nz=z+(d==2?s:0);const nb=getB(nx,ny,nz);if(nb&&BD[nb].opaque&&!BD[nb].shape)continue;}
@@ -1131,7 +1229,7 @@ function buildChunk(ci,cj){
       const tile=d==1?(s>0?D.top:D.bottom):(f==4?D.front:D.side);
       const tx=(tile%ACOLS)*TILE,ty=Math.floor(tile/ACOLS)*TILE;
       const u=(d+1)%3,v=(d+2)%3;const F=[nx,ny,nz];
-      const L=lightAt(nx,ny,nz);const lv=D.light?1:Math.max(LB[(L>>4)&15]*skyMul,LB[L&15]*1.05,mapInfo&&mapInfo.dark?.07:.12);
+      const L=lightAt(nx,ny,nz);const lv=D.light?1:Math.max(LB[(L>>4)&15]*skyMul,LB[L&15]*1.05,mapInfo&&mapInfo.dark?(mapInfo.ambient||.07):.12);
       const vs=[];const aos=[];
       for(const [cu,cv2] of [[0,0],[1,0],[1,1],[0,1]]){
         const l=[0,0,0];l[d]=s>0?1:0;l[u]=cu;l[v]=cv2;
@@ -1317,7 +1415,7 @@ function availableSkins(){return CUSTOM_SKINS.concat(PACK.skins.length?PACK.skin
 
 // -------- loading --------
 // 1.8-era file names for the same tiles (blocks/ folder)
-const TILE_ALT={grass_block_top:'grass_top',grass_block_side:'grass_side',oak_log:'log_oak',oak_log_top:'log_oak_top',oak_leaves:'leaves_oak',oak_planks:'planks_oak',bricks:'brick',red_wool:'wool_colored_red',
+const TILE_ALT={vine:'vine',lily_pad:'waterlily',grass_block_top:'grass_top',grass_block_side:'grass_side',oak_log:'log_oak',oak_log_top:'log_oak_top',oak_leaves:'leaves_oak',oak_planks:'planks_oak',bricks:'brick',red_wool:'wool_colored_red',
   mossy_cobblestone:'cobblestone_mossy',sandstone:'sandstone_normal',stone_bricks:'stonebrick',mossy_stone_bricks:'stonebrick_mossy',chiseled_stone_bricks:'stonebrick_carved',short_grass:'tallgrass',poppy:'flower_rose',dandelion:'flower_dandelion',slime_block:'slime',cobweb:'web',smooth_stone:'stone_slab_top',smooth_stone_slab_side:'stone_slab_side',
   spruce_log:'log_spruce',spruce_log_top:'log_spruce_top',spruce_planks:'planks_spruce',torch:'torch_on',quartz_block_side:'quartz_block_side',quartz_block_top:'quartz_block_top',jungle_leaves:'leaves_jungle',
   cracked_stone_bricks:'stonebrick_cracked',chiseled_sandstone:'sandstone_carved',cut_sandstone:'sandstone_smooth',jungle_log:'log_jungle',white_wool:'wool_colored_white',bone_block_side:'quartz_block_side',bone_block_top:'quartz_block_top'};
@@ -1346,7 +1444,7 @@ async function loadPackBuffer(buf,label){
     const nc=mkCanvas(ACOLS*maxRes,ACOLS*maxRes),g=nc.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(atlasCanvas,0,0,nc.width,nc.height);
     for(const t in tiles){const img=tiles[t];const tx=(t%ACOLS)*maxRes,ty=Math.floor(t/ACOLS)*maxRes;g.clearRect(tx,ty,maxRes,maxRes);
       const cell=imgToCanvas(img,maxRes,maxRes,0,0,img.width,img.width);const n=TILE_PACK[t];
-      const gray=isGray(img);if(gray&&(n==='grass_block_top'||n==='short_grass'))tintCanvas(cell,'#79c05a');if(gray&&n==='oak_leaves')tintCanvas(cell,'#59ae30');if(gray&&n==='jungle_leaves')tintCanvas(cell,'#30bb0b');if(gray&&n==='water_still')tintCanvas(cell,'#3f76e4');
+      const gray=isGray(img);if(gray&&(n==='grass_block_top'||n==='short_grass'))tintCanvas(cell,'#79c05a');if(gray&&n==='oak_leaves')tintCanvas(cell,'#59ae30');if(gray&&n==='jungle_leaves')tintCanvas(cell,'#30bb0b');if(gray&&n==='vine')tintCanvas(cell,'#48b518');if(gray&&n==='lily_pad')tintCanvas(cell,'#208030');if(gray&&n==='water_still')tintCanvas(cell,'#3f76e4');
       if(n==='grass_block_side'&&grassOv&&isGray(grassOv)){const ov=tintCanvas(imgToCanvas(grassOv,maxRes,maxRes),'#79c05a');cell.getContext('2d').drawImage(ov,0,0);}
       if(n==='water_still'){const cg=cell.getContext('2d');const d=cg.getImageData(0,0,maxRes,maxRes);for(let i=3;i<d.data.length;i+=4)d.data[i]=Math.min(d.data[i],180);cg.putImageData(d,0,0);}
       g.drawImage(cell,tx,ty);}
@@ -1814,11 +1912,12 @@ class RelayNet extends MeshNet{constructor(room,name,typed){const tr=mqttTranspo
 
 // ================= match flow: settings, start/end, lobby hub, phases, chests, MCBR timeline, net handlers =================
 const SET={mode:'battle',roundLen:600,hunger:1,refill:120,grace:30,showdown:true,takeAll:true,central:true,bots:5,difficulty:1,
-  maps:{cavern:true,cove:true,crucible:true,skyhold:true},brLen:.2,brExtra:true,enchants:true,lobbyWait:45};
+  maps:{temple:true,cavern:true,cove:true,crucible:true,skyhold:true},brLen:.2,brExtra:true,enchants:true,lobbyWait:45};
 const MATCH={state:'menu',mode:'battle',map:null,seed:0,gameT:0,showdown:false,refillAt:0,mapIdx:0,lobbyCD:-1,winner:null,phaseT:0,graceAnn:false,edits:[],nextMap:null};
 let suddenDeath=false,br=null,myName='Player',mySkin='gen:Player',online=false;
 const inGrace=()=>MATCH.mode==='battle'&&SET.grace>0&&MATCH.gameT<SET.grace;
-function enabledMaps(){const m=MAPS.filter(x=>SET.maps[x.id]);return m.length?m:[MAPS[0]];}
+function enabledMaps(){const m=MAPS.filter(x=>SET.maps[x.id]!==false);   // a map added in an update starts switched on
+return m.length?m:[MAPS[0]];}
 function nextMapId(){if(SET.mode==='br')return 'br';const m=enabledMaps();return m[MATCH.mapIdx%m.length].id;}
 function announce(t,sub,dur=3,bcast=true){msgs.push({t:dur,txt:t,sub:sub||''});if(bcast&&isHost())netSend(N.ANN,{t,s:sub,d:dur});}
 function chatMsg(t,col='#fff',bcast=true){chat.push({t:10,txt:t,col});if(chat.length>8)chat.shift();if(bcast&&isHost())netSend(N.CHAT,{t,c:col});}
@@ -2075,17 +2174,82 @@ function interpRemote(e,dt){
 
 // ================= bots (run on the host) =================
 const DIFF=[{acc:.45,react:.55,aggro:6,bow:.15,pot:.2},{acc:.65,react:.8,aggro:10,bow:.35,pot:.4},{acc:.8,react:1,aggro:14,bow:.55,pot:.6},{acc:.92,react:1.25,aggro:18,bow:.7,pot:.8}];
-function newAI(){return {goal:null,target:null,think:Math.random()*.3,mode:'loot',stuckT:0,lastPos:[0,0,0],strafe:Math.random()<.5?1:-1,strafeT:0,lootT:0,wanderT:0,gatherT:0,chest:null};}
+function newAI(){return {goal:null,target:null,think:Math.random()*.3,mode:'loot',stuckT:0,lastPos:[0,0,0],strafe:Math.random()<.5?1:-1,strafeT:0,lootT:0,wanderT:0,gatherT:0,chest:null,path:null,pathTo:null,pathT:0,skip:new Map(),ignore:new Map(),detour:null,hunt:null,dropDid:null,dropT0:0};}
 const blockCount=e=>e.inv.reduce((n,s)=>n+(s&&ITEMS[s.id].type==='block'?s.count:0),0);
 function nearestChest(b){let best=null,bd=1e9;const nb=blockCount(b);
-  for(const c of chests.values()){if(!c.items.some(Boolean))continue;if(c.claim&&c.claim!==b&&c.claim.alive&&c.claimT>0)continue;if(c.skipFor===b&&c.skipT>MATCH.gameT)continue;
+  for(const c of chests.values()){if(!c.items.some(s=>s&&botWants(b,s.id)))continue;   // only chests with something it wants and has room forif(c.claim&&c.claim!==b&&c.claim.alive&&c.claimT>0)continue;if(c.skipFor===b&&c.skipT>MATCH.gameT)continue;
     const ground=surf(c.x,c.z);const need=c.y-ground-1;if(MATCH.mode==='br'){if(need>1&&nb<need)continue;if(!inZone([c.x,0,c.z],true,.9))continue;}else if(!c.center&&(c.y-b.pos[1]>2.5||b.pos[1]-c.y>6))continue; // no pathfinding: leave chests up on ledges/boardwalks to the players
     const d=dist(b.pos,[c.x+.5,c.y,c.z+.5]);if(d<bd){bd=d;best=c;}}
   return bd<(MATCH.mode==='br'?100:70)?best:null;}
 function groundAhead(x,y,z,maxD=5){for(let i=0;i<maxD;i++){const b=getB(Math.floor(x),Math.floor(y)-1-i,Math.floor(z));if(b===B.LAVA)return false;if(b&&BD[b].solid)return true;if(b===B.WATER)return true;}return false;}
-function bestWeapon(b){let bd=0,best=-1;b.inv.forEach((s,i)=>{if(s&&ITEMS[s.id].type==='weapon'&&ITEMS[s.id].dmg>bd){bd=ITEMS[s.id].dmg;best=i;}});return [best,bd];}
+const wpnVal=id=>ITEMS[id].dmg+1.25*enchLvl(id,'sharpness');
+function bestWeapon(b){let bd=0,best=-1;b.inv.forEach((s,i)=>{if(s&&ITEMS[s.id].type==='weapon'&&wpnVal(s.id)>bd){bd=wpnVal(s.id);best=i;}});return [best,bd];}
+// a player keeps one good weapon, one bow, arrows, food and potions; bots throw away worse weapons and spare armour so they always have room to pick things up
+function botTidy(b){const [best]=bestWeapon(b);let bow=-1,bv=-1;b.inv.forEach((s,i)=>{if(s&&ITEMS[s.id].type==='bow'&&enchScore(s.id)>bv){bv=enchScore(s.id);bow=i;}});
+  for(let i=0;i<9;i++){const s=b.inv[i];if(!s)continue;const it=ITEMS[s.id];
+    if(it.type==='weapon'&&i!==best)b.inv[i]=null;else if(it.type==='bow'&&i!==bow)b.inv[i]=null;else if(it.type==='block'&&MATCH.mode!=='br')b.inv[i]=null;
+    else if(it.type==='armor'){const cur=b.armor[it.slot];if(!cur||ITEMS[cur].pts<it.pts||(ITEMS[cur].pts===it.pts&&enchScore(s.id)>enchScore(cur)))b.armor[it.slot]=s.id;b.inv[i]=null;}}}
+// is a dropped item worth walking to?
+function botWants(b,id){const it=ITEMS[id];if(!it||!invRoom(b,id))return false;
+  if(it.type==='weapon')return wpnVal(id)>bestWeapon(b)[1];
+  if(it.type==='armor'){const cur=b.armor[it.slot];return !cur||ITEMS[cur].pts<it.pts||(ITEMS[cur].pts===it.pts&&enchScore(id)>enchScore(cur));}
+  if(it.type==='bow')return !b.inv.some(s=>s&&ITEMS[s.id].type==='bow');
+  if(it.type==='block')return MATCH.mode==='br'&&blockCount(b)<32;
+  return true;}
+// something is in the way: walk off somewhere else for a few seconds, then try again
+// ---------- pathfinding: A* over the cells a player could stand in (walk, step up a block, drop up to 3, climb ladders) ----------
+const pfColH=v=>{const D=BD[v];if(!D.col)return D.solid?1:0;let h=0;for(const c of D.col)h=Math.max(h,c[4]);return h;};
+const pfPass=v=>!v||!BD[v].solid&&BD[v].liquid!=='lava'||BD[v].ladder||(!BD[v].fence&&pfColH(v)<=.2);   // can a body stand in this block?
+const pfFloor=v=>!!v&&BD[v].solid&&!BD[v].fence&&!BD[v].ladder&&v!==B.BARRIER&&pfColH(v)>.2;           // can you stand on top of it?
+function pfStand(x,y,z){if(x<0||z<0||x>=WX||z>=WZ||y<1||y>=WY-2)return false;const f=getB(x,y,z);if(!pfPass(f)||!pfPass(getB(x,y+1,z)))return false;
+  if(f&&BD[f].ladder)return true;const u=getB(x,y-1,z);return pfFloor(u)||(!!u&&BD[u].liquid==='water');}
+function pfStart(p){const x=Math.floor(p[0]),z=Math.floor(p[2]);let y=Math.floor(p[1]+.01);for(const dy of [0,1,-1,2])if(pfStand(x,y+dy,z))return [x,y+dy,z];return null;}
+function findPath(from,to,maxN=3000){const s=pfStart(from),t=pfStart(to)||[Math.floor(to[0]),Math.floor(to[1]+.01),Math.floor(to[2])];if(!s)return null;
+  const K=(x,y,z)=>(x*512+z)*256+y,open=[],came=new Map(),g=new Map(),h=(x,y,z)=>Math.abs(x-t[0])+Math.abs(z-t[2])+Math.abs(y-t[1])*1.5;
+  const push=n=>{open.push(n);let i=open.length-1;while(i>0){const p=(i-1)>>1;if(open[p].f<=n.f)break;open[i]=open[p];i=p;}open[i]=n;};
+  const pop=()=>{const top=open[0],last=open.pop();if(open.length){let i=0;for(;;){let l=i*2+1,r=l+1,m=i;if(l<open.length&&open[l].f<open[m].f)m=l;if(r<open.length&&open[r].f<open[m].f)m=r;if(m===i)break;open[i]=open[m];i=m;}open[i]=last;}return top;};
+  push({x:s[0],y:s[1],z:s[2],f:h(...s)});g.set(K(...s),0);let n=0,best=null,bh=1e9;
+  while(open.length&&n++<maxN){const c=pop();const ck=K(c.x,c.y,c.z),cg=g.get(ck);const hh=h(c.x,c.y,c.z);if(hh<bh){bh=hh;best=c;}
+    if(Math.abs(c.x-t[0])<=1&&Math.abs(c.z-t[2])<=1&&Math.abs(c.y-t[1])<=1){best=c;bh=0;break;}
+    const nb=[];const cb=getB(c.x,c.y,c.z),lad=!!cb&&!!BD[cb].ladder;
+    for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const x=c.x+dx,z=c.z+dz;
+      if(pfStand(x,c.y,z)){nb.push([x,c.y,z,1]);continue;}
+      if(pfStand(x,c.y+1,z)&&pfPass(getB(c.x,c.y+2,c.z))){nb.push([x,c.y+1,z,2]);continue;}                  // step / jump up one
+      if(pfPass(getB(x,c.y,z))&&pfPass(getB(x,c.y+1,z)))for(let d=1;d<=3;d++){if(pfStand(x,c.y-d,z)){nb.push([x,c.y-d,z,1+d*.6]);break;}if(!pfPass(getB(x,c.y-d,z)))break;}}  // drop
+    if(lad&&pfStand(c.x,c.y+1,c.z))nb.push([c.x,c.y+1,c.z,1.5]);
+    const bb=getB(c.x,c.y-1,c.z);if(bb&&BD[bb].ladder&&pfStand(c.x,c.y-1,c.z))nb.push([c.x,c.y-1,c.z,1.2]);
+    for(const [x,y,z,w] of nb){const k=K(x,y,z),ng=cg+w;if(ng<(g.has(k)?g.get(k):1e9)){g.set(k,ng);came.set(k,ck);push({x,y,z,f:ng+h(x,y,z)});}}}
+  if(!best||bh>2.5)return null;   // couldn't get (near enough) there
+  const out=[];let k=K(best.x,best.y,best.z);const sk=K(...s);while(k!==undefined&&k!==sk){const y=k%256,r=(k-y)/256,z=r%512,x=(r-z)/512;out.push([x,y,z]);k=came.get(k);}
+  return out.reverse();}
+// follow the current path: returns the point to walk at (and sets jump / ladder climbing), or null to walk straight at the goal
+function botWaypoint(b){const ai=b.ai;if(!ai.path||!ai.path.length)return null;
+  const fy=Math.floor(b.pos[1]+.01);let wp=ai.path[0];
+  while(wp&&Math.hypot(wp[0]+.5-b.pos[0],wp[2]+.5-b.pos[2])<.5&&Math.abs(wp[1]-fy)<=1&&!(wp[1]>fy&&onLadder(b))){ai.path.shift();wp=ai.path[0];}
+  if(wp&&wp[1]===fy+1&&onLadder(b)&&Math.hypot(wp[0]+.5-b.pos[0],wp[2]+.5-b.pos[2])<.6&&b.pos[1]-fy>.6){ai.path.shift();wp=ai.path[0];}
+  if(!wp){ai.path=null;return null;}
+  if(wp[1]>fy){if(onLadder(b)){for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const v=getB(Math.floor(b.pos[0])+dx,fy,Math.floor(b.pos[2])+dz);if(v&&BD[v].solid&&!BD[v].ladder)return [b.pos[0]+dx,0,b.pos[2]+dz];}}   // push into the wall behind the ladder to climb
+    else if(Math.hypot(wp[0]+.5-b.pos[0],wp[2]+.5-b.pos[2])<1.4&&b.onGround)b.jump=true;}
+  return [wp[0]+.5,wp[1],wp[2]+.5];}
+// (re)plan towards a point now and then; a failed plan just means walking straight at it like before
+function botPlan(b,to){const ai=b.ai,now=MATCH.gameT;if(hdist(b.pos,to)<2.2&&Math.abs(to[1]-b.pos[1])<1.5){ai.path=null;return;}
+  if(ai.pathTo&&now<ai.pathT&&hdist(ai.pathTo,to)<2.5&&Math.abs(ai.pathTo[1]-to[1])<1.5)return;   // also remembers a failed search for a while
+  ai.path=findPath(b.pos,to);ai.pathTo=[to[0],to[1],to[2]];ai.pathT=now+(ai.path?1.5:3)+Math.random()*.5;}
+// how far can it walk in direction a without hitting a wall it can't step over or a drop it won't take (no pathfinding, so it feels its way like this)
+// (returns the distance, and whether a wall rather than a drop stopped it)
+function walkLen(b,a,maxD){const sol=v=>v&&(BD[v].solid||v===B.BARRIER);const drop=MATCH.mode==='br'?(b.health>12?9:5):5;let y=Math.floor(b.pos[1]+.01),n=0;
+  for(let i=1;i<=maxD;i++){const fx=Math.floor(b.pos[0]+Math.cos(a)*i),fz=Math.floor(b.pos[2]+Math.sin(a)*i);
+    if(sol(getB(fx,y+1,fz))||sol(getB(fx,y+2,fz))){walkLen.wall=true;return n;}if(sol(getB(fx,y,fz))){y++;n=i;continue;}
+    let k=0;while(k<drop&&!sol(getB(fx,y-1,fz))){const v=getB(fx,y-1,fz);if(v===B.LAVA||v===B.WATER)break;y--;k++;}if(k>=drop||getB(fx,y-1,fz)===B.LAVA){walkLen.wall=false;return n;}n=i;}
+  walkLen.wall=false;return n;}
+// pick an open direction (leaning towards whoever it is hunting) and walk that way for a few seconds
+function botDetour(b){const ai=b.ai;const aim=ai.hunt&&ai.hunt.who&&ai.hunt.who.alive?ai.hunt.who.pos:null;let best=null,bs=-1e9,walls=0;
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2+Math.random()*.3,L=walkLen(b,a,10);if(walkLen.wall)walls++;if(L<3)continue;const end=[b.pos[0]+Math.cos(a)*L,0,b.pos[2]+Math.sin(a)*L];
+    const sc=L+Math.random()*4-(aim?hdist(end,aim)*.25:0);if(sc>bs){bs=sc;best=end;}}
+  if(!best){const a=Math.random()*Math.PI*2;best=[b.pos[0]+Math.cos(a)*4,0,b.pos[2]+Math.sin(a)*4];if(MATCH.mode==='br'&&blockCount(b)>0&&walls>=9)ai.escape=MATCH.gameT+2.5;}   // walled in on (nearly) every side: tower up out of the hole
+  ai.detour={until:MATCH.gameT+2.5+Math.random()*1.5,at:best};}
 function botThink(b){
-  const ai=b.ai,D=DIFF[SET.difficulty|0];const [best,bd]=bestWeapon(b);if(!b.using)b.sel=best>=0?best:b.sel;
+  const ai=b.ai,D=DIFF[SET.difficulty|0];if(!b.using)botTidy(b);const [best,bd]=bestWeapon(b);if(!b.using)b.sel=best>=0?best:b.sel;const now=MATCH.gameT;
   // heal: potions first, then food
   if(!b.using){
     if(b.health<9){const pi=b.inv.findIndex(s=>s&&(s.id==='potion_healing'||s.id==='potion_regeneration'));if(pi>=0&&Math.random()<D.pot+.3){b.sel=pi;b.using='drink';b.useT=0;return;}}
@@ -2094,18 +2258,30 @@ function botThink(b){
     for(const k of ['potion_swiftness','potion_strength','potion_fire_resistance'])if(!b.effects[k.split('_')[1]]){const pi=hasItem(b,k);if(pi>=0&&Math.random()<.3){b.sel=pi;b.using='drink';b.useT=0;return;}}
   }
   let enemy=null,ed=1e9;const range=(bd>0?D.aggro:D.aggro*.45)+(MATCH.showdown?14:0)+(suddenDeath?10:0)+armorPts(b)*.4;
-  if(!inGrace())for(const o of ents){if(o===b||!o.alive)continue;const d=dist(b.pos,o.pos);const inv=o.effects.invis&&d>4;if(!inv&&d<ed&&d<range&&los(eye(b),eye(o))){ed=d;enemy=o;}}
-  if(b.lastAttacker&&b.lastAttacker.alive&&b.lastAttackT<5&&dist(b.pos,b.lastAttacker.pos)<20){enemy=b.lastAttacker;ed=dist(b.pos,enemy.pos);}
+  if(!inGrace())for(const o of ents){if(o===b||!o.alive||(ai.ignore.get(o)||0)>now)continue;const d=dist(b.pos,o.pos);const inv=o.effects.invis&&d>4;if(!inv&&d<ed&&d<range&&los(eye(b),eye(o))){ed=d;enemy=o;}}
+  if(b.lastAttacker&&b.lastAttacker.alive&&b.lastAttackT<5&&dist(b.pos,b.lastAttacker.pos)<((ai.ignore.get(b.lastAttacker)||0)>now?4:20)){enemy=b.lastAttacker;ed=dist(b.pos,enemy.pos);}
   ai.target=enemy;
   const outside=MATCH.mode==='br'&&!inZone(b.pos,true,.85);
+  if(!enemy&&ai.detour&&now<ai.detour.until){ai.mode='wander';ai.goal=ai.detour.at;return;}   // finish walking round whatever blocked it first
   if(outside&&(!enemy||ed>4)){const [zx,zz]=zoneCenter();const r=Math.min(3,zoneHalf()*.5);ai.mode='center';ai.goal=[zx+(Math.random()-.5)*2*r,0,zz+(Math.random()-.5)*2*r];return;}
   if(enemy){ai.mode='fight';ai.goal=enemy.pos;
-    const bi=hasItem(b,'bow'),ar=hasItem(b,'arrow');if(bi>=0&&ar>=0&&ed>7&&ed<26&&!b.using&&Math.random()<D.bow){b.sel=bi;b.using='bow';b.useT=0;ai.bowT=.7+Math.random()*.4;return;}
+    const bi=b.inv.findIndex(s=>s&&ITEMS[s.id].type==='bow'),ar=hasItem(b,'arrow');
+    if(ai.ledgeT&&now-ai.ledgeT<1&&ed>3){if(bi>=0&&ar>=0&&ed<30&&!b.using){b.sel=bi;b.using='bow';b.useT=0;ai.bowT=.7+Math.random()*.4;return;}
+      ai.ignore.set(enemy,now+6);ai.target=null;botDetour(b);ai.mode='wander';ai.goal=ai.detour.at;return;}
+    const high=Math.abs(enemy.pos[1]-b.pos[1])>2.5&&ed>4;   // up on a ledge / down below: shoot rather than run at the wall
+    if(bi>=0&&ar>=0&&!b.using&&((high&&ed<28)||(ed>7&&ed<26&&Math.random()<D.bow))){b.sel=bi;b.using='bow';b.useT=0;ai.bowT=.7+Math.random()*.4;return;}
     const si=b.inv.findIndex(s=>s&&ITEMS[s.id].type==='splash'&&s.id!=='splash_healing');if(si>=0&&ed>3&&ed<9&&Math.random()<D.pot*.5){b.sel=si;aimAt(b,enemy,10);throwSplash(b,b.inv[si].id);consume(b,si);b.swing=1;return;}
     return;}
-  let dropT=null,dd=12;for(const d of drops){const x=dist(b.pos,d.pos);if(x<dd&&d.age>0&&!d.dead){dd=x;dropT=d;}}
-  if(dropT){ai.mode='drop';ai.goal=dropT.pos;return;}
-  const c=nearestChest(b);if(c){ai.mode='loot';ai.goal=[c.x+.5,c.y,c.z+.5];ai.chest=c;c.claim=b;c.claimT=3;return;}
+  // dropped items: only ones it wants and has room for, at about its own height; give up after a few seconds
+  let dropT=null,dd=12;for(const d of drops){if(d.dead||!(d.age>0)||(ai.skip.get(d.did)||0)>now||Math.abs(d.pos[1]-b.pos[1])>2.5||!botWants(b,d.id))continue;const x=dist(b.pos,d.pos);if(x<dd){dd=x;dropT=d;}}
+  if(dropT){if(ai.dropDid!==dropT.did){ai.dropDid=dropT.did;ai.dropT0=now;}
+    if(now-ai.dropT0<6){ai.mode='drop';ai.goal=dropT.pos;return;}ai.skip.set(dropT.did,now+30);ai.dropDid=null;}
+  // once it has a weapon and some armour it goes hunting instead of trekking to far-off chests (still grabs ones close by)
+  const geared=bd>=6&&armorPts(b)>=5&&!inGrace();
+  const c=nearestChest(b);if(c&&(!geared||dist(b.pos,[c.x+.5,c.y,c.z+.5])<10)){if(ai.chest!==c)ai.lootT=0;ai.mode='loot';ai.goal=[c.x+.5,c.y,c.z+.5];ai.chest=c;c.claim=b;c.claimT=3;return;}
+  if(!inGrace()){let prey=null,pd=1e9;for(const o of ents){if(o===b||!o.alive||o.spectator||(ai.ignore.get(o)||0)>now)continue;if(MATCH.mode==='br'&&!inZone(o.pos,false))continue;const d=dist(b.pos,o.pos);if(d<pd){pd=d;prey=o;}}
+    if(prey){if(!ai.hunt||ai.hunt.who!==prey||now>ai.hunt.until){const j=Math.min(4,pd*.15);ai.hunt={who:prey,until:now+2+Math.random()*1.5,at:[prey.pos[0]+(Math.random()*2-1)*j,prey.pos[1],prey.pos[2]+(Math.random()*2-1)*j]};}
+      ai.mode='hunt';ai.goal=ai.hunt.at;return;}}   // heads for roughly where they are and refreshes every few seconds; the fight starts once it can see them
   ai.mode='wander';
   if(!ai.goal||ai.wanderT<=0||hdist(b.pos,ai.goal)<2){const [zx,zz]=MATCH.mode==='br'?zoneCenter():[CX,CZ];const r=MATCH.mode==='br'?zoneHalf()*.7:18;ai.goal=[zx+(Math.random()*2-1)*r,0,zz+(Math.random()*2-1)*r];ai.wanderT=6;}
 }
@@ -2114,7 +2290,9 @@ function aimAt(b,t,speed){const d=dist(b.pos,t.pos),ts=d/speed;const lead=[t.pos
   const err=(1-DIFF[SET.difficulty|0].acc)*.12;b.yaw+=(Math.random()-.5)*err;b.pitch+=(Math.random()-.5)*err;}
 function updateBot(b,dt){
   const ai=b.ai,D=DIFF[SET.difficulty|0];ai.think-=dt;ai.wanderT-=dt;ai.strafeT-=dt;
-  if(ai.think<=0&&MATCH.state==='play'&&!(MATCH.preT>0)){ai.think=.25+Math.random()*.2/D.react;botThink(b);}
+  if(ai.think<=0&&MATCH.state==='play'&&!(MATCH.preT>0)){ai.think=.25+Math.random()*.2/D.react;botThink(b);
+    // route-finding for anything it is heading to (a fight only once it is out of reach in a straight line)
+    const T=ai.target;if(ai.goal&&ai.mode!=='wander'&&!(ai.mode==='fight'&&T&&Math.abs(T.pos[1]-b.pos[1])<1.5&&hdist(b.pos,T.pos)<8))botPlan(b,ai.mode==='fight'&&T?T.pos:(ai.goal[1]?ai.goal:[ai.goal[0],b.pos[1],ai.goal[2]]));else ai.path=null;}
   let wx=0,wz=0,speed=4.3*speedMul(b);b.sprint=false;b.jump=false;
   if(MATCH.state==='play'&&!(MATCH.preT>0)){
     const t=ai.target;
@@ -2123,25 +2301,38 @@ function updateBot(b,dt){
       else if(b.useT>=1.6){if(it.type==='food')eatFood(b,s.id);else for(const f of it.fx)giveEffect(b,...f);consume(b,b.sel);b.using=null;}
       if(t&&t.alive){const dx=b.pos[0]-t.pos[0],dz=b.pos[2]-t.pos[2],l=Math.hypot(dx,dz)||1;wx=dx/l;wz=dz/l;}}
     else if(b.using==='bow'){b.useT+=dt;if(!t||!t.alive)b.using=null;else{aimAt(b,t,58);if(b.useT>=ai.bowT){fireBow(b,bowCharge(b.useT));b.using=null;ai.think=.4;}}}
+    else if(ai.escape&&MATCH.gameT<ai.escape&&blockCount(b)>0){b.yaw+=dt;if(b.onGround)b.jump=true;
+      else{const fx=Math.floor(b.pos[0]),fz=Math.floor(b.pos[2]),fy=Math.floor(b.pos[1]);if(b.pos[1]-fy<.45&&b.vel[1]<3.5&&!getB(fx,fy-1,fz)){const bi=b.inv.findIndex(x=>x&&ITEMS[x.id].type==='block');if(bi>=0&&placeBlock(fx,fy-1,fz,ITEMS[b.inv[bi].id].block)){consume(b,bi);b.swing=1;}}}
+      ai.stuckT=0;ai.lastPos=b.pos.slice();}
     else if(ai.goal){
-      const g=ai.goal;let dx=g[0]-b.pos[0],dz=g[2]-b.pos[2];const hd=Math.hypot(dx,dz);const want=Math.atan2(-dx,-dz);
-      if(ai.mode==='fight'&&t&&t.alive){
+      const wp=botWaypoint(b),g=wp||ai.goal;let dx=g[0]-b.pos[0],dz=g[2]-b.pos[2];const hd=Math.hypot(dx,dz);const want=Math.atan2(-dx,-dz);
+      if(ai.mode==='fight'&&t&&t.alive&&!wp){
         const d3=dist(b.pos,t.pos);b.pitch=Math.atan2(t.pos[1]-b.pos[1],hd);
         if(hd>2.2){wx=dx/hd;wz=dz/hd;b.sprint=hd>4&&b.food>6;speed*=b.sprint?1.3:1;}
         else{if(ai.strafeT<=0){ai.strafe=Math.random()<.5?1:-1;ai.strafeT=.6+Math.random();}const r=[Math.cos(b.yaw),-Math.sin(b.yaw)];wx=r[0]*ai.strafe*.7+(hd<1.4?-dx/hd*.6:0);wz=r[1]*ai.strafe*.7+(hd<1.4?-dz/hd*.6:0);}
         if(d3<3.1&&b.atkCD<=0&&Math.random()<D.react*dt*9){if(Math.random()<D.acc&&los(eye(b),[t.pos[0],t.pos[1]+1,t.pos[2]]))doAttack(b,t);else{b.atkCD=.25;b.swing=1;}
           if(t.onGround===false&&Math.random()<.3&&b.onGround)b.jump=true;}
         if((SET.difficulty|0)>=2&&b.onGround&&hd<3.5&&hd>1.5&&Math.random()<dt*1.5)b.jump=true;
-      }else if(hd>.9){wx=dx/hd;wz=dz/hd;b.sprint=hd>10&&b.food>6;speed*=b.sprint?1.3:1;b.pitch*=.9;}
+      }else if(hd>(wp?.15:.9)){wx=dx/hd;wz=dz/hd;b.sprint=(wp?ai.path&&ai.path.length>6:hd>10)&&b.food>6;speed*=b.sprint?1.3:1;b.pitch*=.9;}
+      if(wp&&ai.mode==='fight'&&t&&t.alive){const d3=dist(b.pos,t.pos);if(d3<3.1&&b.atkCD<=0&&Math.random()<D.react*dt*9&&los(eye(b),[t.pos[0],t.pos[1]+1,t.pos[2]]))doAttack(b,t);}
       let dy=want-b.yaw;while(dy>Math.PI)dy-=Math.PI*2;while(dy<-Math.PI)dy+=Math.PI*2;b.yaw+=dy*Math.min(1,dt*10);
       if(ai.mode==='loot'&&ai.chest&&hd<2.5&&ai.chest.y-b.pos[1]>1.2&&MATCH.mode==='br'&&blockCount(b)>0){wx=0;wz=0;if(b.onGround)b.jump=true;
-        else{const fx=Math.floor(b.pos[0]),fz=Math.floor(b.pos[2]),fy=Math.floor(b.pos[1]);if(b.pos[1]-fy<.45&&b.vel[1]<3.5&&!getB(fx,fy-1,fz)){const bi=b.inv.findIndex(x=>x&&ITEMS[x.id].type==='block');if(bi>=0&&placeBlock(fx,fy-1,fz,ITEMS[b.inv[bi].id].block)){consume(b,bi);b.swing=1;}}}ai.stuckT=0;}
-      if(ai.mode==='loot'&&ai.chest&&dist(b.pos,ai.goal)<2.6){ai.lootT+=dt;ai.chest.botOpen=1.2;if(ai.lootT>.7){ai.lootT=0;hostChestOp(key(ai.chest.x,ai.chest.y,ai.chest.z),'all',0,b);ai.goal=null;ai.think=0;}}
+        else{const fx=Math.floor(b.pos[0]),fz=Math.floor(b.pos[2]),fy=Math.floor(b.pos[1]);if(b.pos[1]-fy<.45&&b.vel[1]<3.5&&!getB(fx,fy-1,fz)){const bi=b.inv.findIndex(x=>x&&ITEMS[x.id].type==='block');if(bi>=0&&placeBlock(fx,fy-1,fz,ITEMS[b.inv[bi].id].block)){consume(b,bi);b.swing=1;}}}
+        // pillaring up to a chest: fine while it is gaining height, give up after 3s without progress
+        const nowT=MATCH.gameT;if(ai.pillarC!==ai.chest||b.pos[1]>ai.pillarY+.5){ai.pillarC=ai.chest;ai.pillarY=b.pos[1];ai.pillarT=nowT;}
+        if(nowT-ai.pillarT>3){ai.chest.claim=null;ai.chest.skipFor=b;ai.chest.skipT=nowT+25;ai.pillarC=null;ai.goal=null;ai.think=0;botDetour(b);}else ai.stuckT=0;}
+      if(ai.mode==='loot'&&ai.chest&&ai.goal&&dist(b.pos,ai.goal)<2.6){ai.lootT+=dt;ai.chest.botOpen=1.2;if(ai.lootT>.7){ai.lootT=0;hostChestOp(key(ai.chest.x,ai.chest.y,ai.chest.z),'all',0,b);botTidy(b);if(ai.chest.items.some(Boolean)){ai.chest.skipFor=b;ai.chest.skipT=MATCH.gameT+30;}ai.chest.claim=null;ai.goal=null;ai.think=0;}}
     }
     if(MATCH.mode==='br'&&(ai.mode==='wander'||ai.mode==='loot')){ai.gatherT+=dt;if(ai.gatherT>2.5){ai.gatherT=0;if(blockCount(b)<20)addItem(b,'b2',1);}}
-    if(b.onGround&&(wx||wz)){const ax=b.pos[0]+wx*.8,az=b.pos[2]+wz*.8;if(!groundAhead(ax,b.pos[1]+.5,az,MATCH.mode==='br'?(b.health>12?9:5):5)){wx=0;wz=0;if(ai.mode==='wander'||ai.mode==='loot'||ai.mode==='drop'){ai.goal=null;ai.wanderT=0;ai.think=0;if(ai.chest)ai.chest.claim=null;}}}
+    if(b.onGround&&(wx||wz)&&!(ai.path&&ai.path.length)){const ax=b.pos[0]+wx*.8,az=b.pos[2]+wz*.8;if(!groundAhead(ax,b.pos[1]+.5,az,MATCH.mode==='br'?(b.health>12?9:5):5)){wx=0;wz=0;if(ai.mode==='fight')ai.ledgeT=MATCH.gameT;else{if(ai.mode==='drop'&&ai.dropDid)ai.skip.set(ai.dropDid,MATCH.gameT+30);if(ai.mode==='loot'&&ai.chest){ai.chest.claim=null;ai.chest.skipFor=b;ai.chest.skipT=MATCH.gameT+20;}ai.goal=null;ai.wanderT=0;ai.think=0;botDetour(b);}}}
     if((b.collidedH&&(wx||wz))||b.inWater||b.inLava)b.jump=true;
-    ai.stuckT+=dt;if(ai.stuckT>2.5){if(hdist(b.pos,ai.lastPos)<.8&&(wx||wz)){ai.goal=null;ai.wanderT=0;ai.think=0;if(ai.chest){ai.chest.claim=null;ai.chest.skipFor=b;ai.chest.skipT=MATCH.gameT+20;}}ai.stuckT=0;ai.lastPos=b.pos.slice();}
+    ai.stuckT+=dt;if(ai.stuckT>2.5){const busy=b.using||(ai.mode==='fight'&&t&&t.alive&&dist(b.pos,t.pos)<3.5)||(ai.mode==='loot'&&ai.goal&&dist(b.pos,ai.goal)<2.6);
+      if(hdist(b.pos,ai.lastPos)<.8&&!busy){const now=MATCH.gameT;
+        if(ai.chest&&ai.mode==='loot'){ai.chest.claim=null;ai.chest.skipFor=b;ai.chest.skipT=now+20;}
+        if(ai.mode==='drop'&&ai.dropDid){ai.skip.set(ai.dropDid,now+30);ai.dropDid=null;}
+        if((ai.mode==='fight'||ai.mode==='hunt')&&(t||ai.hunt)){const who=t||ai.hunt.who;if(!(b.lastAttacker===who&&b.lastAttackT<2))ai.ignore.set(who,now+6);ai.hunt=null;}   // can't reach them from here
+        ai.goal=null;ai.path=null;ai.wanderT=0;ai.think=0;botDetour(b);}
+      ai.stuckT=0;ai.lastPos=b.pos.slice();}
     if(b.using)speed=1.4;
   }
   const moved=physics(b,dt,wx,wz);
@@ -2327,7 +2518,7 @@ function drawMiniPlayer(){
     drawHumanoid(p);}
   finally{p.rpos=sv.rpos;p.yaw=sv.yaw;p.pitch=sv.pitch;p.bodyYaw=sv.by;camPos=sv.cam;VP=sv.vp;gl.disable(gl.SCISSOR_TEST);gl.viewport(0,0,cv.width,cv.height);}
 }
-function setEntLight(p){const x=Math.floor(p[0]),z=Math.floor(p[2]),y=Math.floor(p[1]+.5);const a=lightAt(x,y,z),b=lightAt(x,y+1,z);const L=Math.max(a>>4,b>>4)<<4|Math.max(a&15,b&15);const v=Math.max(LB[(L>>4)&15]*(mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1),LB[L&15],mapInfo&&mapInfo.dark?.12:.2);gl.uniform1f(PT.u.bright,v);}
+function setEntLight(p){const x=Math.floor(p[0]),z=Math.floor(p[2]),y=Math.floor(p[1]+.5);const a=lightAt(x,y,z),b=lightAt(x,y+1,z);const L=Math.max(a>>4,b>>4)<<4|Math.max(a&15,b&15);const v=Math.max(LB[(L>>4)&15]*(mapInfo&&mapInfo.dark?(mapInfo.skyMul||0):1),LB[L&15],mapInfo&&mapInfo.dark?Math.max(.12,(mapInfo.ambient||0)*1.3):.2);gl.uniform1f(PT.u.bright,v);}
 // ModelBiped / ModelPlayer.setRotationAngles (1.8). Our parts are the vanilla model flipped by scale(-1,-1,1), so X and Y rotations change sign.
 function limbTick(e){if(e._lt===perfT)return;e._lt=perfT;   // once per frame, even when the model is drawn twice (world + animated character)
   const dts=dtFrame*20;const v=Math.hypot(e.vel[0],e.vel[2])/20;const tgt=Math.min(1,v*4);
@@ -2530,7 +2721,7 @@ const BLOCK_TIPS={1:'A block of dirt with grass growing on top.',2:'Common soil 
   51:'A section of a spruce tree trunk.',52:'Wooden boards cut from spruce logs.',53:'A barrier you can see over but cannot jump.',56:'Metal bars that block the way but let you see through.',
   57:'Smooth white quartz.',58:'Leaves from a jungle tree.',59:'Coal packed into a solid block.',60:'Stone bricks that have cracked with age.',61:'Sandstone carved with a pattern.',
   62:'Sandstone polished smooth.',63:'A block that gives off a constant redstone signal.',64:'A section of a jungle tree trunk.',65:'Half a block of sandstone.',66:'Half a block of stone bricks.',
-  67:'Stone brick steps.',71:'Soft white wool.',72:'Spruce wood steps.'};
+  67:'Stone brick steps.',71:'Soft white wool.',72:'Spruce wood steps.',76:'Leafy vines hanging from the cave roof. You can walk straight through them.',77:'Floats on the water. Light enough to step across, if you are careful.'};
 const HINT_SEEN=new Set();let hintCur=null,hintLook=null,hintLookT=0;
 function wrapText(s,maxW,size){const meas=t=>{if(FONT)return bmpWidth(t,Math.max(1,Math.round(size*1.15/9)));hc.font=`${Math.round(size*1.3)}px ${HFONT}`;return hc.measureText(t).width;};
   const out=[];let cur='';for(const w of String(s).split(' ')){const t=cur?cur+' '+w:w;if(meas(t)>maxW&&cur){out.push(cur);cur=w;}else cur=t;}if(cur)out.push(cur);return out;}
@@ -2740,7 +2931,7 @@ function readOptions(){SENS=clamp(+$('o_sens').value/200,0,1);INVY=$('o_invy').c
   SET.showdown=$('o_show').checked;SET.takeAll=$('o_take').checked;SET.central=$('o_central').checked;SET.bots=clamp(+$('o_bots').value|0,0,15);SET.difficulty=+$('o_diff').value;SET.brLen=+$('o_brlen').value;SET.brExtra=$('o_brx').checked;SET.enchants=$('o_ench').checked;
   for(const m of MAPS)SET.maps[m.id]=$('map_'+m.id).checked;store('bb_set',JSON.stringify(SET));}
 function writeOptions(){$('o_sens').value=Math.round(SENS*200);$('o_invy').checked=INVY;$('o_mode').value=SET.mode;$('o_round').value=SET.roundLen;$('o_hunger').value=SET.hunger;$('o_refill').value=SET.refill;$('o_grace').value=SET.grace;$('o_show').checked=SET.showdown;$('o_take').checked=SET.takeAll;
-  $('o_central').checked=SET.central;$('o_bots').value=SET.bots;$('o_diff').value=SET.difficulty;$('o_brlen').value=SET.brLen;$('o_brx').checked=SET.brExtra;$('o_ench').checked=SET.enchants!==false;for(const m of MAPS)$('map_'+m.id).checked=!!SET.maps[m.id];}
+  $('o_central').checked=SET.central;$('o_bots').value=SET.bots;$('o_diff').value=SET.difficulty;$('o_brlen').value=SET.brLen;$('o_brx').checked=SET.brExtra;$('o_ench').checked=SET.enchants!==false;for(const m of MAPS)$('map_'+m.id).checked=SET.maps[m.id]!==false;}
 $('mapChecks').innerHTML=MAPS.map(m=>`<label title="${m.desc}"><input type="checkbox" id="map_${m.id}" checked> ${m.name}</label>`).join('');
 try{const s=JSON.parse(store('bb_set')||'null');if(s)Object.assign(SET,s,{maps:Object.assign({},SET.maps,s.maps||{})});}catch(e){}
 writeOptions();

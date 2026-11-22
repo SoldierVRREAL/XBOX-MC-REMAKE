@@ -10,7 +10,9 @@ Xbox Minecraft Battle Mode Browser Edition is a fan-made, browser-based tribute 
 
 Open `index.html` in a browser, or host it with GitHub Pages (below).
 
-- **Play Game**: Battle vs bots on Cavern, Cove, Crucible or Skyhold
+- **Play Game**: Battle vs bots on Temple, Cavern, Cove, Crucible or Skyhold
+- **Temple** (new): a ruined stone-brick temple deep in a jungle cave, after the Battle key art: centre chests inside the temple and in the shrine on top (ladder inside), a lily-pad moat you can cross by bridge, stepping stones or the lily pads themselves, a jungle floor with ruins and trees, and a gallery round the cave wall
+- **Bots that play like players**: they keep a sensible inventory, loot, then go hunting (with route-finding over stairs, ladders and drops), shoot with bows at people they can't reach, and give up on anything they can't get to instead of standing still
 - **Play Online** (in Mini Games): online rooms through the game's own server or relay (or "same browser, other tabs" for testing)
 - **Enchanted items**: Sharpness, Knockback and Fire Aspect swords and axes; Power, Punch, Flame and Infinity bows; Protection armour. They show a purple glint, list their enchantments in the inventory tooltip, and turn up in chests (more often in the centre ones). Turn them off with **Enchanted Loot** in Game Rules.
 - **Console look and feel** (matched to Xbox One Edition Battle footage): raised console HUD with the 8-slot player colour strip, a small animated model of you on the left, kill messages in the chat area, contextual button prompts, "Invulnerability wears off / has worn off! Fight!" messages, rounds that start behind a "Downloading terrain" loading screen with tips, block info panels when you look at a block, and an end-of-round scoreboard with kills, awards, favourite weapon, damage inflicted/received and round time. In-Game Tooltips and Animated Character can be turned off in Video Settings.
@@ -83,13 +85,14 @@ python3 build.py
 | `02_blocks.js` | Blocks, shapes, procedural textures |
 | `03_items.js` | Items, 1.8 stats, loot tables, icons |
 | `04_world.js` | Maps (Battle maps, lobby town, Battle Royale), lighting |
+| `04b_maps.js` | Cove, Crucible and Temple |
 | `05_gl.js` | WebGL, chunk meshes, models, item meshes |
 | `06_pack.js` | Resource pack loader |
 | `07_game.js` | Entities, combat, hunger, effects, projectiles, drops |
 | `07b_mcphys.js` | Java Edition movement physics (20 TPS) |
 | `08_net.js` | Multiplayer: room relay client (MQTT over WebSocket) and same-browser tabs |
 | `09_flow.js` | Match flow, lobby, chests, MCBR timeline, net events |
-| `10_bots.js` | Bot AI |
+| `10_bots.js` | Bot AI, including route-finding |
 | `11_render.js` | Audio and rendering |
 | `12_hud.js` | HUD |
 | `13_ui.js` | Menus, input, local player |
