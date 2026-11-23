@@ -65,6 +65,11 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#555}
 .sbRow .dot{width:9px;height:14px;border-radius:2px;box-shadow:0 0 0 1px #000;flex:none}.sbRow .nm{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.sbRow .k{width:26px;text-align:center}
 .sbStat{display:flex;align-items:center;gap:12px;font-size:21px;min-height:44px}
 #sbWinner{text-align:center;font-size:25px;margin:12px 0;min-height:28px}#sbTime{text-align:center;font-size:25px;padding:6px;border:2px solid rgba(205,220,226,.75);background:rgba(36,46,54,.6)}
+#browse{width:100%;margin:10px 0 6px}#browse .bhead{display:flex;align-items:center;gap:10px;font-size:22px;margin-bottom:4px}#browse .bhead span:first-child{flex:none}.bwhere{flex:1;font-size:16px;opacity:.7;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#roomList{max-height:30vh;overflow:auto;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.25)}.rnote{padding:8px 10px;font-size:18px;opacity:.8}
+.room{display:flex;gap:10px;align-items:center;width:100%;padding:6px 10px;font:inherit;font-size:20px;color:#fff;text-shadow:2px 2px 0 #000;background:transparent;border:0;border-bottom:1px solid rgba(255,255,255,.12);cursor:pointer;text-align:left}
+.room:hover,.room:focus{background:rgba(120,180,255,.25);outline:none}.room .rn{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.room .rs{opacity:.8;white-space:nowrap}.room .rp{width:60px;text-align:right}
+.bchk{display:flex;gap:8px;align-items:center;font-size:18px;margin-top:6px}
 table.res{border-collapse:collapse;margin:8px auto;font-size:22px}table.res td{padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.15)}table.res td:last-child,table.res td:nth-child(3),table.res td:nth-child(4){text-align:right}
 
 /* ===== Legacy Console (Xbox) look: --S is the console GUI scale (1 at 360p, 2 at 720p, 3 at 1080p) ===== */
@@ -222,7 +227,10 @@ body.touch #clickResume{display:none!important}
     <label for="n_room">Room code</label><input id="n_room" type="text" maxlength="24" value="battle">
     <label for="n_server">Game server (optional)</label><input id="n_server" type="text" maxlength="120" placeholder="e.g. my-battle.onrender.com or 192.168.1.20:8080">
   </div>
-  <div class="note">Everyone types the same room code and presses Connect. The first player in a room hosts: it runs the bots, chests and round timer.
+  <div id="browse"><div class="bhead"><span>Open games</span><span id="browseWhere" class="bwhere"></span><button class="btn small" id="browseRefresh">Refresh</button></div>
+    <div id="roomList"><div class="rnote">Looking for games...</div></div>
+    <label class="bchk"><input type="checkbox" id="n_public" checked> List my room here when I host</label></div>
+  <div class="note">Pick a game from the list, or everyone types the same room code and presses Connect. The first player in a room hosts: it runs the bots, chests and round timer.
   If you run the game's own server (<code>node server/server.js</code>), players on it connect to it automatically, or type its address above. Without one, the game uses free public relays, so pick an unusual room code.</div>
   <div id="status"></div>
   <div class="row"><button class="btn small" id="connectBtn">Connect</button><button class="btn small" id="onlineClose">Back</button></div>
@@ -262,7 +270,7 @@ body.touch #clickResume{display:none!important}
   <div id="sbWrap"><div class="sbPanel" id="sbPlayers"><div class="sbHead"><span>Players</span><span class="sbIco" id="sbKillIco"></span><span class="sbIco" id="sbAwIco"></span></div><div id="sbRows"></div></div>
     <div class="sbPanel" id="sbSide"><div class="sbStat" id="sbAward"></div><div class="sbStat" id="sbFav"></div><div class="sbStat" id="sbDealt"></div><div class="sbStat" id="sbTaken"></div><div id="sbWinner"></div><div id="sbTime"></div></div></div>
   <div id="resNote" class="note"></div>
-  <div class="row"><button class="btn small" id="nextBtn">Next map</button><button class="btn small" id="menuBtn">Menu</button></div></div>
+  <div class="row"><button class="btn small" id="lobbyBtn">Back to Lobby</button><button class="btn small" id="nextBtn">Next map</button><button class="btn small" id="menuBtn">Menu</button></div></div>
 <div id="loading" class="screen hidden" style="background:rgba(0,0,0,.3)"><div style="width:min(640px,90vw);text-align:center">
   <img id="loadLogo" alt="" style="width:min(460px,76vw);image-rendering:pixelated;display:block;margin:0 auto 7vh">
   <div id="loadTitle" style="font-size:32px;color:#fff;text-shadow:2px 2px 0 #333">Loading level</div>
@@ -1702,9 +1710,12 @@ function updateProjs(dt){
   projs=projs.filter(a=>!a.dead&&a.age<60&&a.pos[1]>-20);
 }
 // ---------- dropped items (host is authoritative) ----------
-let dropSeq=1;
-function hostSpawnDrop(p,id,count,vel){const d={did:dropSeq++,pos:[p[0],p[1]+1,p[2]],vel:vel||[(Math.random()-.5)*4,4+Math.random()*2,(Math.random()-.5)*4],id,count,age:0,spin:Math.random()*6};drops.push(d);netSend(N.DROPADD,d);return d;}
-function requestDrop(p,id,count,vel){if(isHost())hostSpawnDrop(p,id,count,vel);else netSend(N.DROPREQ,{p,id,c:count,v:vel},'host');}
+var dropSeq=1;
+function hostSpawnDrop(p,id,count,vel,by,rid){const d={did:dropSeq++,by,rid,pos:[p[0],p[1]+1,p[2]],vel:vel||[(Math.random()-.5)*4,4+Math.random()*2,(Math.random()-.5)*4],id,count,age:0,spin:Math.random()*6};drops.push(d);netSend(N.DROPADD,d);return d;}
+let dropRid=0;
+function requestDrop(p,id,count,vel){if(isHost()){hostSpawnDrop(p,id,count,vel);return;}const rid=++dropRid;
+  drops.push({did:-rid,ghost:4,pos:[p[0],p[1]+1,p[2]],vel:vel?vel.slice():[(Math.random()-.5)*4,4+Math.random()*2,(Math.random()-.5)*4],id,count,age:0,spin:Math.random()*6,pending:99});   // stand-in until the host's copy arrives
+  netSend(N.DROPREQ,{p,id,c:count,v:vel,rid},'host');}
 function updateDrops(dt){
   for(const d of drops){
     d.age+=dt;d.spin+=dt*2;d.vel[1]-=G*.7*dt;const ny=d.pos[1]+d.vel[1]*dt;
@@ -1713,8 +1724,9 @@ function updateDrops(dt){
     for(const k of [0,2]){const nx=d.pos[k]+d.vel[k]*dt;const t=d.pos.slice();t[k]=nx;if(!solid(Math.floor(t[0]),Math.floor(t[1]),Math.floor(t[2])))d.pos[k]=nx;else d.vel[k]=0;d.vel[k]*=Math.exp(-2*dt);}
     if(d.age>.6&&!d.pending&&!d.dead)for(const e of ents){if(!e.alive||!owned(e))continue;if(hdist(e.pos,d.pos)<1.3&&Math.abs(e.pos[1]+.8-d.pos[1])<1.6){
       if(isHost()){const left=addItem(e,d.id,d.count);if(left<d.count){if(e===player)sfx('pick');d.count=left;if(!left){d.dead=true;netSend(N.DROPDEL,{did:d.did});break;}}}
-      else if(e===player&&invRoom(e,d.id)){d.pending=1.5;netSend(N.PICK,{did:d.did},'host');}}}
+      else if(e===player&&d.did>0&&invRoom(e,d.id)){const left=addItem(e,d.id,d.count),took=d.count-left;if(took>0){sfx('pick');netSend(N.PICK,{did:d.did,id:d.id,n:took},'host');d.count=left;if(!left)d.dead=true;else d.pending=1;}}}}   // picked up at once; the host confirms or takes it back
     if(d.pending){d.pending-=dt;if(d.pending<=0)d.pending=0;}
+    if(d.ghost){d.ghost-=dt;if(d.ghost<=0)d.dead=true;}
   }
   drops=drops.filter(d=>!d.dead&&d.pos[1]>-20&&d.age<300);
 }
@@ -1838,7 +1850,7 @@ function knockback(e,dx,dz,extra,fx,fz){if(!e.mot)e.mot=[0,0,0];const f=Math.hyp
   if(extra){e.mot[0]+=(fx||dx/f)*.5*extra;e.mot[1]+=.1;e.mot[2]+=(fz||dz/f)*.5*extra;}e.onGround=false;e.vel=e.mot.map(v=>v*20);}
 
 // ================= networking: our own room relay (online) or BroadcastChannel (same-browser tabs) =================
-const N={STATE:1,HIT:2,DEATH:3,CHESTREQ:4,CHEST:5,GIVE:6,DROPADD:7,DROPDEL:8,DROPREQ:9,PROJ:10,BOTS:11,PHASE:12,START:13,ANN:14,BLOCK:15,SQUEAK:16,LOBBY:17,READY:18,END:19,DEALT:20,PICK:21,CHAT:22,TOLOBBY:23,HELLO:24,BR:25,CHESTS:26,LEAVE:27,SKIN:28};
+const N={STATE:1,HIT:2,DEATH:3,CHESTREQ:4,CHEST:5,GIVE:6,DROPADD:7,DROPDEL:8,DROPREQ:9,PROJ:10,BOTS:11,PHASE:12,START:13,ANN:14,BLOCK:15,SQUEAK:16,LOBBY:17,READY:18,END:19,DEALT:20,PICK:21,CHAT:22,TOLOBBY:23,HELLO:24,BR:25,CHESTS:26,LEAVE:27,SKIN:28,DROPUPD:29};
 let net=null;
 function isHost(){return !net||net.isHost();}
 function netSend(code,data,to){
@@ -1850,7 +1862,7 @@ class MeshNet{
   constructor(room,name,transport,opt){
     this.kind=opt.kind;this.tr=transport;this.myId=1+Math.floor(Math.random()*1e8);this.name=String(name).slice(0,16);this.members=new Map();this.opt=opt;
     this.members.set(this.myId,{id:this.myId,name:this.name,seen:Date.now(),joined:Date.now()});this.ready=false;this.left=false;
-    transport.onmessage=m=>{try{this.recv(m);}catch(e){}};
+    transport.onmessage=m=>{try{this.recv(m);}catch(e){}};transport.will={t:'bye',from:this.myId,will:1};   // the relay sends this for us if the connection dies
     transport.open(()=>{if(this.left)return;this.hb=setInterval(()=>this.beat(),opt.hb);this.beat();
       setTimeout(()=>{if(this.left)return;let mx=0;for(const m of this.members.values())if(m.id!==this.myId)mx=Math.max(mx,m.joined);
         const me=this.members.get(this.myId);if(mx&&me.joined<=mx)me.joined=mx+1;   // join after everyone already in the room, whatever our clock says
@@ -1858,12 +1870,14 @@ class MeshNet{
       err=>{this.onFail&&this.onFail(err);});
   }
   post(o){if(!this.left)this.tr.post(o);}
-  beat(){const me=this.members.get(this.myId);this.post({t:'hb',from:this.myId,name:this.name,joined:me.joined,r:this.ready?1:0,pt:Math.round(performance.now())});const now=Date.now();
+  beat(){if(this.ready&&this.isHost()&&this.tr.advertise&&this.getAdvert&&(this.advN=(this.advN||0)+1)%3===1){const a=this.getAdvert();if(a)this.tr.advertise(Object.assign({t:'adv',ver:2,room:this.opt.room,from:this.myId},a));}
+    const me=this.members.get(this.myId);this.post({t:'hb',from:this.myId,name:this.name,joined:me.joined,r:this.ready?1:0,pt:Math.round(performance.now())});const now=Date.now();
     for(const [id,m] of [...this.members]){if(id!==this.myId&&now-m.seen>this.opt.timeout){this.members.delete(id);if(m.r)this.onLeave&&this.onLeave(id);this.checkHost();}}}
   recv(m){if(m&&m.from===this.myId){if(m.t==='hb'&&m.pt)this.notePing(performance.now()-m.pt);return;}   // our own heartbeat coming back = round trip to the relay
     if(!m||typeof m.from!=='number')return;
     if(m.t==='hb'){const had=this.members.has(m.from);const ex=this.members.get(m.from)||{id:m.from};ex.seen=Date.now();ex.name=String(m.name||'Player').slice(0,16);ex.joined=+m.joined||Date.now();const wasR=ex.r;ex.r=!!m.r;this.members.set(m.from,ex);
       if(ex.r&&!wasR&&this.ready)this.onJoin&&this.onJoin(m.from,ex.name);if(!had||ex.r!==wasR)this.checkHost();return;}
+    if(m.t==='bye'&&m.will){const ex=this.members.get(m.from);if(ex)ex.seen=Math.min(ex.seen,Date.now()-this.opt.timeout+3500);return;}   // dropped, not left: 3.5 s to reconnect before they count as gone
     if(m.t==='bye'){const ex=this.members.get(m.from);if(ex){this.members.delete(m.from);if(ex.r)this.onLeave&&this.onLeave(m.from);this.checkHost();}return;}
     if(m.t==='ev'){if(m.to&&!m.to.includes(this.myId))return;const ex=this.members.get(m.from);if(!ex)return;ex.seen=Date.now();this.onEvent&&this.onEvent(m.code,m.data,m.from);}}
   // only members that finished joining can be host, so a newcomer never steals the host role
@@ -1888,31 +1902,52 @@ function relayList(typed){const out=[];const add=(u,quick)=>{if(u&&/^wss?:\/\//.
   if(typed){let t=typed.trim();if(t&&!/^wss?:\/\//.test(t))t=(location.protocol==='https:'||/^[^:]+\.[a-z]{2,}$/i.test(t)?'wss://':'ws://')+t;if(t&&!/\/mqtt$/.test(t))t=t.replace(/\/$/,'')+'/mqtt';add(t,false);}
   if(location.protocol==='http:'||location.protocol==='https:'){if(!/\.github\.io$/i.test(location.hostname))add((location.protocol==='https:'?'wss://':'ws://')+location.host+'/mqtt',true);}
   for(const u of PUBLIC_RELAYS)add(u,false);return out;}
-function mqttTransport(room,brokers){ // brokers: [{url,quick}]
+// rooms announce themselves on a shared topic so the server browser can list them (hosts only, every few seconds)
+const ADV_TOPIC='xmbbe/v2/_rooms';
+function mqttTransport(room,brokers,opts={}){ // brokers: [{url,quick}]; opts.advOnly = just listen for room adverts (server browser)
   const enc=new TextEncoder(),dec=new TextDecoder();
   const str=s=>{const b=enc.encode(s);return [b.length>>8,b.length&255,...b];};
+  const bin=b=>[b.length>>8,b.length&255,...b];
   const len=n=>{const o=[];do{let d=n%128;n=Math.floor(n/128);if(n>0)d|=128;o.push(d);}while(n>0);return o;};
   const pkt=(h,body)=>new Uint8Array([h,...len(body.length),...body]);
-  const topic='xmbbe/v2/'+String(room).toLowerCase().replace(/[^a-z0-9_-]/g,'_').slice(0,40);
-  const t={ws:null,buf:new Uint8Array(0),url:null,
-    open(ok,fail){let i=0;const tryNext=()=>{if(i>=brokers.length){fail('Could not reach a game server. Check the server address, or this network may block it (school/work Wi-Fi often does): try home Wi-Fi or a phone hotspot.');return;}
-        const br=brokers[i++],url=br.url;let done=false;let ws;try{ws=new WebSocket(url,['mqtt']);}catch(e){tryNext();return;}ws.binaryType='arraybuffer';t.trying&&t.trying(url);
-        const to=setTimeout(()=>{if(!done){done=true;try{ws.close();}catch(e){}tryNext();}},br.quick?2500:6000);
-        ws.onopen=()=>{const cid='xmbbe'+Math.random().toString(36).slice(2,12);
-          ws.send(pkt(0x10,[...str('MQTT'),4,0x02,0,60,...str(cid)]));};
-        ws.onmessage=e=>{const d=new Uint8Array(e.data);const nb=new Uint8Array(t.buf.length+d.length);nb.set(t.buf);nb.set(d,t.buf.length);t.buf=nb;
-          for(;;){if(t.buf.length<2)break;let mult=1,rl=0,p=1,b;do{if(p>=t.buf.length)return;b=t.buf[p++];rl+=(b&127)*mult;mult*=128;}while(b&128);if(t.buf.length<p+rl)break;
-            const type=t.buf[0]>>4,flags=t.buf[0]&15,body=t.buf.slice(p,p+rl);t.buf=t.buf.slice(p+rl);
-            if(type===2){if(body[1]!==0){if(!done){done=true;clearTimeout(to);try{ws.close();}catch(e){}tryNext();}return;}
-              ws.send(pkt(0x82,[0,1,...str(topic),0]));}
-            else if(type===9){if(!done){done=true;clearTimeout(to);t.ws=ws;t.url=url;t.ping=setInterval(()=>{try{ws.send(new Uint8Array([0xC0,0]));}catch(e){}},25000);ok();}}
-            else if(type===3){const tl=(body[0]<<8)|body[1];let q=2+tl;if((flags>>1)&3)q+=2;try{t.onmessage&&t.onmessage(JSON.parse(dec.decode(body.slice(q))));}catch(e){}}}};
-        ws.onerror=()=>{};ws.onclose=()=>{if(!done){done=true;clearTimeout(to);tryNext();}else if(t.ws===ws&&!t.closed){t.onlost&&t.onlost();}};};tryNext();},
-    post(o){if(!t.ws||t.ws.readyState!==1)return;const body=enc.encode(JSON.stringify(o));const head=str(topic);const total=head.length+body.length;
+  const topic=opts.advOnly?ADV_TOPIC:'xmbbe/v2/'+String(room).toLowerCase().replace(/[^a-z0-9_-]/g,'_').slice(0,40);
+  const t={ws:null,buf:new Uint8Array(0),url:null,will:null,downSince:0,
+    // one connection attempt: CONNECT (with a last-will "bye" so the room hears at once if we vanish), SUBSCRIBE, then ok()
+    connect(br,ok,bad){let done=false,ws;const url=br.url;try{ws=new WebSocket(url,['mqtt']);}catch(e){bad();return;}ws.binaryType='arraybuffer';t.trying&&t.trying(url);let buf=new Uint8Array(0);
+      const to=setTimeout(()=>{if(!done){done=true;try{ws.close();}catch(e){}bad();}},br.quick?2500:6000);
+      ws.onopen=()=>{const cid='xmbbe'+Math.random().toString(36).slice(2,12);const w=t.will&&!opts.advOnly;
+        ws.send(pkt(0x10,[...str('MQTT'),4,w?0x06:0x02,0,60,...str(cid),...(w?[...str(topic),...bin(enc.encode(JSON.stringify(t.will)))]:[])]));};
+      ws.onmessage=e=>{const d=new Uint8Array(e.data);const nb=new Uint8Array(buf.length+d.length);nb.set(buf);nb.set(d,buf.length);buf=nb;
+        for(;;){if(buf.length<2)break;let mult=1,rl=0,p=1,b;do{if(p>=buf.length)return;b=buf[p++];rl+=(b&127)*mult;mult*=128;}while(b&128);if(buf.length<p+rl)break;
+          const type=buf[0]>>4,flags=buf[0]&15,body=buf.slice(p,p+rl);buf=buf.slice(p+rl);
+          if(type===2){if(body[1]!==0){if(!done){done=true;clearTimeout(to);try{ws.close();}catch(e){}bad();}return;}
+            ws.send(pkt(0x82,[0,1,...str(topic),0,...(opts.advOnly?[]:[...str(ADV_TOPIC),0])]));}
+          else if(type===9){if(!done){done=true;clearTimeout(to);ok(ws);}}
+          else if(type===3){const tl=(body[0]<<8)|body[1];const tp=dec.decode(body.slice(2,2+tl));let q=2+tl;if((flags>>1)&3)q+=2;let m;try{m=JSON.parse(dec.decode(body.slice(q)));}catch(e){continue;}
+            if(tp===ADV_TOPIC){t.onadvert&&t.onadvert(m);if(opts.advOnly)continue;}else if(t.ws===ws)t.onmessage&&t.onmessage(m);}}};
+      ws.onerror=()=>{};ws.onclose=()=>{if(!done){done=true;clearTimeout(to);bad();}else if(t.ws===ws&&!t.closed)t.dropped();};},
+    use(ws,url){t.ws=ws;t.url=url;clearInterval(t.ping);t.ping=setInterval(()=>{try{ws.send(new Uint8Array([0xC0,0]));}catch(e){}},25000);},
+    open(ok,fail){let i=0;const tryNext=()=>{if(t.closed)return;if(i>=brokers.length){fail('Could not reach a game server. Check the server address, or this network may block it (school/work Wi-Fi often does): try home Wi-Fi or a phone hotspot.');return;}
+        const br=brokers[i++];t.connect(br,ws=>{t.br=br;t.use(ws,br.url);ok();},tryNext);};tryNext();},
+    // the connection dropped: try the same relay again a few times before giving up (the game keeps running meanwhile)
+    dropped(){t.ws=null;t.downSince=performance.now();let n=0;t.onreconnecting&&t.onreconnecting();
+      const again=()=>{if(t.closed)return;if(++n>6){t.onlost&&t.onlost();return;}t.connect(Object.assign({},t.br,{quick:false}),ws=>{t.use(ws,t.br.url);const down=performance.now()-t.downSince;t.downSince=0;t.onreconnected&&t.onreconnected(down);},()=>setTimeout(again,Math.min(4000,400*n)));};
+      setTimeout(again,250);},
+    raw(o,tp){if(!t.ws||t.ws.readyState!==1)return;const body=enc.encode(JSON.stringify(o));const head=str(tp);const total=head.length+body.length;
       const out=new Uint8Array(1+len(total).length+total);out[0]=0x30;out.set(len(total),1);out.set(head,1+len(total).length);out.set(body,1+len(total).length+head.length);t.ws.send(out);},
+    post(o){t.raw(o,topic);},advertise(o){t.raw(o,ADV_TOPIC);},
     close(){t.closed=true;clearInterval(t.ping);try{t.ws&&t.ws.send(new Uint8Array([0xE0,0]));t.ws&&t.ws.close();}catch(e){}}};
   return t;}
-class RelayNet extends MeshNet{constructor(room,name,typed){const tr=mqttTransport(room,relayList(typed));super(room,name,tr,{kind:'relay',hb:1000,timeout:7000,listen:2600});tr.onlost=()=>this.onFail&&this.onFail('Lost the connection to the relay server.');}}
+// server browser: listen to room adverts on the same relays the game would use
+function browseRooms(typed,onUpdate){const rooms=new Map();const tr=mqttTransport('',relayList(typed),{advOnly:true});let tick=null;
+  const emit=()=>{const now=Date.now();for(const [k,r] of rooms)if(now-r.seen>9000)rooms.delete(k);onUpdate([...rooms.values()].sort((a,b)=>(a.state==='lobby'?0:1)-(b.state==='lobby'?0:1)||b.n-a.n),tr.url);};
+  tr.onadvert=m=>{if(!m||m.t!=='adv'||typeof m.room!=='string'||m.ver!==2)return;rooms.set(m.room.toLowerCase(),Object.assign({},m,{seen:Date.now()}));emit();};
+  tr.open(()=>{emit();tick=setInterval(emit,2000);},err=>onUpdate(null,null,err));
+  return {close(){clearInterval(tick);tr.close();}};}
+class RelayNet extends MeshNet{constructor(room,name,typed){const tr=mqttTransport(room,relayList(typed));super(room,name,tr,{kind:'relay',hb:1000,timeout:7000,listen:2600,room});
+  tr.onlost=()=>this.onFail&&this.onFail('Lost the connection to the game server.');tr.onreconnecting=()=>this.onReconnecting&&this.onReconnecting();
+  tr.onreconnected=down=>{const me=this.members.get(this.myId);if(down>4000&&!this.isHost()){let mx=0;for(const m of this.members.values())if(m.id!==this.myId)mx=Math.max(mx,m.joined);me.joined=Math.max(me.joined,mx+1);}
+    this.beat();this.onReconnected&&this.onReconnected(down);};}}
 
 // ================= match flow: settings, start/end, lobby hub, phases, chests, MCBR timeline, net handlers =================
 const SET={mode:'battle',roundLen:600,hunger:1,refill:120,grace:30,showdown:true,takeAll:true,central:true,bots:5,difficulty:1,
@@ -1978,7 +2013,7 @@ function enterLobby(){
 }
 function hostLobbyTick(dt){
   const humans=net?net.list().length:1;const ready=ents.filter(e=>e.kind==='player'&&e.ready).length;
-  if(humans>=2||SET.bots>0){if(MATCH.lobbyCD<0)MATCH.lobbyCD=SET.lobbyWait;if(ready>=humans&&humans>0)MATCH.lobbyCD=Math.min(MATCH.lobbyCD,5);MATCH.lobbyCD-=dt;if(MATCH.lobbyCD<=0){MATCH.lobbyCD=-1;hostStartMatch();return;}}
+  if(humans>=2||SET.bots>0){if(MATCH.lobbyCD<0)MATCH.lobbyCD=online?SET.lobbyWait:15;if(ready>=humans&&humans>0)MATCH.lobbyCD=Math.min(MATCH.lobbyCD,5);MATCH.lobbyCD-=dt;if(MATCH.lobbyCD<=0){MATCH.lobbyCD=-1;hostStartMatch();return;}}
   else MATCH.lobbyCD=-1;
   MATCH.phaseT-=dt;if(MATCH.phaseT<=0){MATCH.phaseT=1;netSend(N.LOBBY,{cd:MATCH.lobbyCD,next:nextMapId(),mode:SET.mode,ready:ents.filter(e=>e.ready).map(e=>e.id),set:SET});}
 }
@@ -2022,16 +2057,36 @@ function applyEnd(m){
 }
 
 // ---------- chests (host authoritative) ----------
-function hostChestOp(k,op,slot,who,item){
+function hostChestOp(k,op,slot,who,item,rid,moves){
   const c=chests.get(k);if(!c)return;const local=owned(who);
+  if(op==='takep'&&Array.isArray(moves)){const revoke=[];   // a non-host already moved these on its screen: check each one
+    for(const mv of moves){if(!Array.isArray(mv))continue;const [i,id,n]=mv;const s=c.items[i];if(s&&s.id===id){const t=Math.min(n,s.count);c.items[i]=s.count>t?{id,count:s.count-t}:null;if(t<n)revoke.push([id,n-t]);}else revoke.push([id,n]);}
+    if(revoke.length)netSend(N.GIVE,{to:who.id,items:[],revoke,k},+who.id.slice(1));}
   if(op==='take'||op==='all'){
     const slots=op==='all'?c.items.map((s,i)=>i):[slot];const give=[];
     for(const i of slots){const s=c.items[i];if(!s)continue;if(local){const left=addItem(who,s.id,s.count);c.items[i]=left?{id:s.id,count:left}:null;}else{give.push(s);c.items[i]=null;}}
     if(give.length)netSend(N.GIVE,{to:who.id,items:give,k},+who.id.slice(1));
   }else if(op==='put'&&item){const j=c.items.indexOf(null);if(j>=0)c.items[j]=item;else hostSpawnDrop([c.x+.5,c.y,c.z+.5],item.id,item.count);}
-  netSend(N.CHEST,{k,items:c.items});if(chestOpen===c)renderChest();
+  netSend(N.CHEST,{k,items:c.items,by:who&&who.id,ack:rid||0});if(chestOpen===c)renderChest();
 }
-function chestOp(op,slot,item){if(!chestOpen)return;const k=key(chestOpen.x,chestOpen.y,chestOpen.z);if(isHost())hostChestOp(k,op,slot,player,item);else netSend(N.CHESTREQ,{k,op,slot,item},'host');sfx('pick');}
+// Non-hosts don't wait for the host: the item moves on their screen at once and the move is sent with what they took.
+// Until the host confirms (its chest update carries ack = our move number) those moves are re-applied on top of every update,
+// so fast clicking never flickers. If someone else got there first, the host sends a revoke and the item is taken back.
+let chestRid=0;const chestPend=[];
+function applyChestPend(c,k){const now=performance.now();for(let i=chestPend.length-1;i>=0;i--)if(now-chestPend[i].t>4000)chestPend.splice(i,1);
+  for(const p of chestPend){if(p.k!==k)continue;if(p.op==='take'){for(const [i,id,n] of p.moves){const s=c.items[i];if(s&&s.id===id)c.items[i]=s.count>n?{id,count:s.count-n}:null;}}
+    else if(p.op==='put'){const j=c.items.indexOf(null);if(j>=0)c.items[j]=p.item;}}}
+function removeItem(e,id,n){for(let i=0;i<e.inv.length&&n>0;i++){const s=e.inv[i];if(s&&s.id===id){const t=Math.min(n,s.count);s.count-=t;n-=t;if(s.count<=0)e.inv[i]=null;}}
+  for(let i=0;i<4&&n>0;i++)if(e.armor[i]===id){e.armor[i]=null;n--;}return n;}
+function chestOp(op,slot,item){if(!chestOpen)return;const c=chestOpen,k=key(c.x,c.y,c.z);
+  if(isHost()){hostChestOp(k,op,slot,player,item);sfx('pick');return;}
+  const rid=++chestRid;
+  if(op==='take'||op==='all'){const moves=[];for(const i of (op==='all'?c.items.map((s,j)=>j):[slot])){const s=c.items[i];if(!s)continue;
+      const left=addItem(player,s.id,s.count),took=s.count-left;if(!took)continue;moves.push([i,s.id,took]);c.items[i]=left?{id:s.id,count:left}:null;}
+    if(!moves.length){sfx('click');return;}   // no room
+    chestPend.push({rid,k,op:'take',moves,t:performance.now()});netSend(N.CHESTREQ,{k,op:'takep',rid,moves},'host');}
+  else if(op==='put'&&item){const j=c.items.indexOf(null);if(j>=0)c.items[j]=item;chestPend.push({rid,k,op:'put',item,t:performance.now()});netSend(N.CHESTREQ,{k,op:'put',rid,item},'host');}
+  sfx('pick');renderChest();}
 
 // ---------- blocks (Battle Royale building) ----------
 function applyBlock(x,y,z,b){const was=getB(x,y,z);if(was&&!b)blockParticles(x,y,z,was,40);setB(x,y,z,b);relightColumn(x,z);rebuildAt(x,z);if(isHost())MATCH.edits.push([x,y,z,b]);}
@@ -2097,14 +2152,21 @@ function onNetEvent(code,d,from){
   case N.HIT:{const t=entById(d.t);if(!t||!owned(t))return;const a=d.a?entById(d.a):null;if(a)a.heldHint=typeof d.w==='string'&&ITEMS[d.w]?d.w:null;const ok=hurt(t,d.d,a,d.c,d.kb,!!d.r);if(a)a.heldHint=null;if(d.fx&&(ok||d.d===0))for(const f of d.fx)giveEffect(t,...f);break;}
   case N.DEATH:onDeath(d);break;
   case N.DEALT:{if(!isHost())return;if(d.tk){const t=entById(d.tk);if(t)t.dmgTaken=(t.dmgTaken||0)+d.d;break;}const a=entById(d.a);if(a){a.dmgDealt+=d.d;addWpn(a,typeof d.w==='string'&&(ITEMS[d.w]||d.w==='hand')?d.w:null,d.d);}break;}
-  case N.CHESTREQ:{if(!isHost())return;const who=entById('p'+from);if(who)hostChestOp(d.k,d.op,d.slot,who,d.item);break;}
-  case N.CHEST:{const c=chests.get(d.k);if(c){c.items=d.items;if(chestOpen===c)renderChest();}break;}
-  case N.CHESTS:for(const [k,items] of d){const c=chests.get(k);if(c)c.items=items;}if(chestOpen)renderChest();break;
-  case N.GIVE:{if(!player||d.to!==player.id)return;for(const s of d.items){const left=addItem(player,s.id,s.count);if(left){if(d.k)netSend(N.CHESTREQ,{k:d.k,op:'put',item:{id:s.id,count:left}},'host');else requestDrop(player.pos,s.id,left);}}sfx('pick');if(chestOpen)renderChest();break;}
-  case N.DROPADD:if(!drops.some(x=>x.did===d.did))drops.push(Object.assign({},d,{pos:d.pos.slice(),vel:d.vel.slice()}));break;
+  case N.CHESTREQ:{if(!isHost())return;const who=entById('p'+from);if(who)hostChestOp(d.k,d.op,d.slot,who,d.item,d.rid,d.moves);break;}
+  case N.CHEST:{const c=chests.get(d.k);if(c){if(player&&d.by===player.id&&d.ack)for(let i=chestPend.length-1;i>=0;i--)if(chestPend[i].k===d.k&&chestPend[i].rid<=d.ack)chestPend.splice(i,1);
+    c.items=d.items.slice();applyChestPend(c,d.k);if(chestOpen===c)renderChest();}break;}
+  case N.CHESTS:chestPend.length=0;for(const [k,items] of d){const c=chests.get(k);if(c)c.items=items;}if(chestOpen)renderChest();break;
+  case N.GIVE:{if(!player||d.to!==player.id)return;if(d.revoke){for(const r of d.revoke)if(Array.isArray(r))removeItem(player,r[0],r[1]);sfx('click');if(chestOpen)renderChest();if(!d.items||!d.items.length)break;}   // someone else got it first
+    for(const s of d.items){const left=addItem(player,s.id,s.count);if(left){if(d.k)netSend(N.CHESTREQ,{k:d.k,op:'put',item:{id:s.id,count:left}},'host');else requestDrop(player.pos,s.id,left);}}sfx('pick');if(chestOpen)renderChest();break;}
+  case N.DROPADD:if(player&&d.by===player.id&&d.rid){const g=drops.findIndex(x=>x.did===-d.rid);if(g>=0)drops.splice(g,1);}   // the real copy of our own drop: swap out the stand-in
+    if(!drops.some(x=>x.did===d.did))drops.push(Object.assign({},d,{pos:d.pos.slice(),vel:d.vel.slice()}));break;
+  case N.DROPUPD:{const x=drops.find(x=>x.did===d.did);if(x){x.count=d.count;if(x.count<=0)x.dead=true;}break;}
   case N.DROPDEL:{const x=drops.find(x=>x.did===d.did);if(x)x.dead=true;break;}
-  case N.DROPREQ:if(isHost())hostSpawnDrop(d.p,d.id,d.c,d.v);break;
-  case N.PICK:{if(!isHost())return;const x=drops.find(x=>x.did===d.did&&!x.dead);if(!x)return;x.dead=true;netSend(N.DROPDEL,{did:x.did});netSend(N.GIVE,{to:'p'+from,items:[{id:x.id,count:x.count}]},from);break;}
+  case N.DROPREQ:if(isHost()&&ITEMS[d.id]&&d.c>0)hostSpawnDrop(d.p,d.id,d.c,d.v,'p'+from,d.rid);break;
+  case N.PICK:{if(!isHost())return;const x=drops.find(x=>x.did===d.did&&!x.dead);
+    if(d.n>0){const id=d.id;if(!x||x.id!==id){netSend(N.GIVE,{to:'p'+from,items:[],revoke:[[id,d.n]]},from);break;}   // already gone: take back what they picked up
+      const t=Math.min(d.n,x.count);x.count-=t;if(x.count<=0){x.dead=true;netSend(N.DROPDEL,{did:x.did});}else netSend(N.DROPUPD,{did:x.did,count:x.count});if(t<d.n)netSend(N.GIVE,{to:'p'+from,items:[],revoke:[[id,d.n-t]]},from);break;}
+    if(!x)return;x.dead=true;netSend(N.DROPDEL,{did:x.did});netSend(N.GIVE,{to:'p'+from,items:[{id:x.id,count:x.count}]},from);break;}
   case N.PROJ:{const o=entById(d.o);spawnProj(d.k,d.p,d.v,o,d.d,d.pot,false);break;}
   case N.BOTS:for(const b of d){const e=entById(b[0]);if(!e)continue;pushSnap(e,[b[1],b[2],b[3]],[b[4],b[5],b[6]],b[7],b[8],b[17]);if(b[9]<e.health-.4){const pred=e.hitPred&&performance.now()-e.hitPred<800;if(!pred)sfx('hurt',{pos:e.pos});if(!(e.hurtT>0))e.hurtT=.5;}e.health=b[9];
       e.inv=new Array(9).fill(null);e.sel=0;if(b[10])e.inv[0]={id:b[10],count:1};if(b[11])e.armor=b[11];e.using=b[12];e.useT=b[13];if(b[14])e.swing=Math.max(e.swing,b[14]);e.fire=b[15];e.effects=b[16]?{invis:{t:9,amp:0}}:{};}break;
@@ -2118,7 +2180,7 @@ function onNetEvent(code,d,from){
   case N.LOBBY:if(!fromHost)return;if(MATCH.state!=='lobby')enterLobby();MATCH.lobbyCD=d.cd;MATCH.nextMap=d.next;Object.assign(SET,d.set);for(const e of ents)e.ready=d.ready.includes(e.id);break;
   case N.READY:{const e=entById('p'+from);if(e)e.ready=d.r;break;}
   case N.END:if(!fromHost)return;applyEnd(d);break;
-  case N.TOLOBBY:if(!fromHost)return;enterLobby();break;
+  case N.TOLOBBY:if(!fromHost)return;hide('results');if(MATCH.state!=='lobby')enterLobby();break;
   case N.HELLO:{if(!isHost())return;const jid='p'+from;
     if(MATCH.state==='play'){const snap=snapshotFor(jid);snap.join=jid;netSend(N.START,snap,from);}
     else if(MATCH.state==='lobby'){netSend(N.TOLOBBY,{},from);MATCH.phaseT=0;}
@@ -2133,8 +2195,11 @@ function onMemberLeave(id){
   ents=ents.filter(x=>x!==e);
 }
 function onHostChanged(){
-  if(!net)return;chatMsg(net.isHost()?'You are now the host.':'The host changed.','#ffff55',false);
-  if(net.isHost()&&MATCH.state!=='lobby'){netSend(N.TOLOBBY,{});enterLobby();}
+  if(!net)return;chatMsg(net.isHost()?'You are now the host.':'The host changed.','#ffff55',false);if(!net.isHost())return;
+  // the old host left: carry the round on. Chests, drops and the clock are already in sync everywhere; take over the bots
+  dropSeq=Math.max(dropSeq,...drops.map(d=>d.did+1),1)+1000;MATCH.phaseT=0;
+  if(MATCH.state==='play'){for(const e of ents)if(e.kind==='bot'){e.ai=newAI();e.net=null;e.prev=null;e.acc=0;if(!e.mot)e.mot=[0,0,0];}netSend(N.CHESTS,[...chests].map(([k,c])=>[k,c.items]));}
+  else if(MATCH.state==='over')setTimeout(()=>{if(net&&isHost()&&MATCH.state==='over'){netSend(N.TOLOBBY,{});enterLobby();}},6000);
 }
 // state broadcast for my player
 let stateT=0,stateFullT=0,stateFullKey='';
@@ -2803,7 +2868,7 @@ function drawBattleTop(){
 }
 function drawLobbyHud(){
   const humans=ents.filter(e=>e.kind==='player').length;const name=MATCH.nextMap?(MATCH.nextMap==='br'?'Battle Royale':(MAPS.find(m=>m.id===MATCH.nextMap)||{}).name):'';
-  if(!online){txt('Practice  -  Esc for menu',W/2,30,18,'#fff','center');return;}
+  if(!online&&!MATCH.offlineLobby){txt('Practice  -  Esc for menu',W/2,30,18,'#fff','center');return;}
   if(MATCH.lobbyCD>=0)txt(`Time to game change: ${Math.ceil(MATCH.lobbyCD)} seconds`,W/2,30,18,'#fff','center');else txt(humans<2&&!SET.bots?'Waiting for players...':'Waiting...',W/2,30,18,'#fff','center');
   // next map and the player list are on the Tab lobby panel
 }
@@ -2974,7 +3039,7 @@ try{const s=JSON.parse(store('bb_set')||'null');if(s)Object.assign(SET,s,{maps:O
 writeOptions();
 let optReturn='menu';
 $('optBtn').addEventListener('click',()=>{sfx('click');optReturn='menu';openOptions('menu');});
-$('practiceBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();online=false;if(net){net.leave();net=null;}player=null;ents=[];enterLobby();chatMsg('Movement playground to the east: ice, slime, soul sand,','#ffff55',false);chatMsg('cobwebs, ladder, slabs, stairs and a pool.','#ffff55',false);});
+$('practiceBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();online=false;MATCH.offlineLobby=false;if(net){net.leave();net=null;}player=null;ents=[];enterLobby();chatMsg('Movement playground to the east: ice, slime, soul sand,','#ffff55',false);chatMsg('cobwebs, ladder, slabs, stairs and a pool.','#ffff55',false);});
 // console-style menu navigation
 const MBTN=()=>[...document.querySelectorAll('#menuList .lbtn')].filter(b=>!b.classList.contains('hidden'));let mSel=0;
 function setMSel(i){const b=MBTN();mSel=(i+b.length)%b.length;b.forEach((x,j)=>x.classList.toggle('sel',j===mSel));}
@@ -3010,8 +3075,27 @@ const SPLASHES=['Now with our own servers!','Spam click!','Last one standing!','
 
 $('optClose').addEventListener('click',()=>{readOptions();hide('optPanel');show(optReturn);sfx('click');});
 $('soloBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();online=false;if(net){net.leave();net=null;}MATCH.mapIdx=MATCH.mapIdx||0;hide('menu');showLoading('Loading level',()=>{player=null;ents=[];hostStartMatch();});});
-$('onlineBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();hide('menu');show('onlinePanel');});
-$('onlineClose').addEventListener('click',()=>{hide('onlinePanel');show('menu');});
+// ---- server browser: rooms announce themselves; pick one to join ----
+let browser=null;
+function stopBrowse(){if(browser){browser.close();browser=null;}}
+function startBrowse(){stopBrowse();const box=$('roomList');if($('n_kind').value!=='relay'){box.innerHTML='<div class="rnote">Room list works with Internet connections.</div>';return;}
+  box.innerHTML='<div class="rnote">Looking for games...</div>';$('browseWhere').textContent='';
+  browser=browseRooms($('n_server').value,(list,url,err)=>{if(!$('onlinePanel').classList.contains('hidden')||true){
+    if(err){box.innerHTML='<div class="rnote"></div>';box.firstChild.textContent=err;return;}
+    $('browseWhere').textContent=url?'on '+url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,''):'';
+    if(!list.length){box.innerHTML='<div class="rnote">No open games right now. Type a room code and press Connect to start one.</div>';return;}
+    box.textContent='';for(const r of list){const b=document.createElement('button');b.className='room';b.type='button';
+      const nm=document.createElement('span');nm.className='rn';nm.textContent=r.room+(r.host?'  ·  '+r.host:'');
+      const st=document.createElement('span');st.className='rs';const mp=(MAPS.find(m=>m.id===r.map)||{}).name||(r.map==='br'?'Battle Royale':r.map||'');st.textContent=(r.mode==='br'?'Battle Royale':'Battle')+(mp&&r.mode!=='br'?' · '+mp:'')+' · '+(r.state==='lobby'?'In lobby':'In game '+fmtTime(r.gt||0));
+      const pp=document.createElement('span');pp.className='rp';pp.textContent=(r.n||0)+'/'+(r.max||16);
+      b.append(nm,st,pp);b.addEventListener('click',()=>{$('n_room').value=r.room;sfx('click');$('connectBtn').click();});box.appendChild(b);}}});}
+$('browseRefresh').addEventListener('click',()=>{sfx('click');startBrowse();});
+$('n_server').addEventListener('change',()=>{if(!$('onlinePanel').classList.contains('hidden'))startBrowse();});
+$('n_kind').addEventListener('change',()=>{if(!$('onlinePanel').classList.contains('hidden'))startBrowse();});
+$('onlineBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();hide('menu');show('onlinePanel');startBrowse();});
+$('onlineClose').addEventListener('click',()=>{stopBrowse();hide('onlinePanel');show('menu');});
+// leaving the page: say goodbye so the room doesn't wait for a timeout
+addEventListener('pagehide',()=>{try{if(net)net.leave();}catch(e){}});addEventListener('beforeunload',()=>{try{if(net&&online)net.post({t:'bye',from:net.myId});}catch(e){}});
 $('packBtn').addEventListener('click',()=>{sfx('click');hide('menu');show('packPanel');refreshPackList();});
 $('packClose').addEventListener('click',()=>{hide('packPanel');show('menu');});
 $('packClear').addEventListener('click',()=>clearPacks());
@@ -3029,20 +3113,26 @@ $('n_server').value=store('bb_server')||'';$('n_kind').value=store('bb_nkind3')|
 $('connectBtn').addEventListener('click',async()=>{
   const kind=$('n_kind').value,room=($('n_room').value||'battle').trim();store('bb_nkind3',kind);store('bb_server',$('n_server').value.trim());store('bb_room',room);
   if(net){net.leave();net=null;}readOptions();
-  const ready=()=>{online=true;setNetStatus('Connected. '+(net.isHost()?'You are the host.':'Joining host...'));hide('onlinePanel');player=null;ents=[];
+  const ready=()=>{stopBrowse();online=true;setNetStatus('Connected. '+(net.isHost()?'You are the host.':'Joining host...'));hide('onlinePanel');player=null;ents=[];
     if(net.isHost())enterLobby();else{enterLobby();netSend(N.HELLO,{},'host');}};
   const wire=()=>{net.onEvent=onNetEvent;net.onJoin=()=>{if(isHost()&&MATCH.state==='lobby')MATCH.phaseT=0;};net.onLeave=onMemberLeave;net.onHostChange=onHostChanged;};
   if(kind==='local'){setNetStatus('Joining room "'+room+'" in this browser...');net=new LocalNet(room,myName);wire();net.onReady=ready;return;}
-  if(kind==='relay'){setNetStatus('Connecting to the relay...');const n=new RelayNet(room,myName,$('n_server').value);net=n;wire();n.tr.trying=url=>{if(net===n&&!n.ready)setNetStatus('Connecting to '+url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,'')+'...');};
+  if(kind==='relay'){setNetStatus('Connecting to the relay...');const n=new RelayNet(room,myName,$('n_server').value);net=n;wire();
+    n.getAdvert=()=>$('n_public').checked?{host:myName,n:n.list().length,max:16,mode:SET.mode,map:MATCH.state==='play'||MATCH.state==='over'?MATCH.map:nextMapId(),state:MATCH.state==='lobby'?'lobby':'game',gt:Math.round(MATCH.gameT||0)}:null;
+    n.onReconnecting=()=>{if(net===n)chatMsg('Connection lost. Reconnecting...','#ffaa00',false);};
+    n.onReconnected=down=>{if(net!==n)return;chatMsg('Reconnected.','#55ff55',false);if(down>6500&&!n.isHost())netSend(N.HELLO,{},'host');};   // gone long enough to have missed things: ask the host to catch us upn.tr.trying=url=>{if(net===n&&!n.ready)setNetStatus('Connecting to '+url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,'')+'...');};
     n.onReady=()=>{if(net!==n)return;setNetStatus('Connected to '+(n.tr.url||'relay').replace(/^wss?:\/\//,'').replace(/\/mqtt$/,''));ready();};
-    n.onFail=msg=>{if(net!==n)return;const wasOnline=online;net=null;n.leave();if(wasOnline){toMenu();hide('menu');show('onlinePanel');}setNetStatus(msg);};return;}
+    n.onFail=msg=>{if(net!==n)return;const wasOnline=online;net=null;n.leave();if(wasOnline){toMenu();hide('menu');show('onlinePanel');startBrowse();}setNetStatus(msg);};return;}
   setNetStatus('Pick a connection type.');
 });
 $('resumeBtn').addEventListener('click',()=>{paused=false;hide('pause');lockPointer();});
 $('leaveBtn').addEventListener('click',()=>toMenu());
 $('menuBtn').addEventListener('click',()=>toMenu());
+// back to the lobby after a round (online: the host takes everyone there; solo: a lobby that counts down to the next round)
+function backToLobby(){hide('results');if(online){if(isHost()){netSend(N.TOLOBBY,{});enterLobby();}else if(MATCH.state!=='lobby')enterLobby();}else{MATCH.offlineLobby=true;enterLobby();}}
+$('lobbyBtn').addEventListener('click',backToLobby);
 $('nextBtn').addEventListener('click',()=>{hide('results');if(!online){showLoading('Loading level',()=>{player=null;ents=[];hostStartMatch();});}});
-function toMenu(){if(net){net.leave();net=null;}online=false;MATCH.state='menu';player=null;ents=[];document.exitPointerLock&&document.exitPointerLock();hideOverlays();show('menu');setMSel(0);generateMap('skyhold',1,false);buildMesh();refreshSkinPicker();}
+function toMenu(){if(net){net.leave();net=null;}online=false;MATCH.offlineLobby=false;MATCH.state='menu';player=null;ents=[];document.exitPointerLock&&document.exitPointerLock();hideOverlays();show('menu');setMSel(0);generateMap('skyhold',1,false);buildMesh();refreshSkinPicker();}
 function openLobbyPanel(){document.exitPointerLock&&document.exitPointerLock();show('lobbyPanel');const host=isHost();
   $('lobbyInfo').innerHTML=`<div class="note">Room: <b>${($('n_room').value||'').replace(/</g,'&lt;')}</b> · ${net?net.kind:''}${net&&net.tr&&net.tr.url?' via '+net.tr.url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,'').replace(/</g,'&lt;'):''}${net&&net.ping!=null?' · ping '+Math.round(net.ping)+' ms':''} · ${host?'You are the host':'Host decides the options'}<br>Mode: ${SET.mode==='br'?'Battle Royale':'Battle'} · Round ${SET.roundLen?SET.roundLen/60+' min':'unlimited'} · Grace ${SET.grace||'off'} · Hunger ${({0.5:'slow',1:'normal',2:'fast'})[SET.hunger]} · Bots ${SET.bots}<br>Players: ${ents.filter(e=>e.kind==='player').map(e=>(e.ready?'✓ ':'')+e.name.replace(/</g,'&lt;')+(e===player?(net&&net.ping!=null?' ('+Math.round(net.ping)+' ms)':''):(e.ping!=null?' ('+e.ping+' ms)':''))).join(', ')}</div>`;
   $('lobbyStart').classList.toggle('hidden',!host);$('lobbyOpts').classList.toggle('hidden',!host);}
@@ -3060,7 +3150,7 @@ const heartPic=(c,b)=>pxPic(HEART_PX,{k:'#000',c,b,w:'rgba(255,255,255,.75)'});
 const medalPic=()=>pxPic(['k.....k','rk...kb','.rk.kb.','..kyk..','.kyyyk.','kyywyyk','kyyyyyk','.kyyyk.','..kkk..'],{k:'#000',r:'#d83030',b:'#3060d8',y:'#f0c020',w:'#fff8a0'},26);
 const fmtClock=s=>{s=Math.max(0,Math.round(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
 const ordinal=n=>n+(n%100>=11&&n%100<=13?'th':['th','st','nd','rd'][n%10]||'th');
-let resPick=null,resSel=0,resN=0;
+let resPick=null,resSel=0,resN=0,lastResults=null;
 function showResults(m){
   if(MATCH.state!=='over')return;document.exitPointerLock&&document.exitPointerLock();hide('pause');hide('chestUI');
   const rows=m.res.slice().sort((a,b)=>a.p-b.p);const me=player&&player.id;
@@ -3079,8 +3169,8 @@ function showResults(m){
     const k=document.createElement('span');k.className='k';k.textContent=r.k||0;const aw=document.createElement('span');aw.className='sbIco';aw.appendChild(iconCanvas((AWARDS[r.aw]||AWARDS.contender)[1],26));
     d.append(dot,nm,k,aw);d.addEventListener('mouseenter',()=>resPick(i));d.addEventListener('click',()=>resPick(i));box.appendChild(d);});
   resN=rows.length;let sel=rows.findIndex(r=>r.id===me);resPick(sel<0?0:sel);$('sbTime').textContent=fmtClock(m.t!=null?m.t:MATCH.gameT);
-  $('resNote').textContent=online?'Returning to the lobby in a few seconds. The next map cycles automatically.':'';$('nextBtn').classList.toggle('hidden',online);show('results');
-  if(online)setTimeout(()=>hide('results'),9000);
+  $('resNote').textContent=online?'Returning to the lobby in a few seconds.':'Back to the lobby in a few seconds, or pick Next map.';$('nextBtn').classList.toggle('hidden',online);$('menuBtn').textContent=online?'Leave Game':'Menu';show('results');
+  const ends=m;setTimeout(()=>{if(MATCH.state==='over'&&!$('results').classList.contains('hidden')&&lastResults===ends)backToLobby();},online?9500:15000);lastResults=ends;
 }
 document.addEventListener('keydown',e=>{if($('results').classList.contains('hidden')||!resPick||!resN)return;if(e.code==='ArrowDown'||e.code==='KeyS'){resPick((resSel+1)%resN);e.preventDefault();}else if(e.code==='ArrowUp'||e.code==='KeyW'){resPick((resSel+resN-1)%resN);e.preventDefault();}});
 
@@ -3539,7 +3629,7 @@ chestAcc+=dt;while(chestAcc>=TICK){chestAcc-=TICK;tickChestLids();}
     else interpRemote(e,dt);
     updateBodyYaw(e,dt);
   }
-  if(isHost()){if(MATCH.state==='play')hostMatchTick(dt);else if(MATCH.state==='lobby'&&online)hostLobbyTick(dt);}
+  if(isHost()){if(MATCH.state==='play')hostMatchTick(dt);else if(MATCH.state==='lobby'&&(online||MATCH.offlineLobby))hostLobbyTick(dt);}
   for(const c of chests.values())if(c.claimT)c.claimT-=dt;
   updateProjs(dt);updateDrops(dt);updateParticles(dt);
   for(const f of feed)f.t-=dt;feed=feed.filter(f=>f.t>0);for(const m of msgs)m.t-=dt;msgs=msgs.filter(m=>m.t>0);for(const c of chat)c.t-=dt;chat=chat.filter(c=>c.t>0);

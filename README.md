@@ -53,6 +53,10 @@ node server/server.js          # or: npm start   (needs Node.js 18+)
 
 Open `http://localhost:8080` (or your PC's address, e.g. `http://192.168.1.20:8080`, for friends on the same Wi-Fi). Players who open the game from that address connect to it automatically. Free hosts that run Node apps (Render, Railway, Fly.io, Glitch, a Replit, your own PC with port forwarding) work too: point them at this repo with the start command `npm start`. Check `/health` on the server to see rooms and players.
 
+**Finding games:** Play Online shows a list of open games on the same server (room, host, mode, map, lobby or in game, player count); click one to join. Untick "List my room here when I host" to keep a room private. On the game server, `/rooms` shows the same list as JSON.
+
+**How multiplayer behaves:** if you're not the host, taking from chests, picking items up and dropping them happen instantly on your screen; the host checks each move and takes an item back only if someone else got it first. The host leaving doesn't end the round: the next player takes over, bots included. A dropped connection reconnects by itself (you have a few seconds before you count as gone), and after a round everyone goes back to the lobby.
+
 **Option B: GitHub Pages with no server.** Mini Games → Play Online → Connect also works on GitHub Pages: if there's no game server, it falls back to free public relays (EMQX, HiveMQ, Mosquitto test broker). Anyone who knows the room code can join those, so pick an unusual code.
 
 To use a game server from the GitHub Pages copy, type its address in **Game server (optional)** on the Play Online screen, or open the page with `?relay=wss://your-server/mqtt`.
