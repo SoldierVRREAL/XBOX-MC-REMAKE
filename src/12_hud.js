@@ -146,7 +146,7 @@ function drawBattleTop(){
 }
 function drawLobbyHud(){
   const humans=ents.filter(e=>e.kind==='player').length;const name=MATCH.nextMap?(MATCH.nextMap==='br'?'Battle Royale':(MAPS.find(m=>m.id===MATCH.nextMap)||{}).name):'';
-  if(!online){txt('Practice  -  Esc for menu',W/2,30,18,'#fff','center');return;}
+  if(!online&&!MATCH.offlineLobby){txt('Practice  -  Esc for menu',W/2,30,18,'#fff','center');return;}
   if(MATCH.lobbyCD>=0)txt(`Time to game change: ${Math.ceil(MATCH.lobbyCD)} seconds`,W/2,30,18,'#fff','center');else txt(humans<2&&!SET.bots?'Waiting for players...':'Waiting...',W/2,30,18,'#fff','center');
   // next map and the player list are on the Tab lobby panel
 }

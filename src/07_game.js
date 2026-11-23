@@ -187,9 +187,12 @@ function updateProjs(dt){
   projs=projs.filter(a=>!a.dead&&a.age<60&&a.pos[1]>-20);
 }
 // ---------- dropped items (host is authoritative) ----------
-let dropSeq=1;
-function hostSpawnDrop(p,id,count,vel){const d={did:dropSeq++,pos:[p[0],p[1]+1,p[2]],vel:vel||[(Math.random()-.5)*4,4+Math.random()*2,(Math.random()-.5)*4],id,count,age:0,spin:Math.random()*6};drops.push(d);netSend(N.DROPADD,d);return d;}
-function requestDrop(p,id,count,vel){if(isHost())hostSpawnDrop(p,id,count,vel);else netSend(N.DROPREQ,{p,id,c:count,v:vel},'host');}
+var dropSeq=1;
+function hostSpawnDrop(p,id,count,vel,by,rid){const d={did:dropSeq++,by,rid,pos:[p[0],p[1]+1,p[2]],vel:vel||[(Math.random()-.5)*4,4+Math.random()*2,(Math.random()-.5)*4],id,count,age:0,spin:Math.random()*6};drops.push(d);netSend(N.DROPADD,d);return d;}
+let dropRid=0;
+function requestDrop(p,id,count,vel){if(isHost()){hostSpawnDrop(p,id,count,vel);return;}const rid=++dropRid;
+  drops.push({did:-rid,ghost:4,pos:[p[0],p[1]+1,p[2]],vel:vel?vel.slice():[(Math.random()-.5)*4,4+Math.random()*2,(Math.random()-.5)*4],id,count,age:0,spin:Math.random()*6,pending:99});   // stand-in until the host's copy arrives
+  netSend(N.DROPREQ,{p,id,c:count,v:vel,rid},'host');}
 function updateDrops(dt){
   for(const d of drops){
     d.age+=dt;d.spin+=dt*2;d.vel[1]-=G*.7*dt;const ny=d.pos[1]+d.vel[1]*dt;
@@ -198,8 +201,9 @@ function updateDrops(dt){
     for(const k of [0,2]){const nx=d.pos[k]+d.vel[k]*dt;const t=d.pos.slice();t[k]=nx;if(!solid(Math.floor(t[0]),Math.floor(t[1]),Math.floor(t[2])))d.pos[k]=nx;else d.vel[k]=0;d.vel[k]*=Math.exp(-2*dt);}
     if(d.age>.6&&!d.pending&&!d.dead)for(const e of ents){if(!e.alive||!owned(e))continue;if(hdist(e.pos,d.pos)<1.3&&Math.abs(e.pos[1]+.8-d.pos[1])<1.6){
       if(isHost()){const left=addItem(e,d.id,d.count);if(left<d.count){if(e===player)sfx('pick');d.count=left;if(!left){d.dead=true;netSend(N.DROPDEL,{did:d.did});break;}}}
-      else if(e===player&&invRoom(e,d.id)){d.pending=1.5;netSend(N.PICK,{did:d.did},'host');}}}
+      else if(e===player&&d.did>0&&invRoom(e,d.id)){const left=addItem(e,d.id,d.count),took=d.count-left;if(took>0){sfx('pick');netSend(N.PICK,{did:d.did,id:d.id,n:took},'host');d.count=left;if(!left)d.dead=true;else d.pending=1;}}}}   // picked up at once; the host confirms or takes it back
     if(d.pending){d.pending-=dt;if(d.pending<=0)d.pending=0;}
+    if(d.ghost){d.ghost-=dt;if(d.ghost<=0)d.dead=true;}
   }
   drops=drops.filter(d=>!d.dead&&d.pos[1]>-20&&d.age<300);
 }

@@ -65,6 +65,11 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#555}
 .sbRow .dot{width:9px;height:14px;border-radius:2px;box-shadow:0 0 0 1px #000;flex:none}.sbRow .nm{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.sbRow .k{width:26px;text-align:center}
 .sbStat{display:flex;align-items:center;gap:12px;font-size:21px;min-height:44px}
 #sbWinner{text-align:center;font-size:25px;margin:12px 0;min-height:28px}#sbTime{text-align:center;font-size:25px;padding:6px;border:2px solid rgba(205,220,226,.75);background:rgba(36,46,54,.6)}
+#browse{width:100%;margin:10px 0 6px}#browse .bhead{display:flex;align-items:center;gap:10px;font-size:22px;margin-bottom:4px}#browse .bhead span:first-child{flex:none}.bwhere{flex:1;font-size:16px;opacity:.7;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#roomList{max-height:30vh;overflow:auto;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.25)}.rnote{padding:8px 10px;font-size:18px;opacity:.8}
+.room{display:flex;gap:10px;align-items:center;width:100%;padding:6px 10px;font:inherit;font-size:20px;color:#fff;text-shadow:2px 2px 0 #000;background:transparent;border:0;border-bottom:1px solid rgba(255,255,255,.12);cursor:pointer;text-align:left}
+.room:hover,.room:focus{background:rgba(120,180,255,.25);outline:none}.room .rn{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.room .rs{opacity:.8;white-space:nowrap}.room .rp{width:60px;text-align:right}
+.bchk{display:flex;gap:8px;align-items:center;font-size:18px;margin-top:6px}
 table.res{border-collapse:collapse;margin:8px auto;font-size:22px}table.res td{padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.15)}table.res td:last-child,table.res td:nth-child(3),table.res td:nth-child(4){text-align:right}
 
 /* ===== Legacy Console (Xbox) look: --S is the console GUI scale (1 at 360p, 2 at 720p, 3 at 1080p) ===== */
@@ -222,7 +227,10 @@ body.touch #clickResume{display:none!important}
     <label for="n_room">Room code</label><input id="n_room" type="text" maxlength="24" value="battle">
     <label for="n_server">Game server (optional)</label><input id="n_server" type="text" maxlength="120" placeholder="e.g. my-battle.onrender.com or 192.168.1.20:8080">
   </div>
-  <div class="note">Everyone types the same room code and presses Connect. The first player in a room hosts: it runs the bots, chests and round timer.
+  <div id="browse"><div class="bhead"><span>Open games</span><span id="browseWhere" class="bwhere"></span><button class="btn small" id="browseRefresh">Refresh</button></div>
+    <div id="roomList"><div class="rnote">Looking for games...</div></div>
+    <label class="bchk"><input type="checkbox" id="n_public" checked> List my room here when I host</label></div>
+  <div class="note">Pick a game from the list, or everyone types the same room code and presses Connect. The first player in a room hosts: it runs the bots, chests and round timer.
   If you run the game's own server (<code>node server/server.js</code>), players on it connect to it automatically, or type its address above. Without one, the game uses free public relays, so pick an unusual room code.</div>
   <div id="status"></div>
   <div class="row"><button class="btn small" id="connectBtn">Connect</button><button class="btn small" id="onlineClose">Back</button></div>
@@ -262,7 +270,7 @@ body.touch #clickResume{display:none!important}
   <div id="sbWrap"><div class="sbPanel" id="sbPlayers"><div class="sbHead"><span>Players</span><span class="sbIco" id="sbKillIco"></span><span class="sbIco" id="sbAwIco"></span></div><div id="sbRows"></div></div>
     <div class="sbPanel" id="sbSide"><div class="sbStat" id="sbAward"></div><div class="sbStat" id="sbFav"></div><div class="sbStat" id="sbDealt"></div><div class="sbStat" id="sbTaken"></div><div id="sbWinner"></div><div id="sbTime"></div></div></div>
   <div id="resNote" class="note"></div>
-  <div class="row"><button class="btn small" id="nextBtn">Next map</button><button class="btn small" id="menuBtn">Menu</button></div></div>
+  <div class="row"><button class="btn small" id="lobbyBtn">Back to Lobby</button><button class="btn small" id="nextBtn">Next map</button><button class="btn small" id="menuBtn">Menu</button></div></div>
 <div id="loading" class="screen hidden" style="background:rgba(0,0,0,.3)"><div style="width:min(640px,90vw);text-align:center">
   <img id="loadLogo" alt="" style="width:min(460px,76vw);image-rendering:pixelated;display:block;margin:0 auto 7vh">
   <div id="loadTitle" style="font-size:32px;color:#fff;text-shadow:2px 2px 0 #333">Loading level</div>

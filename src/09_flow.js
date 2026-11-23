@@ -62,7 +62,7 @@ function enterLobby(){
 }
 function hostLobbyTick(dt){
   const humans=net?net.list().length:1;const ready=ents.filter(e=>e.kind==='player'&&e.ready).length;
-  if(humans>=2||SET.bots>0){if(MATCH.lobbyCD<0)MATCH.lobbyCD=SET.lobbyWait;if(ready>=humans&&humans>0)MATCH.lobbyCD=Math.min(MATCH.lobbyCD,5);MATCH.lobbyCD-=dt;if(MATCH.lobbyCD<=0){MATCH.lobbyCD=-1;hostStartMatch();return;}}
+  if(humans>=2||SET.bots>0){if(MATCH.lobbyCD<0)MATCH.lobbyCD=online?SET.lobbyWait:15;if(ready>=humans&&humans>0)MATCH.lobbyCD=Math.min(MATCH.lobbyCD,5);MATCH.lobbyCD-=dt;if(MATCH.lobbyCD<=0){MATCH.lobbyCD=-1;hostStartMatch();return;}}
   else MATCH.lobbyCD=-1;
   MATCH.phaseT-=dt;if(MATCH.phaseT<=0){MATCH.phaseT=1;netSend(N.LOBBY,{cd:MATCH.lobbyCD,next:nextMapId(),mode:SET.mode,ready:ents.filter(e=>e.ready).map(e=>e.id),set:SET});}
 }
@@ -106,16 +106,36 @@ function applyEnd(m){
 }
 
 // ---------- chests (host authoritative) ----------
-function hostChestOp(k,op,slot,who,item){
+function hostChestOp(k,op,slot,who,item,rid,moves){
   const c=chests.get(k);if(!c)return;const local=owned(who);
+  if(op==='takep'&&Array.isArray(moves)){const revoke=[];   // a non-host already moved these on its screen: check each one
+    for(const mv of moves){if(!Array.isArray(mv))continue;const [i,id,n]=mv;const s=c.items[i];if(s&&s.id===id){const t=Math.min(n,s.count);c.items[i]=s.count>t?{id,count:s.count-t}:null;if(t<n)revoke.push([id,n-t]);}else revoke.push([id,n]);}
+    if(revoke.length)netSend(N.GIVE,{to:who.id,items:[],revoke,k},+who.id.slice(1));}
   if(op==='take'||op==='all'){
     const slots=op==='all'?c.items.map((s,i)=>i):[slot];const give=[];
     for(const i of slots){const s=c.items[i];if(!s)continue;if(local){const left=addItem(who,s.id,s.count);c.items[i]=left?{id:s.id,count:left}:null;}else{give.push(s);c.items[i]=null;}}
     if(give.length)netSend(N.GIVE,{to:who.id,items:give,k},+who.id.slice(1));
   }else if(op==='put'&&item){const j=c.items.indexOf(null);if(j>=0)c.items[j]=item;else hostSpawnDrop([c.x+.5,c.y,c.z+.5],item.id,item.count);}
-  netSend(N.CHEST,{k,items:c.items});if(chestOpen===c)renderChest();
+  netSend(N.CHEST,{k,items:c.items,by:who&&who.id,ack:rid||0});if(chestOpen===c)renderChest();
 }
-function chestOp(op,slot,item){if(!chestOpen)return;const k=key(chestOpen.x,chestOpen.y,chestOpen.z);if(isHost())hostChestOp(k,op,slot,player,item);else netSend(N.CHESTREQ,{k,op,slot,item},'host');sfx('pick');}
+// Non-hosts don't wait for the host: the item moves on their screen at once and the move is sent with what they took.
+// Until the host confirms (its chest update carries ack = our move number) those moves are re-applied on top of every update,
+// so fast clicking never flickers. If someone else got there first, the host sends a revoke and the item is taken back.
+let chestRid=0;const chestPend=[];
+function applyChestPend(c,k){const now=performance.now();for(let i=chestPend.length-1;i>=0;i--)if(now-chestPend[i].t>4000)chestPend.splice(i,1);
+  for(const p of chestPend){if(p.k!==k)continue;if(p.op==='take'){for(const [i,id,n] of p.moves){const s=c.items[i];if(s&&s.id===id)c.items[i]=s.count>n?{id,count:s.count-n}:null;}}
+    else if(p.op==='put'){const j=c.items.indexOf(null);if(j>=0)c.items[j]=p.item;}}}
+function removeItem(e,id,n){for(let i=0;i<e.inv.length&&n>0;i++){const s=e.inv[i];if(s&&s.id===id){const t=Math.min(n,s.count);s.count-=t;n-=t;if(s.count<=0)e.inv[i]=null;}}
+  for(let i=0;i<4&&n>0;i++)if(e.armor[i]===id){e.armor[i]=null;n--;}return n;}
+function chestOp(op,slot,item){if(!chestOpen)return;const c=chestOpen,k=key(c.x,c.y,c.z);
+  if(isHost()){hostChestOp(k,op,slot,player,item);sfx('pick');return;}
+  const rid=++chestRid;
+  if(op==='take'||op==='all'){const moves=[];for(const i of (op==='all'?c.items.map((s,j)=>j):[slot])){const s=c.items[i];if(!s)continue;
+      const left=addItem(player,s.id,s.count),took=s.count-left;if(!took)continue;moves.push([i,s.id,took]);c.items[i]=left?{id:s.id,count:left}:null;}
+    if(!moves.length){sfx('click');return;}   // no room
+    chestPend.push({rid,k,op:'take',moves,t:performance.now()});netSend(N.CHESTREQ,{k,op:'takep',rid,moves},'host');}
+  else if(op==='put'&&item){const j=c.items.indexOf(null);if(j>=0)c.items[j]=item;chestPend.push({rid,k,op:'put',item,t:performance.now()});netSend(N.CHESTREQ,{k,op:'put',rid,item},'host');}
+  sfx('pick');renderChest();}
 
 // ---------- blocks (Battle Royale building) ----------
 function applyBlock(x,y,z,b){const was=getB(x,y,z);if(was&&!b)blockParticles(x,y,z,was,40);setB(x,y,z,b);relightColumn(x,z);rebuildAt(x,z);if(isHost())MATCH.edits.push([x,y,z,b]);}
@@ -181,14 +201,21 @@ function onNetEvent(code,d,from){
   case N.HIT:{const t=entById(d.t);if(!t||!owned(t))return;const a=d.a?entById(d.a):null;if(a)a.heldHint=typeof d.w==='string'&&ITEMS[d.w]?d.w:null;const ok=hurt(t,d.d,a,d.c,d.kb,!!d.r);if(a)a.heldHint=null;if(d.fx&&(ok||d.d===0))for(const f of d.fx)giveEffect(t,...f);break;}
   case N.DEATH:onDeath(d);break;
   case N.DEALT:{if(!isHost())return;if(d.tk){const t=entById(d.tk);if(t)t.dmgTaken=(t.dmgTaken||0)+d.d;break;}const a=entById(d.a);if(a){a.dmgDealt+=d.d;addWpn(a,typeof d.w==='string'&&(ITEMS[d.w]||d.w==='hand')?d.w:null,d.d);}break;}
-  case N.CHESTREQ:{if(!isHost())return;const who=entById('p'+from);if(who)hostChestOp(d.k,d.op,d.slot,who,d.item);break;}
-  case N.CHEST:{const c=chests.get(d.k);if(c){c.items=d.items;if(chestOpen===c)renderChest();}break;}
-  case N.CHESTS:for(const [k,items] of d){const c=chests.get(k);if(c)c.items=items;}if(chestOpen)renderChest();break;
-  case N.GIVE:{if(!player||d.to!==player.id)return;for(const s of d.items){const left=addItem(player,s.id,s.count);if(left){if(d.k)netSend(N.CHESTREQ,{k:d.k,op:'put',item:{id:s.id,count:left}},'host');else requestDrop(player.pos,s.id,left);}}sfx('pick');if(chestOpen)renderChest();break;}
-  case N.DROPADD:if(!drops.some(x=>x.did===d.did))drops.push(Object.assign({},d,{pos:d.pos.slice(),vel:d.vel.slice()}));break;
+  case N.CHESTREQ:{if(!isHost())return;const who=entById('p'+from);if(who)hostChestOp(d.k,d.op,d.slot,who,d.item,d.rid,d.moves);break;}
+  case N.CHEST:{const c=chests.get(d.k);if(c){if(player&&d.by===player.id&&d.ack)for(let i=chestPend.length-1;i>=0;i--)if(chestPend[i].k===d.k&&chestPend[i].rid<=d.ack)chestPend.splice(i,1);
+    c.items=d.items.slice();applyChestPend(c,d.k);if(chestOpen===c)renderChest();}break;}
+  case N.CHESTS:chestPend.length=0;for(const [k,items] of d){const c=chests.get(k);if(c)c.items=items;}if(chestOpen)renderChest();break;
+  case N.GIVE:{if(!player||d.to!==player.id)return;if(d.revoke){for(const r of d.revoke)if(Array.isArray(r))removeItem(player,r[0],r[1]);sfx('click');if(chestOpen)renderChest();if(!d.items||!d.items.length)break;}   // someone else got it first
+    for(const s of d.items){const left=addItem(player,s.id,s.count);if(left){if(d.k)netSend(N.CHESTREQ,{k:d.k,op:'put',item:{id:s.id,count:left}},'host');else requestDrop(player.pos,s.id,left);}}sfx('pick');if(chestOpen)renderChest();break;}
+  case N.DROPADD:if(player&&d.by===player.id&&d.rid){const g=drops.findIndex(x=>x.did===-d.rid);if(g>=0)drops.splice(g,1);}   // the real copy of our own drop: swap out the stand-in
+    if(!drops.some(x=>x.did===d.did))drops.push(Object.assign({},d,{pos:d.pos.slice(),vel:d.vel.slice()}));break;
+  case N.DROPUPD:{const x=drops.find(x=>x.did===d.did);if(x){x.count=d.count;if(x.count<=0)x.dead=true;}break;}
   case N.DROPDEL:{const x=drops.find(x=>x.did===d.did);if(x)x.dead=true;break;}
-  case N.DROPREQ:if(isHost())hostSpawnDrop(d.p,d.id,d.c,d.v);break;
-  case N.PICK:{if(!isHost())return;const x=drops.find(x=>x.did===d.did&&!x.dead);if(!x)return;x.dead=true;netSend(N.DROPDEL,{did:x.did});netSend(N.GIVE,{to:'p'+from,items:[{id:x.id,count:x.count}]},from);break;}
+  case N.DROPREQ:if(isHost()&&ITEMS[d.id]&&d.c>0)hostSpawnDrop(d.p,d.id,d.c,d.v,'p'+from,d.rid);break;
+  case N.PICK:{if(!isHost())return;const x=drops.find(x=>x.did===d.did&&!x.dead);
+    if(d.n>0){const id=d.id;if(!x||x.id!==id){netSend(N.GIVE,{to:'p'+from,items:[],revoke:[[id,d.n]]},from);break;}   // already gone: take back what they picked up
+      const t=Math.min(d.n,x.count);x.count-=t;if(x.count<=0){x.dead=true;netSend(N.DROPDEL,{did:x.did});}else netSend(N.DROPUPD,{did:x.did,count:x.count});if(t<d.n)netSend(N.GIVE,{to:'p'+from,items:[],revoke:[[id,d.n-t]]},from);break;}
+    if(!x)return;x.dead=true;netSend(N.DROPDEL,{did:x.did});netSend(N.GIVE,{to:'p'+from,items:[{id:x.id,count:x.count}]},from);break;}
   case N.PROJ:{const o=entById(d.o);spawnProj(d.k,d.p,d.v,o,d.d,d.pot,false);break;}
   case N.BOTS:for(const b of d){const e=entById(b[0]);if(!e)continue;pushSnap(e,[b[1],b[2],b[3]],[b[4],b[5],b[6]],b[7],b[8],b[17]);if(b[9]<e.health-.4){const pred=e.hitPred&&performance.now()-e.hitPred<800;if(!pred)sfx('hurt',{pos:e.pos});if(!(e.hurtT>0))e.hurtT=.5;}e.health=b[9];
       e.inv=new Array(9).fill(null);e.sel=0;if(b[10])e.inv[0]={id:b[10],count:1};if(b[11])e.armor=b[11];e.using=b[12];e.useT=b[13];if(b[14])e.swing=Math.max(e.swing,b[14]);e.fire=b[15];e.effects=b[16]?{invis:{t:9,amp:0}}:{};}break;
@@ -202,7 +229,7 @@ function onNetEvent(code,d,from){
   case N.LOBBY:if(!fromHost)return;if(MATCH.state!=='lobby')enterLobby();MATCH.lobbyCD=d.cd;MATCH.nextMap=d.next;Object.assign(SET,d.set);for(const e of ents)e.ready=d.ready.includes(e.id);break;
   case N.READY:{const e=entById('p'+from);if(e)e.ready=d.r;break;}
   case N.END:if(!fromHost)return;applyEnd(d);break;
-  case N.TOLOBBY:if(!fromHost)return;enterLobby();break;
+  case N.TOLOBBY:if(!fromHost)return;hide('results');if(MATCH.state!=='lobby')enterLobby();break;
   case N.HELLO:{if(!isHost())return;const jid='p'+from;
     if(MATCH.state==='play'){const snap=snapshotFor(jid);snap.join=jid;netSend(N.START,snap,from);}
     else if(MATCH.state==='lobby'){netSend(N.TOLOBBY,{},from);MATCH.phaseT=0;}
@@ -217,8 +244,11 @@ function onMemberLeave(id){
   ents=ents.filter(x=>x!==e);
 }
 function onHostChanged(){
-  if(!net)return;chatMsg(net.isHost()?'You are now the host.':'The host changed.','#ffff55',false);
-  if(net.isHost()&&MATCH.state!=='lobby'){netSend(N.TOLOBBY,{});enterLobby();}
+  if(!net)return;chatMsg(net.isHost()?'You are now the host.':'The host changed.','#ffff55',false);if(!net.isHost())return;
+  // the old host left: carry the round on. Chests, drops and the clock are already in sync everywhere; take over the bots
+  dropSeq=Math.max(dropSeq,...drops.map(d=>d.did+1),1)+1000;MATCH.phaseT=0;
+  if(MATCH.state==='play'){for(const e of ents)if(e.kind==='bot'){e.ai=newAI();e.net=null;e.prev=null;e.acc=0;if(!e.mot)e.mot=[0,0,0];}netSend(N.CHESTS,[...chests].map(([k,c])=>[k,c.items]));}
+  else if(MATCH.state==='over')setTimeout(()=>{if(net&&isHost()&&MATCH.state==='over'){netSend(N.TOLOBBY,{});enterLobby();}},6000);
 }
 // state broadcast for my player
 let stateT=0,stateFullT=0,stateFullKey='';

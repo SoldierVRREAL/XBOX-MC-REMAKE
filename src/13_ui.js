@@ -144,7 +144,7 @@ try{const s=JSON.parse(store('bb_set')||'null');if(s)Object.assign(SET,s,{maps:O
 writeOptions();
 let optReturn='menu';
 $('optBtn').addEventListener('click',()=>{sfx('click');optReturn='menu';openOptions('menu');});
-$('practiceBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();online=false;if(net){net.leave();net=null;}player=null;ents=[];enterLobby();chatMsg('Movement playground to the east: ice, slime, soul sand,','#ffff55',false);chatMsg('cobwebs, ladder, slabs, stairs and a pool.','#ffff55',false);});
+$('practiceBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();online=false;MATCH.offlineLobby=false;if(net){net.leave();net=null;}player=null;ents=[];enterLobby();chatMsg('Movement playground to the east: ice, slime, soul sand,','#ffff55',false);chatMsg('cobwebs, ladder, slabs, stairs and a pool.','#ffff55',false);});
 // console-style menu navigation
 const MBTN=()=>[...document.querySelectorAll('#menuList .lbtn')].filter(b=>!b.classList.contains('hidden'));let mSel=0;
 function setMSel(i){const b=MBTN();mSel=(i+b.length)%b.length;b.forEach((x,j)=>x.classList.toggle('sel',j===mSel));}
@@ -180,8 +180,27 @@ const SPLASHES=['Now with our own servers!','Spam click!','Last one standing!','
 
 $('optClose').addEventListener('click',()=>{readOptions();hide('optPanel');show(optReturn);sfx('click');});
 $('soloBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();online=false;if(net){net.leave();net=null;}MATCH.mapIdx=MATCH.mapIdx||0;hide('menu');showLoading('Loading level',()=>{player=null;ents=[];hostStartMatch();});});
-$('onlineBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();hide('menu');show('onlinePanel');});
-$('onlineClose').addEventListener('click',()=>{hide('onlinePanel');show('menu');});
+// ---- server browser: rooms announce themselves; pick one to join ----
+let browser=null;
+function stopBrowse(){if(browser){browser.close();browser=null;}}
+function startBrowse(){stopBrowse();const box=$('roomList');if($('n_kind').value!=='relay'){box.innerHTML='<div class="rnote">Room list works with Internet connections.</div>';return;}
+  box.innerHTML='<div class="rnote">Looking for games...</div>';$('browseWhere').textContent='';
+  browser=browseRooms($('n_server').value,(list,url,err)=>{if(!$('onlinePanel').classList.contains('hidden')||true){
+    if(err){box.innerHTML='<div class="rnote"></div>';box.firstChild.textContent=err;return;}
+    $('browseWhere').textContent=url?'on '+url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,''):'';
+    if(!list.length){box.innerHTML='<div class="rnote">No open games right now. Type a room code and press Connect to start one.</div>';return;}
+    box.textContent='';for(const r of list){const b=document.createElement('button');b.className='room';b.type='button';
+      const nm=document.createElement('span');nm.className='rn';nm.textContent=r.room+(r.host?'  ·  '+r.host:'');
+      const st=document.createElement('span');st.className='rs';const mp=(MAPS.find(m=>m.id===r.map)||{}).name||(r.map==='br'?'Battle Royale':r.map||'');st.textContent=(r.mode==='br'?'Battle Royale':'Battle')+(mp&&r.mode!=='br'?' · '+mp:'')+' · '+(r.state==='lobby'?'In lobby':'In game '+fmtTime(r.gt||0));
+      const pp=document.createElement('span');pp.className='rp';pp.textContent=(r.n||0)+'/'+(r.max||16);
+      b.append(nm,st,pp);b.addEventListener('click',()=>{$('n_room').value=r.room;sfx('click');$('connectBtn').click();});box.appendChild(b);}}});}
+$('browseRefresh').addEventListener('click',()=>{sfx('click');startBrowse();});
+$('n_server').addEventListener('change',()=>{if(!$('onlinePanel').classList.contains('hidden'))startBrowse();});
+$('n_kind').addEventListener('change',()=>{if(!$('onlinePanel').classList.contains('hidden'))startBrowse();});
+$('onlineBtn').addEventListener('click',()=>{initAudio();sfx('click');readName();hide('menu');show('onlinePanel');startBrowse();});
+$('onlineClose').addEventListener('click',()=>{stopBrowse();hide('onlinePanel');show('menu');});
+// leaving the page: say goodbye so the room doesn't wait for a timeout
+addEventListener('pagehide',()=>{try{if(net)net.leave();}catch(e){}});addEventListener('beforeunload',()=>{try{if(net&&online)net.post({t:'bye',from:net.myId});}catch(e){}});
 $('packBtn').addEventListener('click',()=>{sfx('click');hide('menu');show('packPanel');refreshPackList();});
 $('packClose').addEventListener('click',()=>{hide('packPanel');show('menu');});
 $('packClear').addEventListener('click',()=>clearPacks());
@@ -199,20 +218,26 @@ $('n_server').value=store('bb_server')||'';$('n_kind').value=store('bb_nkind3')|
 $('connectBtn').addEventListener('click',async()=>{
   const kind=$('n_kind').value,room=($('n_room').value||'battle').trim();store('bb_nkind3',kind);store('bb_server',$('n_server').value.trim());store('bb_room',room);
   if(net){net.leave();net=null;}readOptions();
-  const ready=()=>{online=true;setNetStatus('Connected. '+(net.isHost()?'You are the host.':'Joining host...'));hide('onlinePanel');player=null;ents=[];
+  const ready=()=>{stopBrowse();online=true;setNetStatus('Connected. '+(net.isHost()?'You are the host.':'Joining host...'));hide('onlinePanel');player=null;ents=[];
     if(net.isHost())enterLobby();else{enterLobby();netSend(N.HELLO,{},'host');}};
   const wire=()=>{net.onEvent=onNetEvent;net.onJoin=()=>{if(isHost()&&MATCH.state==='lobby')MATCH.phaseT=0;};net.onLeave=onMemberLeave;net.onHostChange=onHostChanged;};
   if(kind==='local'){setNetStatus('Joining room "'+room+'" in this browser...');net=new LocalNet(room,myName);wire();net.onReady=ready;return;}
-  if(kind==='relay'){setNetStatus('Connecting to the relay...');const n=new RelayNet(room,myName,$('n_server').value);net=n;wire();n.tr.trying=url=>{if(net===n&&!n.ready)setNetStatus('Connecting to '+url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,'')+'...');};
+  if(kind==='relay'){setNetStatus('Connecting to the relay...');const n=new RelayNet(room,myName,$('n_server').value);net=n;wire();
+    n.getAdvert=()=>$('n_public').checked?{host:myName,n:n.list().length,max:16,mode:SET.mode,map:MATCH.state==='play'||MATCH.state==='over'?MATCH.map:nextMapId(),state:MATCH.state==='lobby'?'lobby':'game',gt:Math.round(MATCH.gameT||0)}:null;
+    n.onReconnecting=()=>{if(net===n)chatMsg('Connection lost. Reconnecting...','#ffaa00',false);};
+    n.onReconnected=down=>{if(net!==n)return;chatMsg('Reconnected.','#55ff55',false);if(down>6500&&!n.isHost())netSend(N.HELLO,{},'host');};   // gone long enough to have missed things: ask the host to catch us upn.tr.trying=url=>{if(net===n&&!n.ready)setNetStatus('Connecting to '+url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,'')+'...');};
     n.onReady=()=>{if(net!==n)return;setNetStatus('Connected to '+(n.tr.url||'relay').replace(/^wss?:\/\//,'').replace(/\/mqtt$/,''));ready();};
-    n.onFail=msg=>{if(net!==n)return;const wasOnline=online;net=null;n.leave();if(wasOnline){toMenu();hide('menu');show('onlinePanel');}setNetStatus(msg);};return;}
+    n.onFail=msg=>{if(net!==n)return;const wasOnline=online;net=null;n.leave();if(wasOnline){toMenu();hide('menu');show('onlinePanel');startBrowse();}setNetStatus(msg);};return;}
   setNetStatus('Pick a connection type.');
 });
 $('resumeBtn').addEventListener('click',()=>{paused=false;hide('pause');lockPointer();});
 $('leaveBtn').addEventListener('click',()=>toMenu());
 $('menuBtn').addEventListener('click',()=>toMenu());
+// back to the lobby after a round (online: the host takes everyone there; solo: a lobby that counts down to the next round)
+function backToLobby(){hide('results');if(online){if(isHost()){netSend(N.TOLOBBY,{});enterLobby();}else if(MATCH.state!=='lobby')enterLobby();}else{MATCH.offlineLobby=true;enterLobby();}}
+$('lobbyBtn').addEventListener('click',backToLobby);
 $('nextBtn').addEventListener('click',()=>{hide('results');if(!online){showLoading('Loading level',()=>{player=null;ents=[];hostStartMatch();});}});
-function toMenu(){if(net){net.leave();net=null;}online=false;MATCH.state='menu';player=null;ents=[];document.exitPointerLock&&document.exitPointerLock();hideOverlays();show('menu');setMSel(0);generateMap('skyhold',1,false);buildMesh();refreshSkinPicker();}
+function toMenu(){if(net){net.leave();net=null;}online=false;MATCH.offlineLobby=false;MATCH.state='menu';player=null;ents=[];document.exitPointerLock&&document.exitPointerLock();hideOverlays();show('menu');setMSel(0);generateMap('skyhold',1,false);buildMesh();refreshSkinPicker();}
 function openLobbyPanel(){document.exitPointerLock&&document.exitPointerLock();show('lobbyPanel');const host=isHost();
   $('lobbyInfo').innerHTML=`<div class="note">Room: <b>${($('n_room').value||'').replace(/</g,'&lt;')}</b> · ${net?net.kind:''}${net&&net.tr&&net.tr.url?' via '+net.tr.url.replace(/^wss?:\/\//,'').replace(/\/mqtt$/,'').replace(/</g,'&lt;'):''}${net&&net.ping!=null?' · ping '+Math.round(net.ping)+' ms':''} · ${host?'You are the host':'Host decides the options'}<br>Mode: ${SET.mode==='br'?'Battle Royale':'Battle'} · Round ${SET.roundLen?SET.roundLen/60+' min':'unlimited'} · Grace ${SET.grace||'off'} · Hunger ${({0.5:'slow',1:'normal',2:'fast'})[SET.hunger]} · Bots ${SET.bots}<br>Players: ${ents.filter(e=>e.kind==='player').map(e=>(e.ready?'✓ ':'')+e.name.replace(/</g,'&lt;')+(e===player?(net&&net.ping!=null?' ('+Math.round(net.ping)+' ms)':''):(e.ping!=null?' ('+e.ping+' ms)':''))).join(', ')}</div>`;
   $('lobbyStart').classList.toggle('hidden',!host);$('lobbyOpts').classList.toggle('hidden',!host);}
@@ -230,7 +255,7 @@ const heartPic=(c,b)=>pxPic(HEART_PX,{k:'#000',c,b,w:'rgba(255,255,255,.75)'});
 const medalPic=()=>pxPic(['k.....k','rk...kb','.rk.kb.','..kyk..','.kyyyk.','kyywyyk','kyyyyyk','.kyyyk.','..kkk..'],{k:'#000',r:'#d83030',b:'#3060d8',y:'#f0c020',w:'#fff8a0'},26);
 const fmtClock=s=>{s=Math.max(0,Math.round(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
 const ordinal=n=>n+(n%100>=11&&n%100<=13?'th':['th','st','nd','rd'][n%10]||'th');
-let resPick=null,resSel=0,resN=0;
+let resPick=null,resSel=0,resN=0,lastResults=null;
 function showResults(m){
   if(MATCH.state!=='over')return;document.exitPointerLock&&document.exitPointerLock();hide('pause');hide('chestUI');
   const rows=m.res.slice().sort((a,b)=>a.p-b.p);const me=player&&player.id;
@@ -249,7 +274,7 @@ function showResults(m){
     const k=document.createElement('span');k.className='k';k.textContent=r.k||0;const aw=document.createElement('span');aw.className='sbIco';aw.appendChild(iconCanvas((AWARDS[r.aw]||AWARDS.contender)[1],26));
     d.append(dot,nm,k,aw);d.addEventListener('mouseenter',()=>resPick(i));d.addEventListener('click',()=>resPick(i));box.appendChild(d);});
   resN=rows.length;let sel=rows.findIndex(r=>r.id===me);resPick(sel<0?0:sel);$('sbTime').textContent=fmtClock(m.t!=null?m.t:MATCH.gameT);
-  $('resNote').textContent=online?'Returning to the lobby in a few seconds. The next map cycles automatically.':'';$('nextBtn').classList.toggle('hidden',online);show('results');
-  if(online)setTimeout(()=>hide('results'),9000);
+  $('resNote').textContent=online?'Returning to the lobby in a few seconds.':'Back to the lobby in a few seconds, or pick Next map.';$('nextBtn').classList.toggle('hidden',online);$('menuBtn').textContent=online?'Leave Game':'Menu';show('results');
+  const ends=m;setTimeout(()=>{if(MATCH.state==='over'&&!$('results').classList.contains('hidden')&&lastResults===ends)backToLobby();},online?9500:15000);lastResults=ends;
 }
 document.addEventListener('keydown',e=>{if($('results').classList.contains('hidden')||!resPick||!resN)return;if(e.code==='ArrowDown'||e.code==='KeyS'){resPick((resSel+1)%resN);e.preventDefault();}else if(e.code==='ArrowUp'||e.code==='KeyW'){resPick((resSel+resN-1)%resN);e.preventDefault();}});

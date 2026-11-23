@@ -16,7 +16,7 @@ chestAcc+=dt;while(chestAcc>=TICK){chestAcc-=TICK;tickChestLids();}
     else interpRemote(e,dt);
     updateBodyYaw(e,dt);
   }
-  if(isHost()){if(MATCH.state==='play')hostMatchTick(dt);else if(MATCH.state==='lobby'&&online)hostLobbyTick(dt);}
+  if(isHost()){if(MATCH.state==='play')hostMatchTick(dt);else if(MATCH.state==='lobby'&&(online||MATCH.offlineLobby))hostLobbyTick(dt);}
   for(const c of chests.values())if(c.claimT)c.claimT-=dt;
   updateProjs(dt);updateDrops(dt);updateParticles(dt);
   for(const f of feed)f.t-=dt;feed=feed.filter(f=>f.t>0);for(const m of msgs)m.t-=dt;msgs=msgs.filter(m=>m.t>0);for(const c of chat)c.t-=dt;chat=chat.filter(c=>c.t>0);
