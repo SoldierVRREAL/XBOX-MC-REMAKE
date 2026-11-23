@@ -19,6 +19,7 @@ const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=u
 const server=http.createServer((req,res)=>{
   let p;try{p=decodeURIComponent(new URL(req.url,'http://x').pathname);}catch(e){res.writeHead(400);res.end();return;}
   if(p==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,rooms:rooms.size,players:clients.size}));return;}
+  if(p==='/rooms'){const now=Date.now(),list=[];for(const [k,a] of adverts){if(now-a.seen>10000)adverts.delete(k);else list.push(a.info);}res.writeHead(200,{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'});res.end(JSON.stringify(list));return;}
   if(p.endsWith('/'))p+='index.html';
   const file=path.resolve(ROOT,'.'+p);
   if(!file.startsWith(ROOT+path.sep)&&file!==ROOT){res.writeHead(403);res.end();return;}
@@ -31,19 +32,27 @@ const server=http.createServer((req,res)=>{
 // ---------- WebSocket + MQTT relay ----------
 const rooms=new Map();   // topic -> Set(client)
 const clients=new Set();
+const adverts=new Map(); // open rooms announced by their hosts (for the server browser and /rooms)
+const encLen=n=>{const o=[];do{let d=n%128;n=Math.floor(n/128);if(n>0)d|=128;o.push(d);}while(n>0);return o;};
+const publishPkt=(topic,payload)=>{const t=Buffer.from(topic),body=Buffer.concat([Buffer.from([t.length>>8,t.length&255]),t,payload]);return Buffer.concat([Buffer.from([0x30,...encLen(body.length)]),body]);};
 function wsSend(c,data){if(c.closed)return;const n=data.length;let h;
   if(n<126)h=Buffer.from([0x82,n]);else if(n<65536){h=Buffer.alloc(4);h[0]=0x82;h[1]=126;h.writeUInt16BE(n,2);}else{h=Buffer.alloc(10);h[0]=0x82;h[1]=127;h.writeBigUInt64BE(BigInt(n),2);}
   try{c.sock.write(Buffer.concat([h,data]));}catch(e){}}
-function drop(c){if(c.closed)return;c.closed=true;clients.delete(c);for(const t of c.topics){const r=rooms.get(t);if(r){r.delete(c);if(!r.size)rooms.delete(t);}}try{c.sock.destroy();}catch(e){}}
+function drop(c){if(c.closed)return;c.closed=true;clients.delete(c);
+  // connection died without a clean goodbye: send its last will (a 'bye') to its room so the others know straight away
+  if(!c.clean&&c.will&&c.topics.has(c.will.topic)){const r=rooms.get(c.will.topic);if(r){const out=publishPkt(c.will.topic,c.will.msg);for(const o of r)if(o!==c)wsSend(o,out);}}for(const t of c.topics){const r=rooms.get(t);if(r){r.delete(c);if(!r.size)rooms.delete(t);}}try{c.sock.destroy();}catch(e){}}
 function mqttPacket(c,type,flags,body,raw){
-  if(type===1){ // CONNECT -> CONNACK
+  if(type===1){ // CONNECT -> CONNACK; remember the last will so the room hears at once if this connection dies
+    try{let q=0;q+=2+body.readUInt16BE(q);q+=1;const fl=body[q];q+=1;q+=2;q+=2+body.readUInt16BE(q);
+      if(fl&4){const tl=body.readUInt16BE(q);const wt=body.slice(q+2,q+2+tl).toString();q+=2+tl;const ml=body.readUInt16BE(q);if(ml<=4096)c.will={topic:wt,msg:Buffer.from(body.slice(q+2,q+2+ml))};}}catch(e){}
     c.connected=true;wsSend(c,Buffer.from([0x20,2,0,0]));return;}
   if(!c.connected){drop(c);return;}
   if(type===8){ // SUBSCRIBE -> SUBACK
     const id=body.slice(0,2);let q=2;const codes=[];
     while(q+2<=body.length){const l=body.readUInt16BE(q);const t=body.slice(q+2,q+2+l).toString();q+=3+l;
       const room=rooms.get(t)||new Set();
-      if(c.topics.size>=MAX_TOPICS||room.size>=MAX_PER_ROOM||!t||/[#+]/.test(t)){codes.push(0x80);continue;}
+      const cap=t.endsWith('/_rooms')?5000:MAX_PER_ROOM;   // the room list topic is shared by everyone
+      if(c.topics.size>=MAX_TOPICS||room.size>=cap||!t||/[#+]/.test(t)){codes.push(0x80);continue;}
       room.add(c);rooms.set(t,room);c.topics.add(t);codes.push(0);}
     wsSend(c,Buffer.from([0x90,2+codes.length,id[0],id[1],...codes]));return;}
   if(type===10){ // UNSUBSCRIBE -> UNSUBACK
@@ -51,9 +60,11 @@ function mqttPacket(c,type,flags,body,raw){
     wsSend(c,Buffer.from([0xB0,2,id[0],id[1]]));return;}
   if(type===3){ // PUBLISH (QoS 0) -> everyone in that room, including the sender (clients ignore their own)
     const l=body.readUInt16BE(0);const t=body.slice(2,2+l).toString();const r=rooms.get(t);if(!r||!c.topics.has(t))return;
-    const out=(flags&6)?Buffer.concat([Buffer.from([0x30]),raw.slice(1)]):raw;for(const o of r)wsSend(o,out);return;}
+    let out=raw;if(flags&6){const pay=body.slice(4+l);out=publishPkt(t,pay);}   // QoS 1/2 sent as QoS 0 (drop the packet id)
+    if(t.endsWith('/_rooms')){try{const a=JSON.parse(body.slice((flags&6)?4+l:2+l).toString());if(a&&a.t==='adv'&&typeof a.room==='string')adverts.set(a.room.toLowerCase(),{seen:Date.now(),info:{room:a.room.slice(0,24),host:String(a.host||'').slice(0,16),n:+a.n||0,max:+a.max||16,mode:a.mode,map:a.map,state:a.state,gt:+a.gt||0}});}catch(e){}}
+    for(const o of r)wsSend(o,out);return;}
   if(type===12){wsSend(c,Buffer.from([0xD0,0]));return;}
-  if(type===14){drop(c);return;}
+  if(type===14){c.clean=true;drop(c);return;}
 }
 server.on('upgrade',(req,sock)=>{
   const key=req.headers['sec-websocket-key'];if(!key){sock.destroy();return;}
